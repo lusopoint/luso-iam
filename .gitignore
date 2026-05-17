@@ -1,0 +1,46 @@
+# Binaries
+/bin/
+/dist/
+iam-server
+*.exe
+*.test
+*.out
+
+# Coverage
+*.cover
+coverage.txt
+
+# Env / secrets
+.env
+.env.local
+*.pem
+*.key
+/etc/iam/keys/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go workspace
+go.work
+go.work.sum
+
+# Frontend
+web/node_modules/
+# Built React assets — produced by `make web-build`. Each fresh build
+# overwrites these; the stub web/dist/index.html IS tracked so the Go
+# binary always has something to embed.
+web/dist/assets/
+web/dist/sw.js
+web/dist/sw.js.map
+web/dist/workbox-*.js
+web/dist/workbox-*.js.map
+web/dist/registerSW.js
+web/dist/manifest.webmanifest
+# Vite's optimized dep cache.
+web/.vite/
