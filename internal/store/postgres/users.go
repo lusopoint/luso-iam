@@ -1,0 +1,88 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+const userColumns = `
+	id, email, username, display_name, status, is_admin,
+	email_verified_at, last_login_at,
+	created_at, updated_at, deleted_at
+`
+
+// GetUserByEmail returns the active user with the given email, or
+// ErrNotFound. Email comparison is case-insensitive because users.email
+// is typed as citext.
+func (s *Store) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	q := `SELECT ` + userColumns + ` FROM users
+	      WHERE email = $1 AND deleted_at IS NULL`
+	rows, err := s.pool.Query(ctx, q, email)
+	if err != nil {
+		return nil, fmt.Errorf("query user by email: %w", err)
+	}
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[User])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("scan user: %w", err)
+	}
+	return &u, nil
+}
+
+// GetUserByID returns the active user with the given id, or ErrNotFound.
+func (s *Store) GetUserByID(ctx context.Context, id pgtype.UUID) (*User, error) {
+	q := `SELECT ` + userColumns + ` FROM users
+	      WHERE id = $1 AND deleted_at IS NULL`
+	rows, err := s.pool.Query(ctx, q, id)
+	if err != nil {
+		return nil, fmt.Errorf("query user by id: %w", err)
+	}
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[User])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("scan user: %w", err)
+	}
+	return &u, nil
+}
+
+// CreateUserParams is the input to CreateUser.
+type CreateUserParams struct {
+	Email       *string
+	Username    *string
+	DisplayName *string
+}
+
+// CreateUser inserts a new user and returns the created row.
+func (s *Store) CreateUser(ctx context.Context, p CreateUserParams) (*User, error) {
+	q := `INSERT INTO users (email, username, display_name)
+	      VALUES ($1, $2, $3)
+	      RETURNING ` + userColumns
+	rows, err := s.pool.Query(ctx, q, p.Email, p.Username, p.DisplayName)
+	if err != nil {
+		return nil, fmt.Errorf("insert user: %w", err)
+	}
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[User])
+	if err != nil {
+		return nil, fmt.Errorf("scan inserted user: %w", err)
+	}
+	return &u, nil
+}
+
+// TouchUserLastLogin updates last_login_at to now() for the given user.
+// Errors are returned but typically logged-and-swallowed by callers
+// since failure to record a login timestamp is non-fatal.
+func (s *Store) TouchUserLastLogin(ctx context.Context, userID pgtype.UUID) error {
+	_, err := s.pool.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("touch last_login_at: %w", err)
+	}
+	return nil
+}
