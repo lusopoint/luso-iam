@@ -3,10 +3,8 @@
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- oidc_clients: registered OAuth 2.0 / OIDC client applications.
 -- The client_id is the primary key — short random or human-readable.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE oidc_clients (
     id                  text        PRIMARY KEY,
     -- argon2id hash of the client_secret. NULL for public clients.
@@ -37,10 +35,8 @@ CREATE TRIGGER oidc_clients_touch_updated_at
     BEFORE UPDATE ON oidc_clients
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- ─────────────────────────────────────────────────────────────────────────
 -- oidc_auth_codes: short-lived (≤10 min) authorization codes.
 -- Single-use: consumed atomically by the token endpoint.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE oidc_auth_codes (
     id              text        PRIMARY KEY,  -- "code_<32 hex>"
     client_id       text        NOT NULL REFERENCES oidc_clients(id),
@@ -64,10 +60,8 @@ CREATE INDEX oidc_auth_codes_expires_idx
     ON oidc_auth_codes (expires_at)
     WHERE consumed_at IS NULL;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- oidc_access_tokens: opaque bearer tokens.
 -- Introspect / UserInfo do a direct DB lookup by token id.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE oidc_access_tokens (
     id          text        PRIMARY KEY,  -- "at_<32 hex>"
     client_id   text        NOT NULL REFERENCES oidc_clients(id),
@@ -84,10 +78,8 @@ CREATE INDEX oidc_access_tokens_expires_idx
     ON oidc_access_tokens (expires_at)
     WHERE revoked_at IS NULL;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- oidc_refresh_tokens: long-lived tokens redeemed for new access tokens.
 -- Refresh token rotation: each use consumes the token and issues a new one.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE oidc_refresh_tokens (
     id              text        PRIMARY KEY,  -- "rt_<32 hex>"
     client_id       text        NOT NULL REFERENCES oidc_clients(id),

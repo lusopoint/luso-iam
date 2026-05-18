@@ -16,8 +16,7 @@ const mfaMethodColumns = `
 	created_at, updated_at
 `
 
-// ─── User-facing queries ──────────────────────────────────────────────────
-
+// User-facing queries
 // ListConfirmedMFAMethods returns all confirmed MFA methods for a user,
 // ordered by creation. Used to decide whether MFA is required and to
 // render the choose-a-method screen during login.
@@ -71,7 +70,7 @@ func (s *Store) GetMFAMethod(ctx context.Context, id pgtype.UUID) (*UserMFAMetho
 	return &m, nil
 }
 
-// ─── TOTP ─────────────────────────────────────────────────────────────────
+// TOTP
 
 // CreateTOTPMethodParams is the input for enrolling a TOTP method.
 // The row is created in unconfirmed state — call ConfirmMFAMethod after
@@ -99,7 +98,7 @@ func (s *Store) CreateTOTPMethod(ctx context.Context, p CreateTOTPMethodParams) 
 	return &m, nil
 }
 
-// ─── WebAuthn ─────────────────────────────────────────────────────────────
+// WebAuthn
 
 // CreateWebAuthnMethodParams is the input for storing a WebAuthn credential.
 // Unlike TOTP, WebAuthn methods are confirmed immediately on creation —
@@ -142,7 +141,7 @@ func (s *Store) UpdateWebAuthnCounter(ctx context.Context, id pgtype.UUID, count
 	return nil
 }
 
-// ─── Shared mutations ─────────────────────────────────────────────────────
+// Shared mutations
 
 // ConfirmMFAMethod marks an unconfirmed method as confirmed.
 func (s *Store) ConfirmMFAMethod(ctx context.Context, id pgtype.UUID) error {
@@ -178,7 +177,7 @@ func (s *Store) DeleteMFAMethod(ctx context.Context, id pgtype.UUID) error {
 	return nil
 }
 
-// ─── Backup codes ─────────────────────────────────────────────────────────
+// Backup codes
 
 // ReplaceBackupCodes atomically replaces all backup codes for a user.
 // Use case: when a user requests a new set, the old ones must be revoked

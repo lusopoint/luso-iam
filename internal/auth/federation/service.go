@@ -40,7 +40,7 @@ func (s *Service) LinkOrCreate(
 	identity *federation.Identity,
 ) (user *postgres.User, isNew bool, err error) {
 
-	// 1. Known identity -> log in
+	// Known identity -> log in
 	user, err = s.store.GetUserByProviderSub(ctx, providerName, identity.Sub)
 	if err == nil {
 		// Refresh the cached profile fields (name, picture may have changed).
@@ -63,7 +63,7 @@ func (s *Service) LinkOrCreate(
 		return nil, false, fmt.Errorf("look up identity: %w", err)
 	}
 
-	// ── 2. Email match → link to existing user ────────────────────────
+	// Email match → link to existing user
 	if identity.Email != "" {
 		existing, emailErr := s.store.GetUserByEmail(ctx, identity.Email)
 		if emailErr == nil {

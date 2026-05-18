@@ -134,7 +134,7 @@ func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (*fe
 	}, nil
 }
 
-// ─── internal helpers ─────────────────────────────────────────────────────
+// internal helpers
 
 func fetchDiscovery(ctx context.Context, issuerURL string, client *http.Client) (*discoveryDoc, error) {
 	// Ensure no double slash before .well-known

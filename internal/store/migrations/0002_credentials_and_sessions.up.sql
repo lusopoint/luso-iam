@@ -3,11 +3,9 @@
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- user_credentials: one row per user storing the argon2id-encoded
 -- password hash. Future credential types (passkeys etc.) live in their
 -- own tables (e.g. user_mfa_methods).
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE user_credentials (
     user_id              uuid        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     -- Full PHC-format argon2id string, e.g. $argon2id$v=19$m=65536,t=3,p=4$...$...
@@ -24,12 +22,10 @@ CREATE TRIGGER user_credentials_touch_updated_at
     BEFORE UPDATE ON user_credentials
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- ─────────────────────────────────────────────────────────────────────────
 -- sessions: browser sessions to the IAM portal. The session id is stored
 -- in a signed cookie; this row holds the actual state. The session
 -- doubles as the CAS Ticket-Granting Ticket — i.e. when a CAS service
 -- ticket is minted it is bound to a session_id.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE sessions (
     id            uuid        PRIMARY KEY DEFAULT uuidv7(),
     user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,

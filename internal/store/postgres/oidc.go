@@ -10,8 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ─── Client ───────────────────────────────────────────────────────────────
-
+// Client
 const oidcClientColumns = `
 	id, secret_hash, name, redirect_uris,
 	allowed_scopes, allowed_grant_types,
@@ -56,7 +55,7 @@ func (s *Store) ValidateRedirectURI(ctx context.Context, clientID, redirectURI s
 	return nil
 }
 
-// ─── Authorization codes ──────────────────────────────────────────────────
+// Authorization codes
 
 const oidcAuthCodeColumns = `
 	id, client_id, user_id, session_id,
@@ -121,8 +120,7 @@ func (s *Store) ConsumeOIDCAuthCode(ctx context.Context, id string) (*OIDCAuthCo
 	return &code, nil
 }
 
-// ─── Access tokens ────────────────────────────────────────────────────────
-
+// Access tokens
 const oidcAccessTokenColumns = `
 	id, client_id, user_id, session_id,
 	scopes, expires_at, revoked_at, created_at
@@ -199,8 +197,7 @@ func (s *Store) RevokeOIDCAccessToken(ctx context.Context, id string) error {
 	return err
 }
 
-// ─── Refresh tokens ───────────────────────────────────────────────────────
-
+// Refresh tokens
 const oidcRefreshTokenColumns = `
 	id, client_id, user_id, session_id,
 	scopes, previous_id,

@@ -8,18 +8,15 @@
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- users.is_admin: simple role flag. Anything more elaborate (RBAC, group
 -- memberships) is overkill for a single-tenant IAM with one privileged role.
 -- Promotion is intentionally manual (SQL or the CLI helper) so the bootstrap
 -- step is explicit and auditable.
--- ─────────────────────────────────────────────────────────────────────────
 ALTER TABLE users
     ADD COLUMN is_admin boolean NOT NULL DEFAULT false;
 
 CREATE INDEX users_is_admin_idx ON users (is_admin) WHERE is_admin;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- audit_log: append-only event log.
 --
 -- Design notes:
@@ -31,7 +28,6 @@ CREATE INDEX users_is_admin_idx ON users (is_admin) WHERE is_admin;
 --     event is ABOUT, if different.
 --   * metadata is JSONB so each event_type can carry its own shape
 --     without schema migrations; queries filter on top-level keys.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE audit_log (
     id          uuid        PRIMARY KEY DEFAULT uuidv7(),
     event_type  text        NOT NULL,
