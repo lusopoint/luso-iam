@@ -39,21 +39,26 @@ func (h *Handler) v1Validate(w http.ResponseWriter, r *http.Request) {
 // CAS 2.0 / 3.0
 
 // serviceValidate returns an http.HandlerFunc that validates a service
-// ticket and returns a CAS XML response.
+// ticket and returns a CAS response.
 //
-// When p3 is false (CAS 2.0), the <cas:attributes> block is omitted.
+// When p3 is false (CAS 2.0), the attributes block is omitted.
 // When p3 is true (CAS 3.0), released attributes are included.
 //
 // HTTP status is always 200 — success/failure is communicated in the
-// XML body per the CAS protocol specification.
+// body per the CAS protocol specification.
+//
+// Response format follows the `format` query parameter:
+//   - `format=json`  → Apereo-compatible JSON
+//   - anything else  → the canonical XML response (default)
 func (h *Handler) serviceValidate(p3 bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		service := r.URL.Query().Get("service")
 		ticket := r.URL.Query().Get("ticket")
+		jsonFormat := r.URL.Query().Get("format") == "json"
 
 		// Spec requires both parameters.
 		if service == "" || ticket == "" {
-			writeXMLFailure(w, pkgcas.FailureInvalidRequest,
+			writeFailure(w, jsonFormat, pkgcas.FailureInvalidRequest,
 				"Required parameters 'service' and 'ticket' are missing.")
 			return
 		}
@@ -61,20 +66,61 @@ func (h *Handler) serviceValidate(p3 bool) http.HandlerFunc {
 		result, err := h.cas.Validate(r.Context(), ticket, service)
 		if err != nil {
 			code, msg := casErrorToXML(err)
-			writeXMLFailure(w, code, msg)
+			writeFailure(w, jsonFormat, code, msg)
 			return
 		}
 
-		// Build the success response.
 		var attrs map[string]string
 		if p3 {
 			attrs = releaseAttributes(result)
 		}
-		writeXMLSuccess(w, pkgcas.NewSuccess(principalName(result), attrs))
+		writeSuccess(w, jsonFormat, principalName(result), attrs)
 	}
 }
 
-// XML writers
+// Response writers
+
+// writeSuccess dispatches to JSON or XML based on the format flag.
+func writeSuccess(w http.ResponseWriter, jsonFormat bool, user string, attrs map[string]string) {
+	if jsonFormat {
+		body, err := marshalJSONSuccess(user, attrs)
+		if err != nil {
+			// Shouldn't happen — our types are JSON-clean. Fall through
+			// to a generic 500 rather than a malformed envelope.
+			http.Error(w, "could not encode response", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, body)
+		return
+	}
+	writeXMLSuccess(w, pkgcas.NewSuccess(user, attrs))
+}
+
+// writeFailure dispatches to JSON or XML based on the format flag.
+func writeFailure(w http.ResponseWriter, jsonFormat bool, code, message string) {
+	if jsonFormat {
+		body, err := marshalJSONFailure(code, message)
+		if err != nil {
+			http.Error(w, "could not encode response", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, body)
+		return
+	}
+	writeXMLFailure(w, code, message)
+}
+
+// writeJSON sends a JSON body with the standard CAS no-store headers.
+// HTTP 200 is required by the protocol even for ticket-validation
+// failures — clients read success/failure from the body.
+func writeJSON(w http.ResponseWriter, body []byte) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+// XML writers (kept for the default path)
 
 func writeXMLSuccess(w http.ResponseWriter, resp pkgcas.SuccessResponse) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
