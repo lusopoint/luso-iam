@@ -18,6 +18,24 @@ export interface AdminUser {
   updated_at: string;
 }
 
+/**
+ * One enrolled MFA method on a user account. We never receive the
+ * TOTP secret or WebAuthn credential bytes — admin only sees metadata.
+ */
+export interface MFAMethod {
+  id: string;
+  method: "totp" | "webauthn" | string; // forward-compat with future types
+  name?: string;
+  confirmed_at?: string; // ISO; absent for abandoned enrollments
+  last_used_at?: string;
+  created_at: string;
+}
+
+export interface ListUserMFAResponse {
+  methods: MFAMethod[];
+  backup_codes_unused: number;
+}
+
 export interface ListUsersResponse {
   users: AdminUser[];
   total: number;
