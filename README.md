@@ -1,12 +1,12 @@
 # IAM Server — Setup & Operations Guide
 
-A complete walkthrough: dev setup, prod deployment, federation (Google/GitHub/Microsoft/GitLab/Apple/generic OIDC), MFA enrollment, CAS service registration, and OIDC client integration.
+A complete walkthrough: dev setup, prod deployment, federation (Google/GitHub/others/generic OIDC), MFA enrollment, CAS service registration, and OIDC client integration.
 
 ---
 
 ## Part 1 — Environment configuration
 
-Every knob is an environment variable. The server reads them at startup and validates before opening any sockets. Set them in a `.env` file (loaded by `docker compose`) or export them in your shell — the server itself doesn't read `.env` directly, so for bare-metal runs you need to source it yourself.
+Every knob is an environment variable. The server reads them at startup and validates before opening any sockets. Set them in a `.env` file (loaded by `docker compose`) or export them in your shell, the server itself doesn't read `.env` directly, so for bare-metal runs you need to source it yourself.
 
 ### Required for any deployment
 
@@ -16,11 +16,12 @@ DATABASE_URL=postgres://iam:iam@localhost:5432/iam?sslmode=disable
 
 # Public URL the server is reachable at. Used in OIDC discovery,
 # email verification links, and CAS responses. MUST match what
-# downstream clients see (no trailing slash).
+# downstream clients see (no trailing slash)
 BASE_URL=http://localhost:8080
 
 # 32-byte hex secret for HMAC-signing session cookies. Generate once,
-# never commit. `openssl rand -hex 32` produces the right shape.
+# never commit! (actually never commit .env)
+# `openssl rand -hex 32` produces the right shape
 SESSION_SECRET=<64 hex chars>
 
 # RSA-2048 PEM private key for signing OIDC id_tokens. The keygen
@@ -31,7 +32,7 @@ SIGNING_KEY_PATH=/etc/iam/keys/signing.pem
 ### Common optional settings
 
 ```bash
-# Listen address. Defaults to :8080.
+# Listen address. Defaults to :8080
 HTTP_ADDR=:8080
 
 # Auto-run migrations at startup. Default true in dev, set false in
@@ -42,7 +43,7 @@ AUTO_MIGRATE=true
 LOG_LEVEL=info
 
 # When true, the Secure cookie flag is set on all cookies. Required
-# for production; defaults off so localhost works without TLS.
+# for production; defaults off so localhost works without TLS
 COOKIES_SECURE=false
 
 # Trust X-Forwarded-* headers (only when behind a reverse proxy).
@@ -52,14 +53,14 @@ TRUSTED_PROXIES=127.0.0.1,::1
 ### MFA configuration
 
 ```bash
-# Display name shown in TOTP authenticator apps: e.g. "IAM Server (alice@example.com)"
+# Display name shown in TOTP authenticator apps: e.g. "IAM Server (l@mail.com)"
 MFA_ISSUER=IAM Server
 
 # Relying-party name shown in WebAuthn / passkey prompts
 MFA_WEBAUTHN_RP_NAME=IAM Server
 
-# Relying-party ID — must be the registrable domain (no scheme, no port).
-# Defaults to the host of BASE_URL when unset.
+# Relying-party ID, must be the registrable domain (no scheme, no port)
+# Defaults to the host of BASE_URL when unset
 # MFA_WEBAUTHN_RP_ID=auth.example.com
 ```
 
@@ -74,11 +75,13 @@ GITHUB_CLIENT_SECRET=...
 
 MICROSOFT_CLIENT_ID=...
 MICROSOFT_CLIENT_SECRET=...
-MICROSOFT_TENANT=common   # or your tenant UUID
+# or your tenant UUID
+MICROSOFT_TENANT=common
 
 GITLAB_CLIENT_ID=...
 GITLAB_CLIENT_SECRET=...
-GITLAB_ISSUER=https://gitlab.com   # override for self-hosted GitLab
+# override for self-hosted GitLab
+GITLAB_ISSUER=https://gitlab.com
 
 APPLE_CLIENT_ID=...
 APPLE_TEAM_ID=...
@@ -90,24 +93,20 @@ APPLE_PRIVATE_KEY_PATH=/etc/iam/keys/apple.p8
 
 ## Part 2 — Development setup
 
-Tested path: macOS / Linux with Docker, Go 1.22+, Node 22+.
+Tested path: macOS / Linux with Docker, Go 1.26+, Node 25.1+.
 
 ### One-time setup
 
 ```bash
-# 1. Extract and enter the tree
-tar -xzf iam-server-p5g.tar.gz
-cd iam-server
-
-# 2. Start Postgres (compose file mounts a named volume; data survives restarts)
+# Start Postgres (compose file mounts a named volume; data survives restarts)
 make compose-up
 
-# 3. Generate a signing key
+# Generate a signing key
 make keygen
-# → creates ./signing.pem
-# → prints the SIGNING_KEY_PATH=... line to paste into .env
+# -> creates ./signing.pem
+# -> prints the SIGNING_KEY_PATH=... line to paste into .env
 
-# 4. Create .env in the project root
+# Create .env in the project root
 cat > .env <<EOF
 DATABASE_URL=postgres://iam:iam@localhost:5432/iam?sslmode=disable
 BASE_URL=http://localhost:8080
@@ -119,26 +118,26 @@ COOKIES_SECURE=false
 MFA_ISSUER=IAM Server (dev)
 EOF
 
-# 5. Run migrations explicitly the first time so you see what happened
+# Run migrations explicitly the first time so you see what happened
 set -a; source .env; set +a
 make migrate-up
 
-# 6. Create the bootstrap admin user (one-time)
-make seed-user email=admin@example.com password=correcthorsebatterystaple admin=1
+# Create the bootstrap admin user (one-time)
+make seed-user email=l@mail.com password=password123 admin=1
 
-# 7. Build the admin SPA assets
+# Build the admin SPA assets
 make web-build
 ```
 
 ### Two-terminal dev loop
 
 ```bash
-# Terminal A — Go server with stub SPA initially, rebuild when you touch backend
+# Terminal A, Go server with stub SPA initially, rebuild when you touch backend
 set -a; source .env; set +a
 make dev-server
 # Reachable at http://localhost:8080
 
-# Terminal B — Vite HMR for SPA work
+# Terminal B, Vite HMR for SPA work
 make web-dev
 # Reachable at http://localhost:5173 with API calls proxied to :8080
 ```
@@ -147,9 +146,9 @@ make web-dev
 
 ### Verify it works
 
-1. `curl http://localhost:8080/healthz` → `ok`
-2. `curl http://localhost:8080/.well-known/openid-configuration` → the discovery document
-3. Open `http://localhost:8080/` in a browser → redirects to `/admin/` → bounces to `/cas/login?next=/admin/`
+1. `curl http://localhost:8080/healthz` -> `ok`
+2. `curl http://localhost:8080/.well-known/openid-configuration` -> the discovery document
+3. Open `http://localhost:8080/` in a browser -> redirects to `/admin/` -> bounces to `/cas/login?next=/admin/`
 4. Sign in with the seeded admin credentials
 5. You should land on the admin dashboard
 
@@ -157,10 +156,11 @@ make web-dev
 
 ```bash
 make compose-down
-docker volume rm iam-server_pgdata   # nukes data; volume name may differ
+# remove volumes
+make compose-clear
 make compose-up
 make migrate-up
-make seed-user email=admin@example.com password=... admin=1
+make seed-user email=l@mail.com password=... admin=1
 ```
 
 ---
@@ -174,7 +174,6 @@ The server is a single Go binary with the SPA embedded. Two common shapes:
 ```bash
 # On your build machine
 make build
-# → bin/iam-server (22 MB, statically linked, SPA inside)
 
 # On the server (Ubuntu 24)
 sudo useradd -r -s /bin/false iam
@@ -299,7 +298,7 @@ Each upstream provider has its own console, redirect-URI rules, and quirks. The 
 
 ### Google
 
-1. **Google Cloud Console** → APIs & Services → Credentials → Create credentials → **OAuth client ID**
+1. **Google Cloud Console** -> APIs & Services -> Credentials -> Create credentials -> **OAuth client ID**
 2. Application type: **Web application**
 3. Authorized redirect URI: `https://auth.example.com/oauth/callback/google`
 4. Copy the **Client ID** and **Client secret**
@@ -314,7 +313,7 @@ The Google provider uses OIDC discovery (`https://accounts.google.com/.well-know
 
 ### GitHub
 
-1. **GitHub** → Settings → Developer settings → OAuth Apps → New OAuth App
+1. **GitHub** -> Settings -> Developer settings -> OAuth Apps -> New OAuth App
 2. Application name: whatever
 3. Homepage URL: `https://auth.example.com`
 4. Authorization callback URL: `https://auth.example.com/oauth/callback/github`
@@ -329,13 +328,13 @@ GitHub isn't OIDC — it's plain OAuth 2. The IAM server fetches `/user` and `/u
 
 ### Microsoft / Entra ID
 
-1. **Azure Portal** → Microsoft Entra ID → App registrations → New registration
+1. **Azure Portal** -> Microsoft Entra ID -> App registrations -> New registration
 2. Redirect URI (web): `https://auth.example.com/oauth/callback/microsoft`
 3. Supported account types:
-   - "My organization only" → use your tenant UUID
-   - "Any AAD directory" → tenant = `organizations`
-   - "AAD + personal accounts" → tenant = `common`
-4. Certificates & secrets → New client secret → copy
+   - "My organization only" -> use your tenant UUID
+   - "Any AAD directory" -> tenant = `organizations`
+   - "AAD + personal accounts" -> tenant = `common`
+4. Certificates & secrets -> New client secret -> copy
 5. Set in env:
    ```bash
    MICROSOFT_CLIENT_ID=…
@@ -347,7 +346,7 @@ The tenant value goes into the discovery URL: `https://login.microsoftonline.com
 
 ### GitLab
 
-1. **GitLab.com** (or your self-hosted instance) → User Settings → Applications
+1. **GitLab.com** (or your self-hosted instance) -> User Settings -> Applications
 2. Redirect URI: `https://auth.example.com/oauth/callback/gitlab`
 3. Scopes: `openid`, `profile`, `email`
 4. Set in env:
@@ -363,13 +362,13 @@ For self-hosted GitLab, set `GITLAB_ISSUER` to your instance's root URL — the 
 
 The most awkward setup of the bunch because Apple wants a signed JWT instead of a static secret, and the cert flow happens in their Developer portal.
 
-1. **Apple Developer** → Certificates, Identifiers & Profiles
-2. Identifiers → register a **Services ID** (this becomes `APPLE_CLIENT_ID`)
+1. **Apple Developer** -> Certificates, Identifiers & Profiles
+2. Identifiers -> register a **Services ID** (this becomes `APPLE_CLIENT_ID`)
 3. Configure the Services ID for "Sign in with Apple":
    - Primary App ID: pick one (create one first if needed)
    - Domains: `auth.example.com`
    - Return URLs: `https://auth.example.com/oauth/callback/apple`
-4. **Keys** → register a new key with "Sign in with Apple" enabled
+4. **Keys** -> register a new key with "Sign in with Apple" enabled
    - Download the `.p8` file — you can only download it **once**
    - Note the Key ID (10 chars) — this is `APPLE_KEY_ID`
 5. Your Team ID is in the top right of the developer portal — this is `APPLE_TEAM_ID`
@@ -392,7 +391,7 @@ Two Apple quirks worth knowing:
 
 For any OIDC-compliant IdP not listed above (Okta, Auth0, Keycloak, Authentik, Zitadel, etc.):
 
-In the IAM admin UI: **Upstream providers → Add → "Generic OIDC"** (or equivalent admin API call — see roadmap note below). Required fields:
+In the IAM admin UI: **Upstream providers -> Add -> "Generic OIDC"** (or equivalent admin API call — see roadmap note below). Required fields:
 
 ```
 Name:                  "Acme Corp Okta"
@@ -409,9 +408,9 @@ Redirect URI: (read-only)  https://auth.example.com/oauth/callback/{slug}
 
 When an upstream callback succeeds, the federation handler looks for a matching account in this order:
 
-1. `(provider, sub)` pair already in `user_upstream_links` → log that user in
-2. `users.email` matches the email from the upstream → link the new provider to that user, log them in
-3. Otherwise → create a new user, link the provider, log them in
+1. `(provider, sub)` pair already in `user_upstream_links` -> log that user in
+2. `users.email` matches the email from the upstream -> link the new provider to that user, log them in
+3. Otherwise -> create a new user, link the provider, log them in
 
 The first time someone signs in via Google with `alice@example.com`, a user row is created. If that same person later signs in via GitHub with the same email, the GitHub identity is linked to the existing row — they're the same user. Email is the join key, which is why verified emails matter; the IAM server trusts the upstream's verification.
 
@@ -478,9 +477,9 @@ The resulting `id_token` carries `acr` and `amr` claims so the relying-party can
 
 ### Backup codes — what happens when
 
-- User loses their phone → admin marks them as needing reset → user types a backup code on `/mfa` → success → optional: they enroll a new TOTP and revoke the lost device
-- User runs out of codes → they can regenerate from `/mfa/enroll` (invalidates the old set)
-- User can't find any codes either → admin path: open the user in the SPA → "Revoke sessions" → tell them to recover the account via federation (if they have it) or do a password reset + ask them to re-enroll
+- User loses their phone -> admin marks them as needing reset -> user types a backup code on `/mfa` -> success -> optional: they enroll a new TOTP and revoke the lost device
+- User runs out of codes -> they can regenerate from `/mfa/enroll` (invalidates the old set)
+- User can't find any codes either -> admin path: open the user in the SPA -> "Revoke sessions" -> tell them to recover the account via federation (if they have it) or do a password reset + ask them to re-enroll
 
 ---
 
@@ -490,7 +489,7 @@ CAS clients need to be registered before `/cas/login` will issue tickets for the
 
 ### Registering a CAS application
 
-In the SPA: **CAS services → Register service**. Fields:
+In the SPA: **CAS services -> Register service**. Fields:
 
 ```
 Name:                    Wiki
@@ -508,8 +507,8 @@ Released attributes:     email, display_name
 
 **About released attributes:**
 
-- Empty list → only `<cas:user>` is returned (CAS 2.0 default)
-- `["email", "display_name"]` → those user fields are released in the `<cas:attributes>` block (CAS 3.0 / p3)
+- Empty list -> only `<cas:user>` is returned (CAS 2.0 default)
+- `["email", "display_name"]` -> those user fields are released in the `<cas:attributes>` block (CAS 3.0 / p3)
 - Don't release anything the downstream application doesn't need
 
 ### Configuring the CAS client side
@@ -570,7 +569,7 @@ For applications speaking OAuth 2 / OIDC instead of CAS.
 
 ### Registering an OIDC client
 
-In the SPA: **OIDC clients → Register client**. Fields:
+In the SPA: **OIDC clients -> Register client**. Fields:
 
 ```
 Client ID:           my-app                  # human-meaningful slug
@@ -590,8 +589,8 @@ ID token TTL:        1h
 
 **Public vs confidential:**
 
-- **Public** (SPAs, mobile apps) → no client secret, PKCE **must** be enabled, the IAM server enforces it
-- **Confidential** (server-side web apps, machine-to-machine) → gets a one-time secret on creation; copy it immediately, only the argon2id hash is stored
+- **Public** (SPAs, mobile apps) -> no client secret, PKCE **must** be enabled, the IAM server enforces it
+- **Confidential** (server-side web apps, machine-to-machine) -> gets a one-time secret on creation; copy it immediately, only the argon2id hash is stored
 
 **On submit:** for confidential clients the response includes the plaintext secret in a one-time banner. Copy it now — there's no "view secret" later, only "rotate to a new one".
 
@@ -732,7 +731,7 @@ Returns `200 OK` on success (and also on "unknown token" — RFC 7009).
 ### Rotate a leaked client secret
 
 ```
-SPA → OIDC clients → click the client → "Rotate secret" → copy the new value, share with the app's owners
+SPA -> OIDC clients -> click the client -> "Rotate secret" -> copy the new value, share with the app's owners
 ```
 
 The old secret stops working immediately. Tokens already issued continue to validate until they expire (typically 1h).
@@ -745,12 +744,12 @@ If they signed up via federation and you want to give them admin:
 make grant-admin email=alice@example.com
 ```
 
-Or in the SPA: open the user → toggle "is_admin".
+Or in the SPA: open the user -> toggle "is_admin".
 
 ### Revoke all sessions for a compromised account
 
 ```
-SPA → Users → click the user → "Revoke sessions"
+SPA -> Users -> click the user -> "Revoke sessions"
 ```
 
 Every browser, every device. They'll be signed out within a few seconds. Combine with "Reset password" if the credentials themselves are compromised.
@@ -758,7 +757,7 @@ Every browser, every device. They'll be signed out within a few seconds. Combine
 ### Audit a suspicious sign-in
 
 ```
-SPA → Audit log → filter event_type = login_success → search the timestamp ± a few minutes
+SPA -> Audit log -> filter event_type = login_success -> search the timestamp ± a few minutes
 ```
 
 Click any row to expand metadata: IP address, user-agent, provider (if federated), MFA method used (`amr`).
@@ -766,7 +765,7 @@ Click any row to expand metadata: IP address, user-agent, provider (if federated
 ### Disable a user without deleting them
 
 ```
-SPA → Users → click → toggle status to "disabled"
+SPA -> Users -> click -> toggle status to "disabled"
 ```
 
 Their active sessions are revoked, they can no longer sign in, but the row is preserved and admin promotion / federation links are intact.
@@ -774,7 +773,7 @@ Their active sessions are revoked, they can no longer sign in, but the row is pr
 ### Add a new admin user from scratch
 
 ```
-SPA → Users → "New user" → enter email, tick "Grant admin privileges"
+SPA -> Users -> "New user" -> enter email, tick "Grant admin privileges"
 ```
 
 The dialog generates a strong password, shown once. Send it to the new admin out-of-band. They sign in, enroll MFA, change their password from the profile page.
@@ -783,9 +782,9 @@ The dialog generates a strong password, shown once. Send it to the new admin out
 
 Order of operations:
 
-1. **Audit log** filtered by their user ID → look for `login_failure` events. Metadata includes the reason (`wrong_password`, `account_locked`, `mfa_failed`, etc.)
-2. If `account_locked` → SPA → user detail → toggle status from `disabled` back to `active`. The auto-lockout (after several failed password attempts) doesn't time out — an admin needs to release it
-3. If `mfa_failed` repeatedly → ask if they've changed phones. They might need backup codes, or an admin can revoke their MFA methods (SPA → user detail → MFA section) so they can re-enroll on next login
+1. **Audit log** filtered by their user ID -> look for `login_failure` events. Metadata includes the reason (`wrong_password`, `account_locked`, `mfa_failed`, etc.)
+2. If `account_locked` -> SPA -> user detail -> toggle status from `disabled` back to `active`. The auto-lockout (after several failed password attempts) doesn't time out — an admin needs to release it
+3. If `mfa_failed` repeatedly -> ask if they've changed phones. They might need backup codes, or an admin can revoke their MFA methods (SPA -> user detail -> MFA section) so they can re-enroll on next login
 
 ---
 
@@ -812,8 +811,8 @@ The server emits structured JSON logs (slog). Key fields: `level`, `msg`, `event
 
 ### Health endpoints
 
-- `GET /healthz` → 200 if the process is up
-- `GET /readyz` → 200 only if Postgres is reachable
+- `GET /healthz` -> 200 if the process is up
+- `GET /readyz` -> 200 only if Postgres is reachable
 
 Use `/readyz` for load balancer health checks; `/healthz` is for liveness probes that should restart the process on failure.
 
@@ -824,7 +823,7 @@ Use `/readyz` for load balancer health checks; `/healthz` is for liveness probes
 So you don't waste time looking:
 
 - **No email/SMS delivery** — password resets and email verification require an out-of-band channel today. SMTP is P8.
-- **No global "force MFA" policy** — it's per-user (any enrolled method → enforced) or per-client (`acr_values`). A blanket policy lever is P7.
+- **No global "force MFA" policy** — it's per-user (any enrolled method -> enforced) or per-client (`acr_values`). A blanket policy lever is P7.
 - **No public signup** — users come from `make seed-user`, federation, or the admin SPA's "New user". A self-service signup page is P8.
 - **No automatic key rotation** — `signing.pem` is treated as long-lived. The Keys page is view-only; rotation tooling lands in P7.
 - **No SAML** — this is an OIDC + CAS server, not a SAML IdP. If you need SAML, run something else for that side.
