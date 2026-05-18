@@ -11,8 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ─── Users ────────────────────────────────────────────────────────────────
-
+// Users
 // ListUsersFilter narrows ListUsers. All fields are optional.
 type ListUsersFilter struct {
 	// Search matches against email, username, and display_name (ILIKE).
@@ -99,12 +98,12 @@ func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersRes
 // change". DisplayName uses a sentinel struct so callers can distinguish
 // "leave alone" (nil) from "clear" (non-nil, value == "").
 type UpdateUserParams struct {
-	ID              pgtype.UUID
-	Email           *string
-	Username        *string
-	DisplayName     *string
-	Status          *string
-	IsAdmin         *bool
+	ID          pgtype.UUID
+	Email       *string
+	Username    *string
+	DisplayName *string
+	Status      *string
+	IsAdmin     *bool
 	// EmailVerifiedAt: pass &time.Time{} (zero value) to clear, or a real
 	// timestamp to set. nil leaves the column untouched. Provided so the
 	// admin create-user flow can mark verified at insert time without
@@ -218,8 +217,7 @@ func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID pgtype.UUID
 	return tag.RowsAffected(), nil
 }
 
-// ─── OIDC clients (admin CRUD) ────────────────────────────────────────────
-
+// OIDC clients (admin CRUD)
 // ListOIDCClients returns all non-deleted clients, newest first.
 // Admin endpoints don't filter by enabled — admins need to see disabled rows
 // to re-enable them.
@@ -390,7 +388,7 @@ func (s *Store) GetOIDCClientAny(ctx context.Context, id string) (*OIDCClient, e
 	return &c, nil
 }
 
-// ─── CAS services (admin CRUD) ────────────────────────────────────────────
+// CAS services (admin CRUD)
 // (casServiceColumns is defined in cas.go and reused here.)
 
 // ListCASServices returns all non-deleted CAS services, newest first.

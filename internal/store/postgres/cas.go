@@ -71,8 +71,7 @@ func (s *Store) CreateCASService(ctx context.Context, p CreateCASServiceParams) 
 	return &svc, nil
 }
 
-// ─── Tickets ──────────────────────────────────────────────────────────────
-
+// Tickets
 // CreateCASTicketParams is the input to CreateCASTicket.
 type CreateCASTicketParams struct {
 	ID         string // caller-provided ticket value, e.g. "ST-<hex>"

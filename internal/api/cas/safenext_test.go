@@ -14,48 +14,48 @@ func TestSafeNext(t *testing.T) {
 		in   string
 		want string
 	}{
-		// ── Accepted ──────────────────────────────────────────────────
-		{"plain_root",         "/",                "/"},
-		{"plain_path",         "/admin/users",     "/admin/users"},
-		{"query_string",       "/admin?tab=audit", "/admin?tab=audit"},
-		{"fragment",           "/admin#section",   "/admin#section"},
-		{"dot_segments",       "/a/./b/../c",      "/a/./b/../c"}, // not our job to normalise; browser handles
+		// Accepted
+		{"plain_root", "/", "/"},
+		{"plain_path", "/admin/users", "/admin/users"},
+		{"query_string", "/admin?tab=audit", "/admin?tab=audit"},
+		{"fragment", "/admin#section", "/admin#section"},
+		{"dot_segments", "/a/./b/../c", "/a/./b/../c"}, // not our job to normalise; browser handles
 
-		// ── Rejected: empty ───────────────────────────────────────────
-		{"empty",              "",                 ""},
+		// Rejected: empty
+		{"empty", "", ""},
 
-		// ── Rejected: missing leading slash ───────────────────────────
-		{"relative",           "admin/users",      ""},
-		{"bare_path",          "users",            ""},
+		// Rejected: missing leading slash
+		{"relative", "admin/users", ""},
+		{"bare_path", "users", ""},
 
-		// ── Rejected: absolute URLs ───────────────────────────────────
+		// Rejected: absolute URLs
 		// These are the classic open-redirect payloads.
-		{"http_scheme",        "http://evil.com",     ""},
-		{"https_scheme",       "https://evil.com",    ""},
-		{"javascript_scheme",  "javascript:alert(1)", ""},
-		{"data_scheme",        "data:text/html,abc",  ""},
+		{"http_scheme", "http://evil.com", ""},
+		{"https_scheme", "https://evil.com", ""},
+		{"javascript_scheme", "javascript:alert(1)", ""},
+		{"data_scheme", "data:text/html,abc", ""},
 
-		// ── Rejected: protocol-relative ───────────────────────────────
+		// Rejected: protocol-relative
 		// "//evil.com/path" inherits the scheme from the current page.
-		{"protocol_relative",  "//evil.com",       ""},
+		{"protocol_relative", "//evil.com", ""},
 		{"protocol_relative_with_path", "//evil.com/admin", ""},
 
-		// ── Rejected: header injection ────────────────────────────────
+		// Rejected: header injection
 		// A reflected newline in a Location header can split the
 		// response. We reject before it ever reaches the response.
-		{"cr_in_path",         "/admin\rfoo",      ""},
-		{"lf_in_path",         "/admin\nfoo",      ""},
-		{"crlf_in_path",       "/admin\r\nfoo",    ""},
+		{"cr_in_path", "/admin\rfoo", ""},
+		{"lf_in_path", "/admin\nfoo", ""},
+		{"crlf_in_path", "/admin\r\nfoo", ""},
 
-		// ── Rejected: backslash ───────────────────────────────────────
+		// Rejected: backslash
 		// Some user-agents treat "\" as "/" — especially on Windows,
 		// which can flip "/\evil.com" into "//evil.com" after browser
 		// normalisation. Reject defensively.
-		{"backslash_path",     "/\\evil.com",      ""},
-		{"backslash_segment",  "/admin\\users",    ""},
+		{"backslash_path", "/\\evil.com", ""},
+		{"backslash_segment", "/admin\\users", ""},
 
-		// ── Edge: just a slash ────────────────────────────────────────
-		{"slash_then_question","/?next=foo",       "/?next=foo"},
+		// Edge: just a slash
+		{"slash_then_question", "/?next=foo", "/?next=foo"},
 	}
 	for _, c := range cases {
 		c := c

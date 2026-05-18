@@ -120,7 +120,7 @@ func (p *Provider) Exchange(ctx context.Context, code, _ string) (*federation.Id
 	}, nil
 }
 
-// ─── internal helpers ─────────────────────────────────────────────────────
+// internal helpers
 
 type githubUser struct {
 	ID        int64  `json:"id"`

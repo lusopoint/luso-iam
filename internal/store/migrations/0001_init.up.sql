@@ -13,11 +13,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- and managed service (RDS, Cloud SQL, Azure, Supabase, Neon, …).
 CREATE EXTENSION IF NOT EXISTS citext;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- uuidv7(): RFC 9562 UUID version 7 — millisecond-precision timestamp
 -- in the leading 48 bits, then version + variant bits, then 74 random bits.
 -- Time-sortable, index-friendly, no client coordination needed.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION uuidv7() RETURNS uuid AS $$
 DECLARE
     unix_ts_ms bytea;
@@ -50,10 +48,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql VOLATILE;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- touch_updated_at(): trigger function to bump updated_at on UPDATE.
 -- Attached to each table that has updated_at.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
 BEGIN
     NEW.updated_at := now();
@@ -61,10 +57,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- users: canonical user record.
 -- Credentials, MFA, sessions, etc. live in separate tables added later.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE users (
     id              uuid        PRIMARY KEY DEFAULT uuidv7(),
     email           citext      NULL,

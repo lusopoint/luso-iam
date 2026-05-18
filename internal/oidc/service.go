@@ -18,7 +18,7 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// ─── Sentinel errors ──────────────────────────────────────────────────────
+// Sentinel errors
 
 var (
 	ErrInvalidClient        = errors.New("oidc: invalid client")
@@ -32,7 +32,7 @@ var (
 	ErrInvalidToken         = errors.New("oidc: invalid token")
 )
 
-// ─── Input / output types ─────────────────────────────────────────────────
+// Input / output types
 
 // AuthRequest carries the parsed, raw authorization request parameters.
 // Validation is done in Service.ValidateAuthRequest.
@@ -80,7 +80,7 @@ type IntrospectResponse struct {
 	TokenType string `json:"token_type,omitempty"`
 }
 
-// ─── Service ──────────────────────────────────────────────────────────────
+// Service
 
 // Service is the OIDC protocol engine.
 type Service struct {
@@ -94,7 +94,7 @@ func New(store *postgres.Store, keys *crypto.KeyManager, baseURL string) *Servic
 	return &Service{store: store, keys: keys, baseURL: baseURL}
 }
 
-// ─── Authorization ────────────────────────────────────────────────────────
+// Authorization
 
 // ValidateAuthRequest validates the incoming authorization request and
 // returns the matching client. Call before showing the consent screen.
@@ -182,7 +182,7 @@ func (s *Service) Authorize(ctx context.Context, p AuthorizeParams) (string, err
 	return id, nil
 }
 
-// ─── Token exchange ───────────────────────────────────────────────────────
+// Token exchange
 
 // ExchangeCode redeems an authorization code for tokens.
 func (s *Service) ExchangeCode(
@@ -338,7 +338,7 @@ func (s *Service) ClientCredentials(
 	}, nil
 }
 
-// ─── Introspection & revocation ───────────────────────────────────────────
+// Introspection & revocation
 
 // Introspect implements RFC 7662. Returns an active=false response (not
 // an error) for invalid or expired tokens.
@@ -406,7 +406,7 @@ func (s *Service) Revoke(ctx context.Context, token, tokenTypeHint string) error
 	return nil // RFC 7009 §2.2: errors for unknown tokens are silent
 }
 
-// ─── UserInfo ─────────────────────────────────────────────────────────────
+// UserInfo
 
 // UserInfo validates the Bearer token and returns the authorized claims.
 func (s *Service) UserInfo(ctx context.Context, accessToken string) (map[string]any, error) {
@@ -430,7 +430,7 @@ func (s *Service) UserInfo(ctx context.Context, accessToken string) (map[string]
 	return s.buildUserClaims(user, at.Scopes), nil
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────
+// Internal helpers
 
 // issueTokens is the canonical token-minting path for authorization_code.
 func (s *Service) issueTokens(
@@ -455,7 +455,7 @@ func (s *Service) issueTokensWithRotation(
 	now := time.Now()
 	atExpiry := now.Add(client.AccessTokenTTL)
 
-	// ── Access token ──────────────────────────────────────────────────
+	// Access token
 	atID := "at_" + mustRandom()
 	if err := s.store.CreateOIDCAccessToken(ctx, postgres.CreateOIDCAccessTokenParams{
 		ID:        atID,
@@ -468,7 +468,7 @@ func (s *Service) issueTokensWithRotation(
 		return nil, fmt.Errorf("create access token: %w", err)
 	}
 
-	// ── Refresh token (if offline_access in scope) ─────────────────────
+	// Refresh token (if offline_access in scope)
 	var rtID string
 	if contains(code.Scopes, "offline_access") && contains(client.AllowedGrantTypes, "refresh_token") {
 		rtID = "rt_" + mustRandom()
@@ -485,7 +485,7 @@ func (s *Service) issueTokensWithRotation(
 		}
 	}
 
-	// ── id_token (only when openid scope present) ──────────────────────
+	// id_token (only when openid scope present)
 	var idToken string
 	if contains(code.Scopes, "openid") {
 		var err error
@@ -615,7 +615,7 @@ func (s *Service) IntrospectAuth(ctx context.Context, clientID, clientSecret str
 	return s.authenticateClient(ctx, clientID, clientSecret)
 }
 
-// ─── Utility ──────────────────────────────────────────────────────────────
+// Utility
 
 func contains(slice []string, s string) bool {
 	for _, v := range slice {

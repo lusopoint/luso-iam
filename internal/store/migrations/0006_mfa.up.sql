@@ -4,7 +4,6 @@
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- user_mfa_methods: enrolled second factors. One row per registered method
 -- per user. The method column drives which payload columns are read:
 --
@@ -14,7 +13,6 @@ BEGIN;
 --
 -- A method is only usable after confirmed_at is set — for TOTP this happens
 -- on first successful verification, for WebAuthn on successful registration.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE user_mfa_methods (
     id            uuid        PRIMARY KEY DEFAULT uuidv7(),
     user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -48,11 +46,9 @@ CREATE TRIGGER user_mfa_methods_touch_updated_at
     BEFORE UPDATE ON user_mfa_methods
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- ─────────────────────────────────────────────────────────────────────────
 -- user_backup_codes: single-use recovery codes. Each row stores the
 -- argon2id hash of one code (we never store plaintext after generation).
 -- A user's full set is replaced atomically when they regenerate.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE user_backup_codes (
     id          uuid        PRIMARY KEY DEFAULT uuidv7(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -66,7 +62,6 @@ CREATE INDEX user_backup_codes_active_idx
     ON user_backup_codes (user_id)
     WHERE used_at IS NULL;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- sessions: carry the authentication context so OIDC id_tokens can emit
 -- the correct acr / amr claims downstream.
 --
@@ -74,7 +69,6 @@ CREATE INDEX user_backup_codes_active_idx
 --   acr='1' = MFA succeeded
 --   amr     = list of authentication methods used during this session
 --             e.g. ['pwd'], ['pwd','otp'], ['fed','google'], ['hwk']
--- ─────────────────────────────────────────────────────────────────────────
 ALTER TABLE sessions
     ADD COLUMN acr text   NOT NULL DEFAULT '0',
     ADD COLUMN amr text[] NOT NULL DEFAULT '{}';

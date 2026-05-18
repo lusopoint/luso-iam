@@ -3,7 +3,6 @@
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────
 -- cas_services: registered CAS service URLs. The login flow validates
 -- that the `service` query parameter matches one of these entries.
 --
@@ -11,7 +10,6 @@ BEGIN;
 -- service_url_pattern converted to '%'. We pre-compute the LIKE pattern
 -- at insert time (stored in `match_pattern`) so lookups are a single
 -- indexed predicate.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE cas_services (
     id                   uuid        PRIMARY KEY DEFAULT uuidv7(),
     name                 text        NOT NULL,
@@ -41,13 +39,11 @@ CREATE TRIGGER cas_services_touch_updated_at
     BEFORE UPDATE ON cas_services
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- ─────────────────────────────────────────────────────────────────────────
 -- cas_tickets: ephemeral service tickets issued by /cas/login and
 -- consumed by /cas/serviceValidate. Single-use, short-lived (~60s).
 --
 -- The ticket itself is the primary key — a server-generated random
 -- string with the "ST-" prefix as required by the CAS spec.
--- ─────────────────────────────────────────────────────────────────────────
 CREATE TABLE cas_tickets (
     id           text        PRIMARY KEY,  -- e.g. "ST-<32 hex chars>"
     session_id   uuid        NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,

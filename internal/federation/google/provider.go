@@ -86,13 +86,13 @@ func (p *Provider) AuthURL(state, codeChallenge string) string {
 // Exchange redeems the authorization code and returns a normalized Identity.
 // It verifies the id_token signature against Google's JWKS.
 func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (*federation.Identity, error) {
-	// ── Token exchange ────────────────────────────────────────────────
+	// Token exchange
 	tokenResp, err := p.exchangeCode(ctx, code, codeVerifier)
 	if err != nil {
 		return nil, fmt.Errorf("google: token exchange: %w", err)
 	}
 
-	// ── Verify id_token ───────────────────────────────────────────────
+	// Verify id_token
 	claims, err := crypto.VerifyRS256(ctx, tokenResp.IDToken, p.clientID, issuer, p.jwks)
 	if err != nil {
 		return nil, fmt.Errorf("google: verify id_token: %w", err)
@@ -107,7 +107,7 @@ func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (*fe
 	}, nil
 }
 
-// ─── internal helpers ─────────────────────────────────────────────────────
+// internal helpers
 
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`

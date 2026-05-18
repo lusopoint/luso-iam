@@ -9,8 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ─── audit_log ────────────────────────────────────────────────────────────
-
+// audit_log
 const auditLogColumns = `
 	id, event_type, actor_id, target_id,
 	metadata, ip_address, user_agent, created_at
