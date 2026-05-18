@@ -1,10 +1,10 @@
-# IAM Server — Setup & Operations Guide
+# IAM Server, Setup & Operations Guide
 
 A complete walkthrough: dev setup, prod deployment, federation (Google/GitHub/others/generic OIDC), MFA enrollment, CAS service registration, and OIDC client integration.
 
 ---
 
-## Part 1 — Environment configuration
+## Part 1, Environment configuration
 
 Every knob is an environment variable. The server reads them at startup and validates before opening any sockets. Set them in a `.env` file (loaded by `docker compose`) or export them in your shell, the server itself doesn't read `.env` directly, so for bare-metal runs you need to source it yourself.
 
@@ -64,7 +64,7 @@ MFA_WEBAUTHN_RP_NAME=IAM Server
 # MFA_WEBAUTHN_RP_ID=auth.example.com
 ```
 
-### Federation — only set what you enable
+### Federation, only set what you enable
 
 ```bash
 GOOGLE_CLIENT_ID=...
@@ -91,7 +91,7 @@ APPLE_PRIVATE_KEY_PATH=/etc/iam/keys/apple.p8
 
 ---
 
-## Part 2 — Development setup
+## Part 2, Development setup
 
 Tested path: macOS / Linux with Docker, Go 1.26+, Node 25.1+.
 
@@ -142,7 +142,7 @@ make web-dev
 # Reachable at http://localhost:5173 with API calls proxied to :8080
 ```
 
-**Important:** the Vite dev server runs at `:5173` and proxies API calls (`/admin/v1`, `/cas`, `/oauth2`, `/.well-known`, `/mfa`) to the Go server at `:8080`. Cookies are shared because both look like the same dev origin to the browser. Use `:5173` for SPA-focused work — HMR is instant. Use `:8080` to test the embedded production-style build.
+**Important:** the Vite dev server runs at `:5173` and proxies API calls (`/admin/v1`, `/cas`, `/oauth2`, `/.well-known`, `/mfa`) to the Go server at `:8080`. Cookies are shared because both look like the same dev origin to the browser. Use `:5173` for SPA-focused work, HMR is instant. Use `:8080` to test the embedded production-style build.
 
 ### Verify it works
 
@@ -165,11 +165,11 @@ make seed-user email=l@mail.com password=... admin=1
 
 ---
 
-## Part 3 — Production deployment
+## Part 3, Production deployment
 
 The server is a single Go binary with the SPA embedded. Two common shapes:
 
-### Shape A — Single VM behind Caddy
+### Shape A, Single VM behind Caddy
 
 ```bash
 # On your build machine
@@ -255,7 +255,7 @@ auth.example.com {
 
 That's all the TLS, HSTS, and certificate management you need from the reverse proxy. Caddy gets a Let's Encrypt cert on first request and renews automatically.
 
-### Shape B — Container
+### Shape B, Container
 
 The repo ships a Dockerfile under `deployments/docker/`. Build:
 
@@ -276,21 +276,23 @@ docker run -d --name iam \
 
 ### Production checklist
 
-- [ ] `COOKIES_SECURE=true` (otherwise the browser drops session cookies over HTTPS — silent failure)
+- [ ] `COOKIES_SECURE=true` (otherwise the browser drops session cookies over HTTPS, silent failure)
 - [ ] `AUTO_MIGRATE=false` and migrations run as a deploy step
 - [ ] `SIGNING_KEY_PATH` points at a real RSA-2048 key, mode 600, owner = service user
 - [ ] `SESSION_SECRET` is 32+ bytes of entropy and unique per environment
 - [ ] Postgres uses `sslmode=require` (or `verify-full` with a CA bundle)
-- [ ] `BASE_URL` exactly matches what users type in the browser — trailing slashes, port numbers, protocol all matter for OIDC redirect validation
+- [ ] `BASE_URL` exactly matches what users type in the browser, trailing slashes, port numbers, protocol all matter for OIDC redirect validation
 - [ ] Backups of the `iam` database scheduled
-- [ ] Backup of `signing.pem` stored encrypted off-host — losing it invalidates every active id_token and forces re-issue
+- [ ] Backup of `signing.pem` stored encrypted off-host, losing it invalidates every active id_token and forces re-issue
 - [ ] First admin user seeded with `make seed-user … admin=1` (or promote a federated user with `make grant-admin email=…`)
 
 ---
 
-## Part 4 — Federation setup
+## Part 4, Federation setup
 
-Each upstream provider has its own console, redirect-URI rules, and quirks. The pattern is the same: register an OAuth client there, get a client ID + secret, paste into the IAM server's env, restart. The IAM server's callback URL is always:
+Each upstream provider has its own console, redirect-URI rules, and quirks. The pattern is the same:
+
+- register an OAuth client there, get a client ID + secret, paste into the IAM server's env, restart. The IAM server's callback URL is always:
 
 ```
 {BASE_URL}/oauth/callback/{provider}
@@ -307,7 +309,7 @@ Each upstream provider has its own console, redirect-URI rules, and quirks. The 
    GOOGLE_CLIENT_ID=…apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=…
    ```
-6. Restart. The "Sign in with Google" button appears on `/cas/login` automatically when both vars are set.
+6. Restart. The "Sign in with Google" button appears on `/cas/login` automatically when both vars are set!
 
 The Google provider uses OIDC discovery (`https://accounts.google.com/.well-known/openid-configuration`) so no other URLs need configuring.
 
@@ -324,7 +326,7 @@ The Google provider uses OIDC discovery (`https://accounts.google.com/.well-know
    GITHUB_CLIENT_SECRET=…
    ```
 
-GitHub isn't OIDC — it's plain OAuth 2. The IAM server fetches `/user` and `/user/emails` against the GitHub API to build the `Identity`. If a GitHub user has set their email to private, the IAM server uses the primary email from `/user/emails` (requires the `user:email` scope, which we request).
+GitHub isn't OIDC, it's plain OAuth 2. The IAM server fetches `/user` and `/user/emails` against the GitHub API to build the `Identity`. If a GitHub user has set their email to private, the IAM server uses the primary email from `/user/emails` (requires the `user:email` scope, which we request).
 
 ### Microsoft / Entra ID
 
@@ -356,9 +358,9 @@ The tenant value goes into the discovery URL: `https://login.microsoftonline.com
    GITLAB_ISSUER=https://gitlab.com    # or https://gitlab.example.internal
    ```
 
-For self-hosted GitLab, set `GITLAB_ISSUER` to your instance's root URL — the IAM server appends `/.well-known/openid-configuration` to discover the rest.
+For self-hosted GitLab, set `GITLAB_ISSUER` to your instance's root URL, the IAM server appends `/.well-known/openid-configuration` to discover the rest.
 
-### Apple — Sign in with Apple
+### Apple, Sign in with Apple
 
 The most awkward setup of the bunch because Apple wants a signed JWT instead of a static secret, and the cert flow happens in their Developer portal.
 
@@ -369,18 +371,19 @@ The most awkward setup of the bunch because Apple wants a signed JWT instead of 
    - Domains: `auth.example.com`
    - Return URLs: `https://auth.example.com/oauth/callback/apple`
 4. **Keys** -> register a new key with "Sign in with Apple" enabled
-   - Download the `.p8` file — you can only download it **once**
-   - Note the Key ID (10 chars) — this is `APPLE_KEY_ID`
-5. Your Team ID is in the top right of the developer portal — this is `APPLE_TEAM_ID`
+   - Download the `.p8` file, you can only download it **once**
+   - Note the Key ID (10 chars), this is `APPLE_KEY_ID`
+5. Your Team ID is in the top right of the developer portal, this is `APPLE_TEAM_ID`
 6. Set in env:
    ```bash
-   APPLE_CLIENT_ID=com.example.auth.signin   # the Services ID identifier
+   # the Services ID identifier
+   APPLE_CLIENT_ID=com.example.auth.signin
    APPLE_TEAM_ID=ABCDE12345
    APPLE_KEY_ID=ABCDE12345
    APPLE_PRIVATE_KEY_PATH=/etc/iam/keys/apple_AuthKey_ABCDE12345.p8
    ```
 
-The IAM server signs a fresh ES256 JWT every time it talks to Apple's token endpoint — that's the "client secret" Apple wants. The `.p8` file must stay readable by the service user.
+The IAM server signs a fresh ES256 JWT every time it talks to Apple's token endpoint, that's the "client secret" Apple wants. The `.p8` file must stay readable by the service user.
 
 Two Apple quirks worth knowing:
 
@@ -391,18 +394,18 @@ Two Apple quirks worth knowing:
 
 For any OIDC-compliant IdP not listed above (Okta, Auth0, Keycloak, Authentik, Zitadel, etc.):
 
-In the IAM admin UI: **Upstream providers -> Add -> "Generic OIDC"** (or equivalent admin API call — see roadmap note below). Required fields:
+In the IAM admin UI: **Upstream providers -> Add -> "Generic OIDC"** (or equivalent admin API call, see roadmap note below). Required fields:
 
 ```
 Name:                  "Acme Corp Okta"
 Issuer:                https://acme.okta.com
 Client ID:             0oaXXXXXXXXXXXX
-Client secret:         …
+Client secret:         ...
 Scopes:                openid profile email
 Redirect URI: (read-only)  https://auth.example.com/oauth/callback/{slug}
 ```
 
-**Roadmap note:** providers are currently env-configured at startup. Per-provider DB rows + the "Upstream providers" admin page exist in the schema and store layer but aren't wired into the SPA yet. For now, generic OIDC providers go in via env too — see `internal/federation/registry.go` for the format expected. Making this fully admin-managed is a P8 item.
+**Roadmap note:** providers are currently env-configured at startup. Per-provider DB rows + the "Upstream providers" admin page exist in the schema and store layer but aren't wired into the SPA yet. For now, generic OIDC providers go in via env too, see `internal/federation/registry.go` for the format expected.
 
 ### Account linking behaviour
 
@@ -412,11 +415,11 @@ When an upstream callback succeeds, the federation handler looks for a matching 
 2. `users.email` matches the email from the upstream -> link the new provider to that user, log them in
 3. Otherwise -> create a new user, link the provider, log them in
 
-The first time someone signs in via Google with `alice@example.com`, a user row is created. If that same person later signs in via GitHub with the same email, the GitHub identity is linked to the existing row — they're the same user. Email is the join key, which is why verified emails matter; the IAM server trusts the upstream's verification.
+The first time someone signs in via Google with `l@mail.com`, a user row is created. If that same person later signs in via GitHub with the same email, the GitHub identity is linked to the existing row, they're the same user. Email is the join key, which is why verified emails matter; the IAM server trusts the upstream's verification.
 
 ---
 
-## Part 5 — MFA enrollment & enforcement
+## Part 5, MFA enrollment & enforcement
 
 ### What's available
 
@@ -425,7 +428,7 @@ The first time someone signs in via Google with `alice@example.com`, a user row 
 | **TOTP**               | Most users              | RFC 6238 6-digit / 30s. Works with Google Authenticator, 1Password, Authy, any RFC 6238 app |
 | **WebAuthn / passkey** | Best UX where supported | Touch ID, Face ID, Windows Hello, YubiKey, etc. Modern browsers only                        |
 | **Backup codes**       | Recovery, always        | 10 single-use 8-char codes, argon2id-hashed at rest                                         |
-| Email OTP, SMS OTP     | Coming in P8            | Not implemented yet                                                                         |
+| Email OTP, SMS OTP     | TODO                    | Not implemented yet                                                                         |
 
 ### Enrolling MFA on your own account
 
@@ -448,7 +451,7 @@ The next time you sign in, after entering your password you're redirected to `/m
 
 ### Forcing MFA for other users (per-user)
 
-There's no global "force MFA" toggle yet — that's a P7 item. Today, the flow is:
+There's no global "force MFA" toggle yet, TODO. Today, the flow is:
 
 - A user with **zero enrolled methods** completes login on password alone (no MFA step)
 - A user with **at least one enrolled method** is required to complete MFA on every login
@@ -461,7 +464,7 @@ OIDC clients can request a specific assurance level via `acr_values` in the auth
 
 | `acr_values`                              | Means         | What's enforced                                                         |
 | ----------------------------------------- | ------------- | ----------------------------------------------------------------------- |
-| `urn:mace:incommon:iap:silver`            | Password only | Default — current session is fine if MFA wasn't already done            |
+| `urn:mace:incommon:iap:silver`            | Password only | Default, current session is fine if MFA wasn't already done             |
 | `urn:mace:incommon:iap:bronze` (or `mfa`) | MFA required  | If the current session is password-only, redirects to `/mfa` to step up |
 
 Configure on the client side:
@@ -475,7 +478,7 @@ authzUrl.searchParams.set("acr_values", "mfa");
 
 The resulting `id_token` carries `acr` and `amr` claims so the relying-party can verify what actually happened (`amr: ["pwd", "totp"]` for password + TOTP).
 
-### Backup codes — what happens when
+### Backup codes, what happens when (TODO)
 
 - User loses their phone -> admin marks them as needing reset -> user types a backup code on `/mfa` -> success -> optional: they enroll a new TOTP and revoke the lost device
 - User runs out of codes -> they can regenerate from `/mfa/enroll` (invalidates the old set)
@@ -483,7 +486,7 @@ The resulting `id_token` carries `acr` and `amr` claims so the relying-party can
 
 ---
 
-## Part 6 — CAS service registration
+## Part 6, CAS service registration
 
 CAS clients need to be registered before `/cas/login` will issue tickets for them. This is the "Service not authorized" guard from earlier in the project.
 
@@ -523,22 +526,6 @@ Different applications have different configuration formats. The information you
 | Validate URL (CAS 3.0) | `https://auth.example.com/cas/p3/serviceValidate` |
 | Logout URL             | `https://auth.example.com/cas/logout`             |
 
-### Example: a generic CAS client (`phpcas`)
-
-```php
-phpCAS::client(
-    CAS_VERSION_3_0,
-    'auth.example.com',
-    443,
-    '/cas',
-    'https://wiki.example.com'   // your service URL
-);
-phpCAS::setNoCasServerValidation();   // dev only — set a real CA chain in prod
-phpCAS::forceAuthentication();
-$user = phpCAS::getUser();
-$attrs = phpCAS::getAttributes();
-```
-
 ### Example: testing CAS with curl
 
 ```bash
@@ -550,9 +537,9 @@ curl "https://auth.example.com/cas/p3/serviceValidate?service=https://wiki.examp
 # Returns XML:
 # <cas:serviceResponse xmlns:cas="...">
 #   <cas:authenticationSuccess>
-#     <cas:user>alice@example.com</cas:user>
+#     <cas:user>l@mail.com</cas:user>
 #     <cas:attributes>
-#       <cas:email>alice@example.com</cas:email>
+#       <cas:email>l@mail.com</cas:email>
 #       <cas:display_name>Alice</cas:display_name>
 #     </cas:attributes>
 #   </cas:authenticationSuccess>
@@ -563,7 +550,7 @@ Tickets are single-use (validating consumes them) and have a 60-second TTL by de
 
 ---
 
-## Part 7 — OIDC client integration
+## Part 7, OIDC client integration
 
 For applications speaking OAuth 2 / OIDC instead of CAS.
 
@@ -575,7 +562,7 @@ In the SPA: **OIDC clients -> Register client**. Fields:
 Client ID:           my-app                  # human-meaningful slug
 Name:                My App
 Public client:       false                   # true for SPAs / mobile, false for backends
-Require PKCE:        true                    # force PKCE — recommended
+Require PKCE:        true                    # force PKCE, recommended
 Require consent:     false                   # show consent screen on first auth
 Redirect URIs:       https://app.example.com/callback
                      https://app.example.com/silent-renew      # one per line
@@ -592,7 +579,7 @@ ID token TTL:        1h
 - **Public** (SPAs, mobile apps) -> no client secret, PKCE **must** be enabled, the IAM server enforces it
 - **Confidential** (server-side web apps, machine-to-machine) -> gets a one-time secret on creation; copy it immediately, only the argon2id hash is stored
 
-**On submit:** for confidential clients the response includes the plaintext secret in a one-time banner. Copy it now — there's no "view secret" later, only "rotate to a new one".
+**On submit:** for confidential clients the response includes the plaintext secret in a one-time banner. Copy it now, there's no "view secret" later, only "rotate to a new one".
 
 ### The handshake from the client's side
 
@@ -722,11 +709,11 @@ curl -X POST https://auth.example.com/oauth2/revoke \
   -d 'token=eyJhbGc…&token_type_hint=access_token'
 ```
 
-Returns `200 OK` on success (and also on "unknown token" — RFC 7009).
+Returns `200 OK` on success (and also on "unknown token", RFC 7009).
 
 ---
 
-## Part 8 — Common operational tasks
+## Part 8, Common operational tasks
 
 ### Rotate a leaked client secret
 
@@ -741,7 +728,7 @@ The old secret stops working immediately. Tokens already issued continue to vali
 If they signed up via federation and you want to give them admin:
 
 ```bash
-make grant-admin email=alice@example.com
+make grant-admin email=l@mail.com
 ```
 
 Or in the SPA: open the user -> toggle "is_admin".
@@ -783,12 +770,12 @@ The dialog generates a strong password, shown once. Send it to the new admin out
 Order of operations:
 
 1. **Audit log** filtered by their user ID -> look for `login_failure` events. Metadata includes the reason (`wrong_password`, `account_locked`, `mfa_failed`, etc.)
-2. If `account_locked` -> SPA -> user detail -> toggle status from `disabled` back to `active`. The auto-lockout (after several failed password attempts) doesn't time out — an admin needs to release it
+2. If `account_locked` -> SPA -> user detail -> toggle status from `disabled` back to `active`. The auto-lockout (after several failed password attempts) doesn't time out, an admin needs to release it
 3. If `mfa_failed` repeatedly -> ask if they've changed phones. They might need backup codes, or an admin can revoke their MFA methods (SPA -> user detail -> MFA section) so they can re-enroll on next login
 
 ---
 
-## Part 9 — Troubleshooting
+## Part 9, Troubleshooting
 
 | Symptom                                                                              | Most likely cause                                                                                                   | Fix                                                                                      |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -818,12 +805,10 @@ Use `/readyz` for load balancer health checks; `/healthz` is for liveness probes
 
 ---
 
-## Part 10 — What's intentionally not in this server yet
+## Part 10, What's TODO
 
-So you don't waste time looking:
-
-- **No email/SMS delivery** — password resets and email verification require an out-of-band channel today. SMTP is P8.
-- **No global "force MFA" policy** — it's per-user (any enrolled method -> enforced) or per-client (`acr_values`). A blanket policy lever is P7.
-- **No public signup** — users come from `make seed-user`, federation, or the admin SPA's "New user". A self-service signup page is P8.
-- **No automatic key rotation** — `signing.pem` is treated as long-lived. The Keys page is view-only; rotation tooling lands in P7.
-- **No SAML** — this is an OIDC + CAS server, not a SAML IdP. If you need SAML, run something else for that side.
+- **No email/SMS delivery**, password resets and email verification require an out-of-band channel today. SMTP is P8.
+- **No global "force MFA" policy**, it's per-user (any enrolled method -> enforced) or per-client (`acr_values`). A blanket policy lever is P7.
+- **No public signup**, users come from `make seed-user`, federation, or the admin SPA's "New user". A self-service signup page is P8.
+- **No automatic key rotation**, `signing.pem` is treated as long-lived. The Keys page is view-only; rotation tooling lands in P7.
+- **No SAML**, this is an OIDC + CAS server, not a SAML IdP. If you need SAML, run something else for that side.
