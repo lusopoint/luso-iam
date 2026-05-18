@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Backup codes · IAM</title>
+    <style>
+        :root{--bg:#f4f5f7;--card:#ffffff;--border:#e3e6ea;--text:#1f2328;
+              --muted:#6b7280;--accent:#2563eb;--accent-hover:#1d4ed8;
+              --warn:#92400e;--warn-bg:#fffbeb;}
+        @media(prefers-color-scheme:dark){
+            :root{--bg:#0f1115;--card:#161922;--border:#2a2f3a;--text:#e6e8eb;
+                  --muted:#9aa1ab;--warn:#fcd34d;--warn-bg:#3f2f0a;}}
+        *{box-sizing:border-box;}
+        body{margin:0;padding:1rem;min-height:100vh;background:var(--bg);color:var(--text);
+             font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+             display:flex;align-items:center;justify-content:center;}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+              padding:2rem;width:100%;max-width:440px;}
+        h1{margin:0 0 .25rem;font-size:1.3rem;}
+        .subtitle{color:var(--muted);margin:0 0 1.25rem;font-size:.9rem;}
+        .warn{background:var(--warn-bg);color:var(--warn);padding:.65rem .75rem;
+              border-radius:6px;font-size:.85rem;margin-bottom:1.25rem;}
+        .codes{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;
+               background:var(--bg);border:1px solid var(--border);
+               padding:1rem;border-radius:6px;margin-bottom:1.25rem;
+               font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.95rem;}
+        .codes div{text-align:center;}
+        .actions{display:flex;gap:.5rem;}
+        .btn{flex:1;padding:.6rem;font:inherit;font-weight:500;border-radius:6px;
+             cursor:pointer;text-align:center;text-decoration:none;}
+        .btn-primary{color:#fff;background:var(--accent);border:0;}
+        .btn-primary:hover{background:var(--accent-hover);}
+        .btn-secondary{color:var(--text);background:var(--bg);
+                       border:1px solid var(--border);}
+        .btn-secondary:hover{background:var(--border);}
+    </style>
+</head>
+<body>
+<main class="card">
+    <h1>Backup codes</h1>
+    <p class="subtitle">Use any of these codes once to sign in if you lose your authenticator.</p>
+
+    <div class="warn">
+        <strong>Save these somewhere safe.</strong> They will not be shown again.
+    </div>
+
+    <div class="codes">
+        {{ range .Codes }}
+        <div>{{ . }}</div>
+        {{ end }}
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-secondary" type="button" onclick="copyCodes()">Copy</button>
+        <a class="btn btn-primary" href="/mfa/enroll">Done</a>
+    </div>
+</main>
+<script>
+function copyCodes() {
+    const codes = Array.from(document.querySelectorAll('.codes div'))
+        .map(d => d.textContent.trim()).join('\n');
+    navigator.clipboard.writeText(codes).then(() => {
+        const btn = document.querySelector('.btn-secondary');
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = orig, 2000);
+    });
+}
+</script>
+</body>
+</html>
