@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Security settings · IAM</title>
+    <style>
+        :root{--bg:#f4f5f7;--card:#ffffff;--border:#e3e6ea;--text:#1f2328;
+              --muted:#6b7280;--accent:#2563eb;--accent-hover:#1d4ed8;
+              --success:#15803d;--success-bg:#f0fdf4;}
+        @media(prefers-color-scheme:dark){
+            :root{--bg:#0f1115;--card:#161922;--border:#2a2f3a;--text:#e6e8eb;
+                  --muted:#9aa1ab;--success:#86efac;--success-bg:#1c3324;}}
+        *{box-sizing:border-box;}
+        body{margin:0;padding:1rem;min-height:100vh;background:var(--bg);color:var(--text);
+             font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+             display:flex;justify-content:center;}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+              padding:2rem;width:100%;max-width:500px;margin-top:2rem;height:fit-content;}
+        h1{margin:0 0 1.25rem;font-size:1.4rem;}
+        h2{font-size:.95rem;font-weight:600;margin:1.5rem 0 .5rem;}
+        h2:first-of-type{margin-top:0;}
+        .empty{color:var(--muted);font-size:.9rem;font-style:italic;}
+        .method{display:flex;align-items:center;justify-content:space-between;
+                padding:.65rem .85rem;border:1px solid var(--border);
+                border-radius:6px;margin-bottom:.5rem;background:var(--bg);}
+        .method .info .name{font-size:.9rem;font-weight:500;}
+        .method .info .meta{font-size:.78rem;color:var(--muted);margin-top:.15rem;}
+        .badge{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;
+               padding:.15rem .4rem;border-radius:4px;background:var(--success-bg);
+               color:var(--success);margin-left:.4rem;}
+        .actions{display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem;}
+        .btn{padding:.55rem .85rem;font:inherit;font-weight:500;
+             border-radius:6px;cursor:pointer;text-align:center;text-decoration:none;
+             font-size:.9rem;}
+        .btn-primary{color:#fff;background:var(--accent);border:0;}
+        .btn-primary:hover{background:var(--accent-hover);}
+        .btn-secondary{color:var(--text);background:var(--bg);
+                       border:1px solid var(--border);}
+        .btn-secondary:hover{background:var(--border);}
+        form.inline{display:inline;}
+        .btn-link{background:none;border:0;color:var(--accent);font:inherit;
+                  cursor:pointer;padding:0;font-size:.85rem;}
+    </style>
+</head>
+<body>
+<main class="card">
+    <h1>Security settings</h1>
+
+    <h2>Authenticator apps (TOTP)</h2>
+    {{ if .TOTPMethods }}
+        {{ range .TOTPMethods }}
+        <div class="method">
+            <div class="info">
+                <div class="name">
+                    {{ if .Name }}{{ .Name }}{{ else }}Authenticator{{ end }}
+                </div>
+                <div class="meta">
+                    Added {{ .Created }}{{ if .LastUsed }} · last used {{ .LastUsed }}{{ end }}
+                </div>
+            </div>
+            <form class="inline" method="POST" action="/mfa/methods/{{ .ID }}/delete"
+                  onsubmit="return confirm('Remove this authenticator?');">
+                <button class="btn-link" type="submit">Remove</button>
+            </form>
+        </div>
+        {{ end }}
+    {{ else }}
+        <p class="empty">No authenticator apps enrolled.</p>
+    {{ end }}
+    <div class="actions">
+        <a class="btn btn-secondary" href="/mfa/enroll/totp">Add authenticator app</a>
+    </div>
+
+    {{ if .WebAuthnEnabled }}
+    <h2>Security keys / passkeys</h2>
+    {{ if .WebAuthnMethods }}
+        {{ range .WebAuthnMethods }}
+        <div class="method">
+            <div class="info">
+                <div class="name">
+                    {{ if .Name }}{{ .Name }}{{ else }}Security key{{ end }}
+                </div>
+                <div class="meta">
+                    Added {{ .Created }}{{ if .LastUsed }} · last used {{ .LastUsed }}{{ end }}
+                </div>
+            </div>
+            <form class="inline" method="POST" action="/mfa/methods/{{ .ID }}/delete"
+                  onsubmit="return confirm('Remove this security key?');">
+                <button class="btn-link" type="submit">Remove</button>
+            </form>
+        </div>
+        {{ end }}
+    {{ else }}
+        <p class="empty">No security keys enrolled.</p>
+    {{ end }}
+    <div class="actions">
+        <button id="add-wa" class="btn btn-secondary" type="button">Add security key or passkey</button>
+        <div id="wa-status" style="font-size:.85rem;color:var(--muted);text-align:center;"></div>
+    </div>
+    {{ end }}
+
+    <h2>Backup codes</h2>
+    {{ if .HasBackupCodes }}
+        <p class="empty">{{ .BackupCodesRemaining }} unused codes remaining.</p>
+    {{ else }}
+        <p class="empty">No backup codes generated.</p>
+    {{ end }}
+    <div class="actions">
+        <form method="POST" action="/mfa/enroll/backup">
+            <button class="btn btn-secondary" type="submit"
+                    onclick="return confirm('Generating new codes invalidates any existing codes. Continue?');">
+                {{ if .HasBackupCodes }}Regenerate backup codes{{ else }}Generate backup codes{{ end }}
+            </button>
+        </form>
+    </div>
+</main>
+
+{{ if .WebAuthnEnabled }}
+<script>
+(function() {
+    const btn = document.getElementById('add-wa');
+    const status = document.getElementById('wa-status');
+    if (!btn || !window.PublicKeyCredential) {
+        if (btn) btn.disabled = true;
+        if (status) status.textContent = 'Your browser does not support WebAuthn.';
+        return;
+    }
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        status.textContent = 'Follow your browser\'s prompts…';
+
+        try {
+            const beginResp = await fetch('/mfa/enroll/webauthn/begin', {method:'POST'});
+            if (!beginResp.ok) throw new Error('Could not start registration.');
+            const opts = await beginResp.json();
+
+            opts.publicKey.challenge = b64uToBytes(opts.publicKey.challenge);
+            opts.publicKey.user.id = b64uToBytes(opts.publicKey.user.id);
+            if (opts.publicKey.excludeCredentials) {
+                opts.publicKey.excludeCredentials.forEach(c => c.id = b64uToBytes(c.id));
+            }
+
+            const cred = await navigator.credentials.create({publicKey: opts.publicKey});
+
+            const body = {
+                id: cred.id,
+                rawId: bytesToB64u(new Uint8Array(cred.rawId)),
+                type: cred.type,
+                response: {
+                    attestationObject: bytesToB64u(new Uint8Array(cred.response.attestationObject)),
+                    clientDataJSON:    bytesToB64u(new Uint8Array(cred.response.clientDataJSON)),
+                },
+            };
+
+            const finishResp = await fetch('/mfa/enroll/webauthn/finish', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(body),
+            });
+            if (!finishResp.ok) {
+                const t = await finishResp.text();
+                throw new Error(t || 'Registration failed.');
+            }
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+            status.textContent = err.message || 'Cancelled.';
+            btn.disabled = false;
+        }
+    });
+
+    function b64uToBytes(s) {
+        s = s.replace(/-/g,'+').replace(/_/g,'/');
+        const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
+        const bin = atob(s + '='.repeat(pad));
+        const out = new Uint8Array(bin.length);
+        for (let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+        return out;
+    }
+    function bytesToB64u(bytes) {
+        let s = '';
+        for (let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+        return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+})();
+</script>
+{{ end }}
+</body>
+</html>

@@ -1,0 +1,178 @@
+import type { ApiProblem } from "./types";
+
+/*
+ * Hand-rolled API client. We keep it tiny on purpose — no react-query, no
+ * fetch generator, no Axios. The admin SPA's needs are simple: a few CRUD
+ * lists plus a handful of mutations. A 60-line wrapper buys us:
+ *
+ *  - Consistent error handling (Problem JSON → ApiError thrown).
+ *  - Cookie credentials included on every request (admin sessions are
+ *    same-origin, so `credentials: "include"` is all that's needed).
+ *  - A single place to tweak headers, base URL, or future tracing.
+ *
+ * If the surface grows beyond a couple dozen calls, switch to openapi-fetch
+ * with a generated client. Until then, ad-hoc is faster to evolve.
+ */
+
+const ADMIN_BASE = "/admin/v1";
+
+/** Thrown for any non-2xx HTTP response. Carries the parsed Problem envelope. */
+export class ApiError extends Error {
+  status: number;
+  code: string | undefined;
+  problem: ApiProblem;
+
+  constructor(problem: ApiProblem) {
+    super(problem.detail || problem.title);
+    this.status = problem.status;
+    this.code = problem.code;
+    this.problem = problem;
+    this.name = "ApiError";
+  }
+}
+
+interface RequestOpts {
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  query?: Record<string, string | number | undefined>;
+  body?: unknown;
+  /** AbortSignal for cancellation from React effect cleanup. */
+  signal?: AbortSignal;
+}
+
+async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+  const method = opts.method ?? "GET";
+  const url = buildURL(path, opts.query);
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  let body: BodyInit | undefined;
+
+  if (opts.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(opts.body);
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body,
+    credentials: "include", // session cookie + same-origin CSRF check
+    signal: opts.signal,
+  });
+
+  // 204 No Content — common for DELETE / lock / unlock.
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  // Both success and failure bodies are JSON. For non-OK responses, try
+  // to surface the Problem envelope; fall back to a synthetic one if the
+  // body wasn't valid JSON.
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = text.length > 0 ? JSON.parse(text) : undefined;
+  } catch {
+    parsed = undefined;
+  }
+
+  if (!res.ok) {
+    const problem: ApiProblem = isProblem(parsed)
+      ? parsed
+      : { type: "about:blank", title: res.statusText || "Error", status: res.status };
+    throw new ApiError(problem);
+  }
+
+  return parsed as T;
+}
+
+function buildURL(path: string, query?: RequestOpts["query"]): string {
+  const full = path.startsWith("http") ? path : `${ADMIN_BASE}${path}`;
+  if (!query) return full;
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (v === undefined || v === null || v === "") continue;
+    search.set(k, String(v));
+  }
+  const qs = search.toString();
+  return qs ? `${full}?${qs}` : full;
+}
+
+function isProblem(v: unknown): v is ApiProblem {
+  return typeof v === "object" && v !== null && "status" in v && "title" in v;
+}
+
+/* ─── Resource-level helpers ─────────────────────────────────────────────
+ * The handlers below wrap `request()` so that pages don't need to know the
+ * URL shape. Keeps the SPA refactor-friendly when paths change.
+ */
+
+import type {
+  AdminUser,
+  ListUsersResponse,
+  CreateUserRequest,
+  CreateUserResponse,
+  OIDCClient,
+  CreateClientRequest,
+  CreateClientResponse,
+  CASService,
+  CreateCASServiceRequest,
+  AdminSession,
+  ListAuditResponse,
+  SigningKey,
+} from "./types";
+
+export const api = {
+  me: (signal?: AbortSignal) => request<{ user: AdminUser }>("/me", { signal }),
+
+  // Users
+  listUsers: (params: { search?: string; status?: string; limit?: number; offset?: number }, signal?: AbortSignal) =>
+    request<ListUsersResponse>("/users", { query: params, signal }),
+  createUser: (body: CreateUserRequest) =>
+    request<CreateUserResponse>("/users", { method: "POST", body }),
+  getUser: (id: string, signal?: AbortSignal) =>
+    request<AdminUser>(`/users/${id}`, { signal }),
+  updateUser: (id: string, body: Partial<Pick<AdminUser, "email" | "username" | "display_name" | "status" | "is_admin">>) =>
+    request<AdminUser>(`/users/${id}`, { method: "PATCH", body }),
+  lockUser:   (id: string) => request<AdminUser>(`/users/${id}/lock`,   { method: "POST" }),
+  unlockUser: (id: string) => request<AdminUser>(`/users/${id}/unlock`, { method: "POST" }),
+  deleteUser: (id: string) => request<void>(`/users/${id}`, { method: "DELETE" }),
+  resetUserPassword: (id: string, newPassword: string) =>
+    request<void>(`/users/${id}/password`, { method: "POST", body: { new_password: newPassword } }),
+  listUserSessions: (id: string, signal?: AbortSignal) =>
+    request<{ sessions: AdminSession[] }>(`/users/${id}/sessions`, { signal }),
+  revokeUserSessions: (id: string) =>
+    request<{ revoked: number }>(`/users/${id}/revoke-all`, { method: "POST" }),
+
+  // OIDC clients
+  listClients: (signal?: AbortSignal) =>
+    request<{ clients: OIDCClient[] }>("/clients", { signal }),
+  getClient: (id: string, signal?: AbortSignal) =>
+    request<OIDCClient>(`/clients/${id}`, { signal }),
+  createClient: (body: CreateClientRequest) =>
+    request<CreateClientResponse>("/clients", { method: "POST", body }),
+  updateClient: (id: string, body: Partial<OIDCClient>) =>
+    request<OIDCClient>(`/clients/${id}`, { method: "PATCH", body }),
+  deleteClient: (id: string) => request<void>(`/clients/${id}`, { method: "DELETE" }),
+  rotateClientSecret: (id: string) =>
+    request<{ secret: string }>(`/clients/${id}/rotate`, { method: "POST" }),
+
+  // CAS services
+  listCASServices: (signal?: AbortSignal) =>
+    request<{ services: CASService[] }>("/cas-services", { signal }),
+  getCASService: (id: string, signal?: AbortSignal) =>
+    request<CASService>(`/cas-services/${id}`, { signal }),
+  createCASService: (body: CreateCASServiceRequest) =>
+    request<CASService>("/cas-services", { method: "POST", body }),
+  updateCASService: (id: string, body: Partial<CASService>) =>
+    request<CASService>(`/cas-services/${id}`, { method: "PATCH", body }),
+  deleteCASService: (id: string) =>
+    request<void>(`/cas-services/${id}`, { method: "DELETE" }),
+
+  // Audit log
+  listAudit: (params: { event_type?: string; actor_id?: string; target_id?: string; since?: string; until?: string; limit?: number; offset?: number }, signal?: AbortSignal) =>
+    request<ListAuditResponse>("/audit", { query: params, signal }),
+
+  // Signing keys
+  listKeys: (signal?: AbortSignal) =>
+    request<{ keys: SigningKey[] }>("/keys", { signal }),
+};

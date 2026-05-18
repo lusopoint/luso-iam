@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Two-factor authentication · IAM</title>
+    <style>
+        :root {
+            --bg:#f4f5f7;--card:#ffffff;--border:#e3e6ea;--text:#1f2328;
+            --muted:#6b7280;--accent:#2563eb;--accent-hover:#1d4ed8;
+            --error:#b91c1c;--error-bg:#fef2f2;
+        }
+        @media(prefers-color-scheme:dark){
+            :root{--bg:#0f1115;--card:#161922;--border:#2a2f3a;--text:#e6e8eb;
+                  --muted:#9aa1ab;--error:#fca5a5;--error-bg:#3f1c1c;}
+        }
+        *{box-sizing:border-box;}
+        html,body{margin:0;padding:0;height:100%;}
+        body{background:var(--bg);color:var(--text);
+             font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+             display:flex;align-items:center;justify-content:center;padding:1rem;}
+        .card{background:var(--card);border:1px solid var(--border);
+              border-radius:12px;padding:2rem;width:100%;max-width:380px;}
+        h1{margin:0 0 .25rem;font-size:1.4rem;font-weight:600;}
+        .subtitle{color:var(--muted);margin:0 0 1.5rem;font-size:.9rem;}
+        .error{background:var(--error-bg);color:var(--error);
+               padding:.55rem .7rem;border-radius:6px;font-size:.85rem;
+               margin-bottom:1rem;}
+        .field{margin-bottom:1rem;}
+        label{display:block;font-size:.85rem;font-weight:500;margin-bottom:.35rem;}
+        input[type=text]{width:100%;padding:.55rem .7rem;font:inherit;color:inherit;
+              background:var(--bg);border:1px solid var(--border);
+              border-radius:6px;outline:none;
+              font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+              letter-spacing:.1em;text-align:center;font-size:1.1rem;}
+        input[type=text]:focus{border-color:var(--accent);}
+        .btn{width:100%;padding:.6rem;font:inherit;font-weight:500;
+             color:#fff;background:var(--accent);border:0;border-radius:6px;
+             cursor:pointer;}
+        .btn:hover{background:var(--accent-hover);}
+        .alt{margin-top:1.25rem;text-align:center;font-size:.85rem;color:var(--muted);}
+        .alt a{color:var(--accent);text-decoration:none;}
+        .alt a:hover{text-decoration:underline;}
+        .webauthn-block{margin-bottom:1rem;}
+        .btn-secondary{width:100%;padding:.55rem;font:inherit;font-weight:500;
+             color:var(--text);background:var(--card);border:1px solid var(--border);
+             border-radius:6px;cursor:pointer;display:flex;align-items:center;
+             justify-content:center;gap:.5rem;}
+        .btn-secondary:hover{background:var(--bg);}
+        .divider{display:flex;align-items:center;gap:.75rem;
+            color:var(--muted);font-size:.8rem;margin:1.25rem 0;}
+        .divider::before,.divider::after{
+            content:"";flex:1;height:1px;background:var(--border);}
+        #wa-status{font-size:.85rem;color:var(--muted);margin-top:.5rem;text-align:center;}
+        #wa-status.error{color:var(--error);background:transparent;padding:0;margin-top:.5rem;}
+    </style>
+</head>
+<body>
+<main class="card">
+    <h1>Two-factor authentication</h1>
+    <p class="subtitle">Confirm it's you with one of your enrolled methods.</p>
+
+    {{ if .Error }}
+    <div class="error" role="alert">{{ .Error }}</div>
+    {{ end }}
+
+    {{ if .HasWebAuthn }}
+    <div class="webauthn-block">
+        <button id="wa-btn" class="btn-secondary" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Use a security key or passkey
+        </button>
+        <div id="wa-status"></div>
+    </div>
+    <div class="divider">or enter a code</div>
+    {{ end }}
+
+    {{ if .HasTOTP }}
+    <form method="POST" action="/mfa/totp">
+        <div class="field">
+            <label for="code">Authenticator code</label>
+            <input type="text" id="code" name="code" required autofocus
+                   inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                   autocomplete="one-time-code">
+        </div>
+        <button class="btn" type="submit">Verify</button>
+    </form>
+    {{ end }}
+
+    {{ if .HasBackup }}
+    <p class="alt">
+        Lost your device? <a href="/mfa/backup">Use a backup code</a>
+    </p>
+    {{ end }}
+</main>
+
+{{ if .HasWebAuthn }}
+<script>
+(function() {
+    const btn = document.getElementById('wa-btn');
+    const status = document.getElementById('wa-status');
+    if (!btn || !window.PublicKeyCredential) {
+        if (btn) btn.style.display = 'none';
+        return;
+    }
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        status.classList.remove('error');
+        status.textContent = 'Waiting for security key…';
+
+        try {
+            // 1. Ask server for assertion options.
+            const optsResp = await fetch('/mfa/webauthn/begin', {method: 'POST'});
+            if (!optsResp.ok) throw new Error('begin failed');
+            const opts = await optsResp.json();
+
+            // 2. Decode base64url-encoded fields.
+            opts.publicKey.challenge = b64uToBytes(opts.publicKey.challenge);
+            if (opts.publicKey.allowCredentials) {
+                opts.publicKey.allowCredentials.forEach(c => {
+                    c.id = b64uToBytes(c.id);
+                });
+            }
+
+            // 3. Get assertion from the browser.
+            const cred = await navigator.credentials.get({publicKey: opts.publicKey});
+
+            // 4. Encode for transport back to server.
+            const body = {
+                id: cred.id,
+                rawId: bytesToB64u(new Uint8Array(cred.rawId)),
+                type: cred.type,
+                response: {
+                    authenticatorData: bytesToB64u(new Uint8Array(cred.response.authenticatorData)),
+                    clientDataJSON:    bytesToB64u(new Uint8Array(cred.response.clientDataJSON)),
+                    signature:         bytesToB64u(new Uint8Array(cred.response.signature)),
+                    userHandle: cred.response.userHandle
+                        ? bytesToB64u(new Uint8Array(cred.response.userHandle))
+                        : null,
+                },
+            };
+
+            const finishResp = await fetch('/mfa/webauthn/finish', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+            });
+            if (!finishResp.ok) {
+                const txt = await finishResp.text();
+                throw new Error(txt || 'verification failed');
+            }
+            const data = await finishResp.json();
+            window.location.assign(data.redirect || '/');
+        } catch (err) {
+            console.error(err);
+            status.classList.add('error');
+            status.textContent = err.message || 'Sign-in cancelled.';
+            btn.disabled = false;
+        }
+    });
+
+    function b64uToBytes(s) {
+        s = s.replace(/-/g,'+').replace(/_/g,'/');
+        const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
+        const bin = atob(s + '='.repeat(pad));
+        const out = new Uint8Array(bin.length);
+        for (let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+        return out;
+    }
+    function bytesToB64u(bytes) {
+        let s = '';
+        for (let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+        return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+})();
+</script>
+{{ end }}
+</body>
+</html>
