@@ -78,6 +78,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST   /admin/v1/users/{id}/password", h.protected(h.resetUserPassword))
 	mux.HandleFunc("GET    /admin/v1/users/{id}/sessions", h.protected(h.listUserSessions))
 	mux.HandleFunc("POST   /admin/v1/users/{id}/revoke-all", h.protected(h.revokeUserSessions))
+	mux.HandleFunc("GET    /admin/v1/users/{id}/mfa", h.protected(h.listUserMFA))
+	mux.HandleFunc("DELETE /admin/v1/users/{id}/mfa", h.protected(h.deleteAllUserMFA))
+	mux.HandleFunc("DELETE /admin/v1/users/{id}/mfa/{methodId}", h.protected(h.deleteUserMFA))
 
 	// OIDC clients
 	mux.HandleFunc("GET    /admin/v1/clients", h.protected(h.listClients))
