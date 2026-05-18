@@ -7,7 +7,7 @@ import { usePrompt } from "../components/Prompt";
 import { ErrorState, Loading } from "../components/States";
 import { useToast } from "../components/Toast";
 import { ApiError, api } from "../lib/api";
-import type { AdminSession, AdminUser } from "../lib/types";
+import type { AdminSession, AdminUser, MFAMethod } from "../lib/types";
 import { formatDateTime, relativeTime, shortID } from "../lib/util";
 
 /*
@@ -30,17 +30,41 @@ export default function UserDetail() {
 
   const [user, setUser] = useState<AdminUser | null>(null);
   const [sessions, setSessions] = useState<AdminSession[]>([]);
+  // MFA state — kept separate from sessions because the panel is
+  // independently refreshable: deleting one method shouldn't refetch
+  // the session list and vice versa.
+  const [mfaMethods, setMfaMethods] = useState<MFAMethod[]>([]);
+  const [backupCount, setBackupCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // Refetch just the MFA section. Used after delete operations so the
+  // panel reflects reality without reloading the whole page.
+  async function refreshMFA() {
+    try {
+      const m = await api.listUserMFA(id);
+      setMfaMethods(m.methods);
+      setBackupCount(m.backup_codes_unused);
+    } catch {
+      // Best-effort — if this fails, the inline panel just shows
+      // stale data. The next page navigation refetches everything.
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
     const ctrl = new AbortController();
-    Promise.all([api.getUser(id, ctrl.signal), api.listUserSessions(id, ctrl.signal)])
-      .then(([u, s]) => {
+    Promise.all([
+      api.getUser(id, ctrl.signal),
+      api.listUserSessions(id, ctrl.signal),
+      api.listUserMFA(id, ctrl.signal),
+    ])
+      .then(([u, s, m]) => {
         setUser(u);
         setSessions(s.sessions);
+        setMfaMethods(m.methods);
+        setBackupCount(m.backup_codes_unused);
         setError(null);
         setLoading(false);
       })
@@ -216,6 +240,117 @@ export default function UserDetail() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* ── MFA & recovery ──────────────────────────────────────────────
+          Recovery flows live here. The story:
+            - Lost a single device         → "Remove" that method
+            - Lost everything, no codes    → "Remove all methods" (typed confirmation)
+          After either, the user signs in (with backup codes, federation,
+          or a password reset), then re-enrolls from /mfa/enroll. */}
+      <div className="card mt-4">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            MFA &amp; recovery
+          </h2>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {backupCount} backup code{backupCount === 1 ? "" : "s"} unused
+          </span>
+        </div>
+
+        {mfaMethods.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            No enrolled methods. The user will sign in with their password only.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {mfaMethods.map((m) => (
+              <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                <span className={m.method === "totp" ? "badge-brand" : "badge-green"}>
+                  {m.method}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-slate-800 dark:text-slate-200">
+                    {m.name || (m.method === "totp" ? "Authenticator app" : "Passkey")}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {m.confirmed_at ? "Confirmed" : "Pending enrollment"}
+                    {" · "}
+                    {m.last_used_at ? `last used ${relativeTime(m.last_used_at)}` : "never used"}
+                    {" · "}
+                    added {formatDateTime(m.created_at)}
+                  </p>
+                </div>
+                <button
+                  className="text-xs text-red-600 hover:underline"
+                  disabled={!!busy}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: "Remove this method?",
+                      message: `Removing "${m.name || m.method}" means the user can no longer sign in with it. They can re-enroll from /mfa/enroll after their next login.`,
+                      confirmLabel: "Remove",
+                      danger: true,
+                    });
+                    if (!ok) return;
+                    setBusy("Remove MFA");
+                    try {
+                      await api.deleteUserMFAMethod(id, m.id);
+                      await refreshMFA();
+                      toast.success("Method removed.");
+                    } catch (err) {
+                      toast.error("Could not remove method.", err instanceof ApiError ? err.message : String(err));
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+          <span className="mr-auto text-xs text-slate-500 dark:text-slate-400">
+            Last-resort recovery for users with no codes:
+          </span>
+          <button
+            className="btn-danger"
+            disabled={!!busy || (mfaMethods.length === 0 && backupCount === 0)}
+            onClick={async () => {
+              // Typed confirmation: the user has to spell out the email
+              // before we delete every second factor + every backup code.
+              // This is the nuclear option — guarding it with friction
+              // is the right trade.
+              const expected = (user?.email || user?.username || id).toLowerCase();
+              const typed = await prompt({
+                title: "Remove ALL MFA methods?",
+                message:
+                  "This deletes every enrolled second factor AND every unused backup code. The user reverts to password-only login until they re-enroll. " +
+                  `Type ${expected} to confirm.`,
+                inputLabel: "Confirm identifier",
+                placeholder: expected,
+                confirmLabel: "Remove everything",
+                danger: true,
+                validate: (v) => v.trim().toLowerCase() === expected ? null : "Doesn't match.",
+              });
+              if (typed === null) return;
+              setBusy("Remove all MFA");
+              try {
+                await api.deleteAllUserMFA(id);
+                await refreshMFA();
+                toast.success("All MFA methods and backup codes removed.");
+              } catch (err) {
+                toast.error("Could not remove methods.", err instanceof ApiError ? err.message : String(err));
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            Remove all MFA methods
+          </button>
+        </div>
       </div>
     </>
   );

@@ -111,6 +111,7 @@ import type {
   ListUsersResponse,
   CreateUserRequest,
   CreateUserResponse,
+  ListUserMFAResponse,
   OIDCClient,
   CreateClientRequest,
   CreateClientResponse,
@@ -142,6 +143,14 @@ export const api = {
     request<{ sessions: AdminSession[] }>(`/users/${id}/sessions`, { signal }),
   revokeUserSessions: (id: string) =>
     request<{ revoked: number }>(`/users/${id}/revoke-all`, { method: "POST" }),
+
+  // User MFA management
+  listUserMFA: (id: string, signal?: AbortSignal) =>
+    request<ListUserMFAResponse>(`/users/${id}/mfa`, { signal }),
+  deleteUserMFAMethod: (userId: string, methodId: string) =>
+    request<void>(`/users/${userId}/mfa/${methodId}`, { method: "DELETE" }),
+  deleteAllUserMFA: (id: string) =>
+    request<void>(`/users/${id}/mfa`, { method: "DELETE" }),
 
   // OIDC clients
   listClients: (signal?: AbortSignal) =>
