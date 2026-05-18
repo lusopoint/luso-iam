@@ -72,20 +72,16 @@ migrate-new: ## create a new migration pair: - make migrate-new name=add_foo
 # with the compiled SPA embedded. Web-build short-circuits via the
 # node_modules timestamp marker so iterative server builds aren't slow
 
-web-install: ## install web dependencies
-	$(WEB_DIR)/node_modules/.package-lock.json
-
-$(WEB_DIR)/node_modules/.package-lock.json: $(WEB_DIR)/package.json
+web-install: ## Install web dependencies (npm handles its own caching)
 	cd $(WEB_DIR) && npm install --no-audit --no-fund
 
-web-build: web-install ## build the React admin SPA into web/dist
+web-build: web-install ## Build the React admin SPA into web/dist
 	cd $(WEB_DIR) && npm run build
 
-# so we can just build and the proxy handles the rest (TODO: maybe we would want to convert to caddy?)
-web-dev: web-install ## start the Vite dev server (with API proxy to :8080)
+web-dev: web-install ## Start the Vite dev server (with API proxy to :8080)
 	cd $(WEB_DIR) && npm run dev
 
-web-clean: ## remove web/dist (resets to stub on next web-build)
+web-clean: ## Remove web/dist (resets to stub on next web-build)
 	rm -rf $(WEB_DIR)/dist/assets
 	git checkout $(WEB_DIR)/dist/index.html 2>/dev/null || true
 
