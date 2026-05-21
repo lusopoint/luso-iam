@@ -16,6 +16,7 @@ import (
 	"github.com/lusopoint/lusoiam/internal/audit"
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 	"github.com/lusopoint/lusoiam/internal/crypto"
+	"github.com/lusopoint/lusoiam/internal/federation"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
@@ -30,7 +31,12 @@ type Handler struct {
 	sessions *session.Service
 	audit    *audit.Service
 	keys     *crypto.KeyManager
-	baseURL  string
+	// federation is the read-only registry of configured upstream
+	// providers. nil is allowed, the federation admin endpoints just
+	// return an empty list in that case, which is the same shape the
+	// SPA already handles for "no providers configured"
+	federation *federation.Registry
+	baseURL    string
 	// baseOrigin is the parsed scheme+host of baseURL, used for same-origin
 	// CSRF checks. Computed once at construction time.
 	baseOrigin string
@@ -38,11 +44,12 @@ type Handler struct {
 
 // Config is the constructor input bundle.
 type Config struct {
-	Store    *postgres.Store
-	Sessions *session.Service
-	Audit    *audit.Service
-	Keys     *crypto.KeyManager
-	BaseURL  string
+	Store      *postgres.Store
+	Sessions   *session.Service
+	Audit      *audit.Service
+	Keys       *crypto.KeyManager
+	Federation *federation.Registry
+	BaseURL    string
 }
 
 // New returns a configured Handler.
@@ -56,6 +63,7 @@ func New(c Config) *Handler {
 		sessions:   c.Sessions,
 		audit:      c.Audit,
 		keys:       c.Keys,
+		federation: c.Federation,
 		baseURL:    c.BaseURL,
 		baseOrigin: origin,
 	}
@@ -82,6 +90,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /admin/v1/users/{id}/mfa", h.protected(h.deleteAllUserMFA))
 	mux.HandleFunc("DELETE /admin/v1/users/{id}/mfa/{methodId}", h.protected(h.deleteUserMFA))
 
+	// Per-user federation identities (read + unlink).
+	mux.HandleFunc("GET    /admin/v1/users/{id}/federation", h.protected(h.listUserFederation))
+	mux.HandleFunc("DELETE /admin/v1/users/{id}/federation/{linkId}", h.protected(h.unlinkUserFederation))
+
 	// OIDC clients
 	mux.HandleFunc("GET    /admin/v1/clients", h.protected(h.listClients))
 	mux.HandleFunc("POST   /admin/v1/clients", h.protected(h.createClient))
@@ -99,6 +111,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 	// Audit log (read-only)
 	mux.HandleFunc("GET /admin/v1/audit", h.protected(h.listAudit))
+
+	// Federation providers (read-only — config lives in env vars no client secret!)
+	mux.HandleFunc("GET /admin/v1/federation/providers", h.protected(h.listFederationProviders))
 
 	// Signing keys (read-only for now; rotation is a P7 deliverable)
 	mux.HandleFunc("GET /admin/v1/keys", h.protected(h.listKeys))

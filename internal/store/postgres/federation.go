@@ -36,9 +36,9 @@ func (s *Store) GetUserIdentity(ctx context.Context, provider, sub string) (*Use
 }
 
 // GetUserByProviderSub is a convenience join that returns the IAM User
-// that owns the given (provider, sub) identity, or ErrNotFound.
+// that owns the given (provider, sub) identity, or ErrNotFound
 func (s *Store) GetUserByProviderSub(ctx context.Context, provider, sub string) (*User, error) {
-	q := `SELECT ` + userColumns + ` FROM users u
+	q := `SELECT ` + userColumnsAs("u") + ` FROM users u
 	      JOIN user_identities ui ON ui.user_id = u.id
 	      WHERE ui.provider = $1 AND ui.sub = $2
 	        AND u.deleted_at IS NULL`
@@ -136,6 +136,42 @@ func (s *Store) ListUserIdentities(ctx context.Context, userID pgtype.UUID) ([]U
 		return nil, fmt.Errorf("scan user_identities: %w", err)
 	}
 	return ids, nil
+}
+
+// GetUserIdentityByID returns the user_identity row with the given id,
+// or ErrNotFound. Used by the admin unlink endpoint to verify
+// ownership before deleting (otherwise an attacker could probe IDs
+// belonging to other users).
+func (s *Store) GetUserIdentityByID(ctx context.Context, id pgtype.UUID) (*UserIdentity, error) {
+	q := `SELECT ` + userIdentityColumns + ` FROM user_identities WHERE id = $1`
+	rows, err := s.pool.Query(ctx, q, id)
+	if err != nil {
+		return nil, fmt.Errorf("query user_identity: %w", err)
+	}
+	ui, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[UserIdentity])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("scan user_identity: %w", err)
+	}
+	return &ui, nil
+}
+
+// DeleteUserIdentity removes a single user_identity row. We use a hard
+// delete (not a soft delete) because once unlinked, the (provider, sub)
+// pair must be free to re-link — either to the same user via /mfa/enroll
+// type flow, or to a different user if the upstream account changes
+// hands. A soft delete would leave the unique constraint occupied.
+func (s *Store) DeleteUserIdentity(ctx context.Context, id pgtype.UUID) error {
+	cmd, err := s.pool.Exec(ctx, `DELETE FROM user_identities WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete user_identity: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func marshalClaims(m map[string]any) ([]byte, error) {

@@ -4,16 +4,34 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const userColumns = `
-	id, email, username, display_name, status, is_admin,
-	email_verified_at, last_login_at,
-	created_at, updated_at, deleted_at
-`
+// userColumnNames is the canonical column list for the users table
+var userColumnNames = []string{
+	"id", "email", "username", "display_name", "status", "is_admin",
+	"email_verified_at", "last_login_at",
+	"created_at", "updated_at", "deleted_at",
+}
+
+// userColumns is the bare comma-separated list(no ambiguity possible).
+var userColumns = strings.Join(userColumnNames, ", ")
+
+// userColumnsAs returns the column list with a table alias prepended,
+// for queries that JOIN another table sharing column names. Without
+// the prefix, columns like id/email/created_at/updated_at/display_name
+// (all of which also exist on user_identities) collide and Postgres
+// raises "column reference is ambiguous"
+func userColumnsAs(alias string) string {
+	parts := make([]string, len(userColumnNames))
+	for i, c := range userColumnNames {
+		parts[i] = alias + "." + c + " AS " + c
+	}
+	return strings.Join(parts, ", ")
+}
 
 // GetUserByEmail returns the active user with the given email, or
 // ErrNotFound. Email comparison is case-insensitive because users.email

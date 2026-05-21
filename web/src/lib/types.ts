@@ -36,6 +36,37 @@ export interface ListUserMFAResponse {
   backup_codes_unused: number;
 }
 
+// ─── Federation ───────────────────────────────────────────────────────────
+
+/** A configured upstream provider as surfaced by the admin status page. */
+export interface FederationProvider {
+  name: string;          // slug: "google", "github", ...
+  display_name: string;  // "Google", "GitHub", ...
+  redirect_uri: string;
+}
+
+export interface ListProvidersResponse {
+  providers: FederationProvider[];
+}
+
+/** One link between a user and an upstream provider account. */
+export interface UserFederationIdentity {
+  id: string;
+  provider: string;
+  display_name: string;
+  sub: string;
+  email?: string;
+  /** The user's name as known by the provider — distinct from their IAM display_name. */
+  provider_name?: string;
+  picture_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListUserFederationResponse {
+  identities: UserFederationIdentity[];
+}
+
 export interface ListUsersResponse {
   users: AdminUser[];
   total: number;

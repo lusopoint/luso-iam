@@ -112,6 +112,8 @@ import type {
   CreateUserRequest,
   CreateUserResponse,
   ListUserMFAResponse,
+  ListProvidersResponse,
+  ListUserFederationResponse,
   OIDCClient,
   CreateClientRequest,
   CreateClientResponse,
@@ -151,6 +153,14 @@ export const api = {
     request<void>(`/users/${userId}/mfa/${methodId}`, { method: "DELETE" }),
   deleteAllUserMFA: (id: string) =>
     request<void>(`/users/${id}/mfa`, { method: "DELETE" }),
+
+  // Federation
+  listFederationProviders: (signal?: AbortSignal) =>
+    request<ListProvidersResponse>("/federation/providers", { signal }),
+  listUserFederation: (id: string, signal?: AbortSignal) =>
+    request<ListUserFederationResponse>(`/users/${id}/federation`, { signal }),
+  unlinkUserFederation: (userId: string, linkId: string) =>
+    request<void>(`/users/${userId}/federation/${linkId}`, { method: "DELETE" }),
 
   // OIDC clients
   listClients: (signal?: AbortSignal) =>
