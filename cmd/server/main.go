@@ -195,11 +195,12 @@ func run() error {
 
 	// Admin REST API (consumed by the React SPA at /admin/*).
 	apiadmin.New(apiadmin.Config{
-		Store:    store,
-		Sessions: sessionSvc,
-		Audit:    auditSvc,
-		Keys:     keys,
-		BaseURL:  cfg.BaseURL,
+		Store:      store,
+		Sessions:   sessionSvc,
+		Audit:      auditSvc,
+		Keys:       keys,
+		Federation: registry,
+		BaseURL:    cfg.BaseURL,
 	}).Register(mux)
 
 	// Admin SPA — serves the React app from web/dist embedded at compile time.

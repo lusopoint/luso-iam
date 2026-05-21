@@ -11,6 +11,7 @@ import Audit from "./pages/Audit";
 import ClientNew from "./pages/ClientNew";
 import Clients from "./pages/Clients";
 import Dashboard from "./pages/Dashboard";
+import Federation from "./pages/Federation";
 import Keys from "./pages/Keys";
 import CASServices from "./pages/CASServices";
 import UserDetail from "./pages/UserDetail";
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="clients"   element={<Clients />} />
               <Route path="clients/new" element={<ClientNew />} />
               <Route path="cas-services" element={<CASServices />} />
+              <Route path="federation" element={<Federation />} />
               <Route path="audit"     element={<Audit />} />
               <Route path="keys"      element={<Keys />} />
               <Route path="*"         element={<Navigate to="/" replace />} />

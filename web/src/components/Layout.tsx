@@ -24,6 +24,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/users",        label: "Users" },
   { to: "/clients",      label: "OIDC clients" },
   { to: "/cas-services", label: "CAS services" },
+  { to: "/federation",   label: "Federation" },
   { to: "/audit",        label: "Audit log" },
   { to: "/keys",         label: "Signing keys" },
 ];

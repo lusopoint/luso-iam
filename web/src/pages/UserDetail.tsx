@@ -7,7 +7,7 @@ import { usePrompt } from "../components/Prompt";
 import { ErrorState, Loading } from "../components/States";
 import { useToast } from "../components/Toast";
 import { ApiError, api } from "../lib/api";
-import type { AdminSession, AdminUser, MFAMethod } from "../lib/types";
+import type { AdminSession, AdminUser, MFAMethod, UserFederationIdentity } from "../lib/types";
 import { formatDateTime, relativeTime, shortID } from "../lib/util";
 
 /*
@@ -35,6 +35,9 @@ export default function UserDetail() {
   // the session list and vice versa.
   const [mfaMethods, setMfaMethods] = useState<MFAMethod[]>([]);
   const [backupCount, setBackupCount] = useState<number>(0);
+  // Federation state — same independence rationale as MFA. Lives next
+  // to the MFA panel in the UI.
+  const [federationLinks, setFederationLinks] = useState<UserFederationIdentity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -52,6 +55,15 @@ export default function UserDetail() {
     }
   }
 
+  async function refreshFederation() {
+    try {
+      const f = await api.listUserFederation(id);
+      setFederationLinks(f.identities);
+    } catch {
+      // Same best-effort policy as refreshMFA.
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
     const ctrl = new AbortController();
@@ -59,12 +71,14 @@ export default function UserDetail() {
       api.getUser(id, ctrl.signal),
       api.listUserSessions(id, ctrl.signal),
       api.listUserMFA(id, ctrl.signal),
+      api.listUserFederation(id, ctrl.signal),
     ])
-      .then(([u, s, m]) => {
+      .then(([u, s, m, f]) => {
         setUser(u);
         setSessions(s.sessions);
         setMfaMethods(m.methods);
         setBackupCount(m.backup_codes_unused);
+        setFederationLinks(f.identities);
         setError(null);
         setLoading(false);
       })
@@ -351,6 +365,93 @@ export default function UserDetail() {
             Remove all MFA methods
           </button>
         </div>
+      </div>
+
+      {/* ── Federation / Upstream SSO ──────────────────────────────────
+          Per-user linked identities. Read + unlink only. Removing the
+          last identity for a user with no password credential is
+          refused server-side (409 would_lock_out) — the SPA reflects
+          that as a friendlier "Set a password first" toast. */}
+      <div className="card mt-4">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Federated identities
+          </h2>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {federationLinks.length === 0
+              ? "no providers linked"
+              : `${federationLinks.length} provider${federationLinks.length === 1 ? "" : "s"} linked`}
+          </span>
+        </div>
+
+        {federationLinks.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            This user has no upstream provider links. They sign in with their password (or MFA).
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {federationLinks.map((link) => (
+              <li key={link.id} className="flex items-start gap-3 px-4 py-2.5">
+                <span className="badge-slate shrink-0">{link.display_name}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-slate-800 dark:text-slate-200">
+                    {link.email || link.provider_name || link.sub}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-mono">sub: {link.sub.length > 30 ? link.sub.slice(0, 27) + "…" : link.sub}</span>
+                    {" · "}
+                    linked {formatDateTime(link.created_at)}
+                    {link.updated_at !== link.created_at &&
+                      ` · last login ${relativeTime(link.updated_at)}`}
+                  </p>
+                </div>
+                <button
+                  className="shrink-0 text-xs text-red-600 hover:underline"
+                  disabled={!!busy}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: `Unlink ${link.display_name}?`,
+                      message:
+                        `The user will no longer be able to sign in via ${link.display_name}. ` +
+                        "They can re-link on a future sign-in if they choose to.",
+                      confirmLabel: "Unlink",
+                      danger: true,
+                    });
+                    if (!ok) return;
+                    setBusy("Unlink");
+                    try {
+                      await api.unlinkUserFederation(id, link.id);
+                      await refreshFederation();
+                      toast.success(`Unlinked ${link.display_name}.`);
+                    } catch (err) {
+                      // Server returns 409 with code "would_lock_out"
+                      // when removing this link would leave the user
+                      // with no way to sign in (no password + no other
+                      // federation). Translate that to a friendlier
+                      // message — the admin should reset the password
+                      // first, then retry.
+                      if (err instanceof ApiError && err.code === "would_lock_out") {
+                        toast.error(
+                          "Can't unlink — user would be locked out.",
+                          "Reset their password first, then retry the unlink.",
+                        );
+                      } else {
+                        toast.error(
+                          "Could not unlink.",
+                          err instanceof ApiError ? err.message : String(err),
+                        );
+                      }
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  Unlink
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </>
   );
