@@ -1,21 +1,45 @@
-# Binaries
+# Go
 /bin/
-/dist/
-iam-server
+/iam-server
 *.exe
 *.test
 *.out
+go.work
+go.work.sum
 
 # Coverage
 *.cover
 coverage.txt
+coverage.html
 
 # Env / secrets
+# Anything matching .env.local, .env.production.local, etc.
 .env
-.env.local
+.env.*.local
 *.pem
 *.key
 /etc/iam/keys/
+
+# Frontend
+# Source assets (web/public) ARE committed — that's where icons live.
+# Vite's package install + cache:
+web/node_modules/
+web/.vite/
+
+# Built React assets — produced by `make web-build`. Each fresh build
+# overwrites these; the stub web/dist/index.html IS tracked so the Go
+# binary always has something to embed via //go:embed.
+web/dist/assets/
+web/dist/sw.js
+web/dist/sw.js.map
+web/dist/workbox-*.js
+web/dist/workbox-*.js.map
+web/dist/registerSW.js
+web/dist/manifest.webmanifest
+web/tsconfig.node.tsbuildinfo
+web/tsconfig.tsbuildinfo
+web/vite.config.d.ts
+web/vite.config.js
 
 # IDE
 .idea/
@@ -26,21 +50,5 @@ coverage.txt
 .DS_Store
 Thumbs.db
 
-# Go workspace
-go.work
-go.work.sum
-
-# Frontend
-web/node_modules/
-# Built React assets — produced by `make web-build`. Each fresh build
-# overwrites these; the stub web/dist/index.html IS tracked so the Go
-# binary always has something to embed.
-web/dist/assets/
-web/dist/sw.js
-web/dist/sw.js.map
-web/dist/workbox-*.js
-web/dist/workbox-*.js.map
-web/dist/registerSW.js
-web/dist/manifest.webmanifest
-# Vite's optimized dep cache.
-web/.vite/
+# Logs
+*.log
