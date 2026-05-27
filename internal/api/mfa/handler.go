@@ -515,7 +515,14 @@ func (h *Handler) finishChallenge(
 		}))
 	}
 
-	// Resolve the destination. Priority: CAS service > NextURL > root.
+	// Resolve the destination. Priority:
+	//   1. CAS service ticket (downstream app login completed via CAS)
+	//   2. ch.NextURL — first-party in-server path (admin UI, etc.)
+	//   3. ch.Redirect — cross-origin URL for the reverse-proxy companion
+	//      (Caddy/Traefik forward_auth flow). Already validated against
+	//      the configured PROXY_ALLOWED_CALLBACK_ORIGINS allowlist at the
+	//      time the challenge was issued, so we trust it here.
+	//   4. root
 	if ch.Service != "" {
 		if _, err := h.cas.ResolveService(r.Context(), ch.Service); err == nil {
 			ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, ch.Service, false)
@@ -526,6 +533,9 @@ func (h *Handler) finishChallenge(
 	}
 	if ch.NextURL != "" {
 		return ch.NextURL, nil
+	}
+	if ch.Redirect != "" {
+		return ch.Redirect, nil
 	}
 	return "/", nil
 }

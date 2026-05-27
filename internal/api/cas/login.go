@@ -12,19 +12,22 @@ import (
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 )
 
-// loginGET handles GET /cas/login.
-//
+// GET /cas/login
 // CAS spec behaviour:
 //
-//   - renew=true  → force fresh authentication even if a valid session exists.
-//   - gateway=true → silently check session; redirect to service without
-//     a ticket if unauthenticated (never show the login form).
-//   - Unregistered service → 403 error page (never issue a ticket).
-//   - No service param and authenticated → redirect to / (portal stub).
+//   - renew=true -> force fresh authentication even if a valid session exists
+//   - gateway=true -> silently check session, redirect to service without
+//     a ticket if unauthenticated (never show the login form)
+//   - Unregistered service -> 403 error page (never issue a ticket)
+//   - No service param and authenticated -> redirect to / (portal stub)
 func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	serviceURL := q.Get("service")
 	nextURL := safeNext(q.Get("next"))
+	// rd is the cross-origin redirect used by the reverse-proxy
+	// Unlike `next`, it can reference a different host
+	// but only origins on the configured "allowlist" are accepted
+	redirectURL := h.safeRedirect(q.Get("rd"))
 	renew := q.Get("renew") == "true"
 	gateway := q.Get("gateway") == "true"
 
@@ -32,10 +35,11 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 	if !renew {
 		sess, err := h.sessions.Get(r.Context(), r)
 		if err == nil {
-			// Already authenticated. Three cases, in priority order:
-			//   1. service=<URL>  → CAS ticket flow (downstream app login)
-			//   2. next=<path>    → first-party redirect (admin UI, etc.)
-			//   3. neither        → fall back to /
+			// Already authenticated, cases in priority order:
+			//   1. service=<URL>  -> CAS ticket flow (downstream app login)
+			//   2. next=<path>    -> first-party redirect (admin UI, ...)
+			//   3. rd=<URL>       -> cross-origin redirect (proxy companion)
+			//   4. nothing        -> fall back to "/"
 			if serviceURL != "" {
 				if _, regErr := h.cas.ResolveService(r.Context(), serviceURL); regErr != nil {
 					renderError(w, http.StatusForbidden, errorPageData{
@@ -60,34 +64,38 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, nextURL, http.StatusFound)
 				return
 			}
+			if redirectURL != "" {
+				http.Redirect(w, r, redirectURL, http.StatusFound)
+				return
+			}
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 	}
 
 	// No valid session
-
-	// Gateway mode: redirect to service without authenticating.
+	// Gateway mode, redirect to service without authenticating
 	if gateway && serviceURL != "" {
 		http.Redirect(w, r, serviceURL, http.StatusFound)
 		return
 	}
 
-	// Show the login form.
+	// Show the login form
 	renderLogin(w, http.StatusOK, loginPageData{
-		Service:   serviceURL,
-		Next:      nextURL,
-		Renew:     renew,
-		Gateway:   gateway,
-		Error:     r.URL.Query().Get("error"), // set by federation callback on failure
+		Service:  serviceURL,
+		Next:     nextURL,
+		Redirect: redirectURL,
+		Renew:    renew,
+		Gateway:  gateway,
+		// set by federation callback on failure
+		Error:     r.URL.Query().Get("error"),
 		Providers: h.providers(),
 	})
 }
 
-// loginPOST handles POST /cas/login (form submission).
-//
+// POST /cas/login (form submission)
 // It authenticates the submitted credentials, creates a session, and
-// either redirects to the service with a ticket or sends the user to /.
+// either redirects to the service with a ticket or sends the user to "/"
 func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderError(w, http.StatusBadRequest, errorPageData{
@@ -101,6 +109,7 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	pwd := r.FormValue("password")
 	serviceURL := r.FormValue("service")
 	nextURL := safeNext(r.FormValue("next"))
+	redirectURL := h.safeRedirect(r.FormValue("rd"))
 	renew := r.FormValue("renew") == "true"
 
 	// Authenticate
@@ -115,7 +124,7 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		}
 		// Audit the failed attempt. Actor is unknown (we never confirmed
 		// who the user was) so leave it nil; record the submitted email
-		// in metadata for forensic review.
+		// in metadata for forensic review
 		if h.audit != nil {
 			reason := "invalid_credentials"
 			switch {
@@ -130,17 +139,18 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 			}))
 		}
 		renderLogin(w, http.StatusUnauthorized, loginPageData{
-			Email:   email,
-			Service: serviceURL,
-			Next:    nextURL,
-			Renew:   renew,
-			Error:   msg,
+			Email:    email,
+			Service:  serviceURL,
+			Next:     nextURL,
+			Redirect: redirectURL,
+			Renew:    renew,
+			Error:    msg,
 		})
 		return
 	}
 
 	// Verify the service before creating a session
-	// We check early so we don't create a session that leads nowhere.
+	// We check early so we don't create a session that leads nowhere
 	if serviceURL != "" {
 		if _, err := h.cas.ResolveService(r.Context(), serviceURL); err != nil {
 			if errors.Is(err, authcas.ErrUnauthorizedService) {
@@ -161,8 +171,8 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 
 	// MFA gate
 	// If the user has any confirmed second factors, we don't create a
-	// session yet — we issue a pending-MFA cookie and redirect to /mfa.
-	// The MFA handler creates the real session once verification succeeds.
+	// session yet — we issue a pending-MFA cookie and redirect to /mfa
+	// The MFA handler creates the real session once verification succeeds
 	if h.mfa != nil {
 		status, err := h.mfa.StatusForUser(r.Context(), user.ID)
 		if err != nil {
@@ -175,9 +185,14 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		}
 		if status.Required {
 			ch := authmfa.Challenge{
-				UserID:    uuidToString(user.ID),
-				Service:   serviceURL,
-				NextURL:   nextURL,
+				UserID:  uuidToString(user.ID),
+				Service: serviceURL,
+				NextURL: nextURL,
+				// redirectURL is the cross-origin destination from
+				// /proxy/verify (Caddy/Traefik forward_auth flow)
+				// Pre-validated by h.safeRedirect; carries through MFA so
+				// the user lands on the protected app after challenge
+				Redirect:  redirectURL,
 				Methods:   status.MethodTypes,
 				HasBackup: status.HasBackupCodes,
 			}
@@ -231,21 +246,21 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// First-party redirect (e.g. admin SPA). next has already been
-	// validated by safeNext to be a same-origin path.
+	// validated by safeNext to be a same-origin path
 	if nextURL != "" {
 		http.Redirect(w, r, nextURL, http.StatusFound)
 		return
 	}
 
-	// Neither service nor next — send to the portal root.
+	// Neither service nor next — send to the portal root
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-// safeNext sanitises a post-login `next` query parameter. We only allow
-// same-origin relative paths starting with a single "/" — never URLs
+// safeNext sanitises a post-login `next` query parameter
+// We only allow same-origin relative paths starting with a single "/", never URLs
 // with a scheme, never protocol-relative ("//evil.com"), never values
 // containing a CR/LF (header injection). Anything that doesn't fit the
-// pattern is silently dropped; the redirect falls back to "/".
+// pattern is silently dropped, the redirect falls back to "/"
 //
 // This is the standard open-redirect guard. It exists because `next` is
 // reflected into a Location header after authentication, which is
@@ -254,14 +269,14 @@ func safeNext(s string) string {
 	if s == "" {
 		return ""
 	}
-	// Must start with "/" but NOT "//" (which is protocol-relative).
+	// Must start with "/" but NOT "//" (which is protocol-relative)
 	if len(s) < 1 || s[0] != '/' {
 		return ""
 	}
 	if len(s) >= 2 && s[1] == '/' {
 		return ""
 	}
-	// Reject \, which some user-agents treat as / on Windows paths.
+	// Reject \, which some user-agents treat as / on Windows paths
 	for _, r := range s {
 		if r == '\r' || r == '\n' || r == '\\' {
 			return ""

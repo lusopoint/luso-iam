@@ -30,12 +30,25 @@ var ErrNoChallenge = errors.New("mfa: no pending challenge")
 // and MFA verification. Stored client-side in an HMAC-signed cookie so
 // the server is stateless across the gap.
 type Challenge struct {
-	UserID    string   `json:"u"`    // user UUID
-	Service   string   `json:"svc"`  // CAS service URL (may be empty)
-	NextURL   string   `json:"next"` // post-MFA redirect (used by /oauth2/authorize)
-	Methods   []string `json:"m"`    // enrolled method types: "totp", "webauthn"
-	HasBackup bool     `json:"bk"`   // user has backup codes
-	Expires   int64    `json:"exp"`  // unix seconds
+	UserID string `json:"u"`
+
+	// CAS service URL (may be empty)
+	Service string `json:"svc"`
+
+	// post-MFA redirect (used by /oauth2/authorize)
+	NextURL string `json:"next"`
+
+	// post-MFA cross-origin redirect (used by /proxy/verify); pre-validated by caller
+	Redirect string `json:"rd"`
+
+	// enrolled method types: "totp", "webauthn"
+	Methods []string `json:"m"`
+
+	// user has backup codes
+	HasBackup bool `json:"bk"`
+
+	// unix seconds
+	Expires int64 `json:"exp"`
 }
 
 // IssueChallenge signs a Challenge into a cookie on w. Sets a 5-minute
