@@ -6,7 +6,7 @@ A complete walkthrough: dev setup, prod deployment, federation (Google/GitHub/ot
 
 ## Part 1, Environment configuration
 
-Every knob is an environment variable. The server reads them at startup and validates before opening any sockets. Set them in a `.env` file (loaded by `docker compose`) or export them in your shell, the server itself doesn't read `.env` directly, so for bare-metal runs you need to source it yourself.
+Every knob is an environment variable. The server reads them at startup and validates before opening any sockets. Set them in a `.env` file (loaded by `docker compose`) or export them in your shell — the server itself doesn't read `.env` directly, so for bare-metal runs you need to source it yourself.
 
 ### Required for any deployment
 
@@ -16,12 +16,16 @@ DATABASE_URL=postgres://iam:iam@localhost:5432/iam?sslmode=disable
 
 # Public URL the server is reachable at. Used in OIDC discovery,
 # email verification links, and CAS responses. MUST match what
-# downstream clients see (no trailing slash)
+# downstream clients see (no trailing slash).
+#
+# A note on what this controls beyond URLs:
+#   - WebAuthn RPID is derived from the host part of BASE_URL.
+#   - The Secure flag on cookies is set when BASE_URL starts with https://
+#     (so production https → secure cookies; dev http → not).
 BASE_URL=http://localhost:8080
 
 # 32-byte hex secret for HMAC-signing session cookies. Generate once,
-# never commit! (actually never commit .env)
-# `openssl rand -hex 32` produces the right shape
+# never commit. `openssl rand -hex 32` produces the right shape.
 SESSION_SECRET=<64 hex chars>
 
 # RSA-2048 PEM private key for signing OIDC id_tokens. The keygen
@@ -32,39 +36,58 @@ SIGNING_KEY_PATH=/etc/iam/keys/signing.pem
 ### Common optional settings
 
 ```bash
-# Listen address. Defaults to :8080
+# Listen address. Defaults to :8080.
 HTTP_ADDR=:8080
 
 # Auto-run migrations at startup. Default true in dev, set false in
 # prod if you'd rather run `make migrate-up` as a deploy step.
 AUTO_MIGRATE=true
 
-# Slog level: debug | info | warn | error
+# Slog level: debug | info | warn | error. Default: info.
 LOG_LEVEL=info
 
-# When true, the Secure cookie flag is set on all cookies. Required
-# for production; defaults off so localhost works without TLS
-COOKIES_SECURE=false
+# Log format: text (default, dev-friendly) | json (production).
+LOG_FORMAT=json
 
-# Trust X-Forwarded-* headers (only when behind a reverse proxy).
-TRUSTED_PROXIES=127.0.0.1,::1
+# Environment tag, mostly for log enrichment. Free-form string.
+ENV=production
+
+# Postgres connection pool sizing. Defaults are sensible for most loads.
+DB_MAX_CONNS=20
+DB_MIN_CONNS=2
 ```
 
-### MFA configuration
+### Reverse-proxy companion (forward_auth)
+
+Only needed if you're using the `/proxy/verify` endpoint (see Part 8):
 
 ```bash
-# Display name shown in TOTP authenticator apps: e.g. "IAM Server (l@mail.com)"
-MFA_ISSUER=IAM Server
+# Make the IAM session cookie readable across all subdomains under the
+# parent. Without this, the cookie is scoped to the auth host only.
+SESSION_COOKIE_DOMAIN=.example.com
 
-# Relying-party name shown in WebAuthn / passkey prompts
-MFA_WEBAUTHN_RP_NAME=IAM Server
-
-# Relying-party ID, must be the registrable domain (no scheme, no port)
-# Defaults to the host of BASE_URL when unset
-# MFA_WEBAUTHN_RP_ID=auth.example.com
+# Comma-separated allowlist of origins that may receive a redirect
+# after login. Open-redirect defense — any origin not here will see
+# a bare 401 with no Location header.
+PROXY_ALLOWED_CALLBACK_ORIGINS=https://app.example.com,https://wiki.example.com
 ```
 
+### MFA
+
+```bash
+# Display name shown in TOTP authenticator apps,
+# e.g. "IAM Server (alice@example.com)".
+MFA_ISSUER=IAM Server
+
+# Relying-party name shown in WebAuthn / passkey prompts.
+MFA_WEBAUTHN_RP_NAME=IAM Server
+```
+
+WebAuthn's RPID (the registrable domain it binds credentials to) is **automatically derived** from `BASE_URL`'s host — there's no env var for it. `BASE_URL=https://auth.example.com` gives RPID `auth.example.com`. This is correct for almost every deployment; the rare cases where you'd want a different RPID (multi-subdomain setups with credentials shared across hosts) aren't supported today.
+
 ### Federation, only set what you enable
+
+First-class providers (one button each, fixed labels):
 
 ```bash
 GOOGLE_CLIENT_ID=...
@@ -72,22 +95,24 @@ GOOGLE_CLIENT_SECRET=...
 
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
-
-MICROSOFT_CLIENT_ID=...
-MICROSOFT_CLIENT_SECRET=...
-# or your tenant UUID
-MICROSOFT_TENANT=common
-
-GITLAB_CLIENT_ID=...
-GITLAB_CLIENT_SECRET=...
-# override for self-hosted GitLab
-GITLAB_ISSUER=https://gitlab.com
-
-APPLE_CLIENT_ID=...
-APPLE_TEAM_ID=...
-APPLE_KEY_ID=...
-APPLE_PRIVATE_KEY_PATH=/etc/iam/keys/apple.p8
 ```
+
+Generic OIDC providers — any OpenID-Connect-compliant IdP (Microsoft Entra, GitLab, Okta, Auth0, Keycloak, Authentik, Zitadel, a corporate IdP, etc.). Declare which ones are enabled in `OIDC_PROVIDERS`, then provide each one's settings under `OIDC_<SLUG>_*`:
+
+```bash
+OIDC_PROVIDERS=microsoft,okta
+
+OIDC_MICROSOFT_ISSUER=https://login.microsoftonline.com/common/v2.0
+OIDC_MICROSOFT_CLIENT_ID=...
+OIDC_MICROSOFT_CLIENT_SECRET=...
+
+OIDC_OKTA_ISSUER=https://acme.okta.com
+OIDC_OKTA_CLIENT_ID=...
+OIDC_OKTA_CLIENT_SECRET=...
+OIDC_OKTA_DISPLAY_NAME=Acme SSO   # optional
+```
+
+See [Part 4](#part-4-federation-setup) for the full provider walkthrough, including the slug rules and per-provider quirks. Sign in with Apple isn't OIDC-compatible (its "client secret" is a per-request signed JWT) and is **planned but not yet wired**.
 
 ---
 
@@ -114,7 +139,6 @@ SESSION_SECRET=$(openssl rand -hex 32)
 SIGNING_KEY_PATH=$PWD/signing.pem
 AUTO_MIGRATE=true
 LOG_LEVEL=debug
-COOKIES_SECURE=false
 MFA_ISSUER=IAM Server (dev)
 EOF
 
@@ -191,14 +215,15 @@ DATABASE_URL=postgres://iam:STRONG_PASSWORD@db.internal:5432/iam?sslmode=require
 BASE_URL=https://auth.example.com
 SESSION_SECRET=GENERATE_WITH_openssl_rand_-hex_32
 SIGNING_KEY_PATH=/etc/iam/keys/signing.pem
-COOKIES_SECURE=true
-TRUSTED_PROXIES=127.0.0.1,::1
 LOG_LEVEL=info
+LOG_FORMAT=json
+ENV=production
 AUTO_MIGRATE=false
 MFA_ISSUER=Auth.example.com
 MFA_WEBAUTHN_RP_NAME=Example
-MFA_WEBAUTHN_RP_ID=auth.example.com
 ```
+
+(`COOKIES_SECURE` and the WebAuthn RPID are derived from `BASE_URL` automatically — https → secure cookies, RPID = `auth.example.com`.)
 
 **`/etc/systemd/system/iam-server.service`:**
 
@@ -276,7 +301,7 @@ docker run -d --name iam \
 
 ### Production checklist
 
-- [ ] `COOKIES_SECURE=true` (otherwise the browser drops session cookies over HTTPS, silent failure)
+- [ ] `BASE_URL=https://...` (the https scheme is what turns on the Secure flag on cookies; over plain http, browsers will silently drop session cookies)
 - [ ] `AUTO_MIGRATE=false` and migrations run as a deploy step
 - [ ] `SIGNING_KEY_PATH` points at a real RSA-2048 key, mode 600, owner = service user
 - [ ] `SESSION_SECRET` is 32+ bytes of entropy and unique per environment
@@ -328,84 +353,82 @@ The Google provider uses OIDC discovery (`https://accounts.google.com/.well-know
 
 GitHub isn't OIDC, it's plain OAuth 2. The IAM server fetches `/user` and `/user/emails` against the GitHub API to build the `Identity`. If a GitHub user has set their email to private, the IAM server uses the primary email from `/user/emails` (requires the `user:email` scope, which we request).
 
-### Microsoft / Entra ID
-
-1. **Azure Portal** -> Microsoft Entra ID -> App registrations -> New registration
-2. Redirect URI (web): `https://auth.example.com/oauth/callback/microsoft`
-3. Supported account types:
-   - "My organization only" -> use your tenant UUID
-   - "Any AAD directory" -> tenant = `organizations`
-   - "AAD + personal accounts" -> tenant = `common`
-4. Certificates & secrets -> New client secret -> copy
-5. Set in env:
-   ```bash
-   MICROSOFT_CLIENT_ID=…
-   MICROSOFT_CLIENT_SECRET=…
-   MICROSOFT_TENANT=common
-   ```
-
-The tenant value goes into the discovery URL: `https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration`. Pick the tenant that matches who you want to let in.
-
-### GitLab
-
-1. **GitLab.com** (or your self-hosted instance) -> User Settings -> Applications
-2. Redirect URI: `https://auth.example.com/oauth/callback/gitlab`
-3. Scopes: `openid`, `profile`, `email`
-4. Set in env:
-   ```bash
-   GITLAB_CLIENT_ID=…
-   GITLAB_CLIENT_SECRET=…
-   GITLAB_ISSUER=https://gitlab.com    # or https://gitlab.example.internal
-   ```
-
-For self-hosted GitLab, set `GITLAB_ISSUER` to your instance's root URL, the IAM server appends `/.well-known/openid-configuration` to discover the rest.
-
-### Apple, Sign in with Apple
-
-The most awkward setup of the bunch because Apple wants a signed JWT instead of a static secret, and the cert flow happens in their Developer portal.
-
-1. **Apple Developer** -> Certificates, Identifiers & Profiles
-2. Identifiers -> register a **Services ID** (this becomes `APPLE_CLIENT_ID`)
-3. Configure the Services ID for "Sign in with Apple":
-   - Primary App ID: pick one (create one first if needed)
-   - Domains: `auth.example.com`
-   - Return URLs: `https://auth.example.com/oauth/callback/apple`
-4. **Keys** -> register a new key with "Sign in with Apple" enabled
-   - Download the `.p8` file, you can only download it **once**
-   - Note the Key ID (10 chars), this is `APPLE_KEY_ID`
-5. Your Team ID is in the top right of the developer portal, this is `APPLE_TEAM_ID`
-6. Set in env:
-   ```bash
-   # the Services ID identifier
-   APPLE_CLIENT_ID=com.example.auth.signin
-   APPLE_TEAM_ID=ABCDE12345
-   APPLE_KEY_ID=ABCDE12345
-   APPLE_PRIVATE_KEY_PATH=/etc/iam/keys/apple_AuthKey_ABCDE12345.p8
-   ```
-
-The IAM server signs a fresh ES256 JWT every time it talks to Apple's token endpoint, that's the "client secret" Apple wants. The `.p8` file must stay readable by the service user.
-
-Two Apple quirks worth knowing:
-
-- Apple returns the user's name **only on the very first sign-in**. The IAM server captures it then; if you lose that callback (or the user revokes consent and signs in again), the name field stays empty.
-- Apple users can opt to share a random relay email. The IAM server stores whatever address Apple sends; the user can update it later from the profile page.
-
 ### Generic OIDC
 
-For any OIDC-compliant IdP not listed above (Okta, Auth0, Keycloak, Authentik, Zitadel, etc.):
+For any OIDC-compliant IdP: Microsoft Entra, GitLab, Okta, Auth0, Keycloak, Authentik, Zitadel, a corporate IdP, anything that publishes an OIDC discovery document.
 
-In the IAM admin UI: **Upstream providers -> Add -> "Generic OIDC"** (or equivalent admin API call, see roadmap note below). Required fields:
+The IAM server can host any number of generic-OIDC providers side-by-side. Each one becomes its own button on the login page and its own slug in the `user_identities.provider` column.
+
+**Setup is two-step.** First, declare which providers are enabled by listing their slugs in `OIDC_PROVIDERS`. Then provide each provider's settings under `OIDC_<SLUG>_*`. Slugs are lowercase letters / digits / underscores; they appear in URLs (`/oauth/callback/<slug>`) and in the database, so pick something stable and re-use the same slug across deploys to keep user account links intact.
+
+```bash
+# Declare which providers to enable. Comma-separated. Order is
+# preserved on the login page.
+OIDC_PROVIDERS=microsoft,okta
+
+# Microsoft Entra — using the OIDC v2 endpoint.
+OIDC_MICROSOFT_ISSUER=https://login.microsoftonline.com/common/v2.0
+OIDC_MICROSOFT_CLIENT_ID=...
+OIDC_MICROSOFT_CLIENT_SECRET=...
+OIDC_MICROSOFT_DISPLAY_NAME=Microsoft       # optional; defaults to title-cased slug
+OIDC_MICROSOFT_SCOPES=openid email profile  # optional; defaults to these three
+
+# Okta — corporate SSO.
+OIDC_OKTA_ISSUER=https://acme.okta.com
+OIDC_OKTA_CLIENT_ID=0oaXXXXXXXXXXXX
+OIDC_OKTA_CLIENT_SECRET=...
+OIDC_OKTA_DISPLAY_NAME=Acme SSO
+```
+
+The redirect URI to register in each provider's console follows the same pattern as the built-ins:
 
 ```
-Name:                  "Acme Corp Okta"
-Issuer:                https://acme.okta.com
-Client ID:             0oaXXXXXXXXXXXX
-Client secret:         ...
-Scopes:                openid profile email
-Redirect URI: (read-only)  https://auth.example.com/oauth/callback/{slug}
+https://auth.example.com/oauth/callback/<slug>
 ```
 
-**Roadmap note:** providers are currently env-configured at startup. Per-provider DB rows + the "Upstream providers" admin page exist in the schema and store layer but aren't wired into the SPA yet. For now, generic OIDC providers go in via env too, see `internal/federation/registry.go` for the format expected.
+So with the config above you'd register `https://auth.example.com/oauth/callback/microsoft` in the Azure portal and `https://auth.example.com/oauth/callback/okta` in the Okta admin console.
+
+**Failure modes worth knowing about:**
+
+| Mistake                                                                                      | What happens                                                                                                         |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Slug in `OIDC_PROVIDERS` but missing `OIDC_<SLUG>_ISSUER` (or `CLIENT_ID` / `CLIENT_SECRET`) | Startup error naming each missing var                                                                                |
+| Same slug listed twice                                                                       | Startup error — would silently link two different upstream accounts into one row                                     |
+| Slug contains hyphens, uppercase, or special chars                                           | Silently dropped from the list — Validate then reports "no provider with that slug" if you also set its credentials  |
+| `OIDC_<SLUG>_ISSUER` is unreachable at startup (DNS, firewall, etc.)                         | Logged error, server keeps running, that provider just doesn't appear on the login page until you fix it and restart |
+| Slug `google` or `github`                                                                    | Reserved for the first-class providers; rejected to avoid colliding with those env vars                              |
+
+The discovery document is fetched once at startup with a 15-second timeout per provider, so a flaky upstream IdP can't stall the entire server boot.
+
+#### Provider-specific notes
+
+- **Microsoft / Entra ID**: the tenant goes in the issuer URL. `common` for any AAD or personal account, `organizations` for any AAD account, or a tenant UUID for a single tenant. Full issuer: `https://login.microsoftonline.com/<tenant>/v2.0`.
+- **GitLab**: the issuer is the root URL of your GitLab instance. `https://gitlab.com` for SaaS, `https://gitlab.example.internal` for self-hosted.
+- **Auth0**: the issuer is `https://<your-tenant>.<region>.auth0.com/` (with the trailing slash).
+- **Okta**: the issuer is your Okta domain root, e.g. `https://acme.okta.com`. Some Okta orgs require `/oauth2/default` appended to use the default authorization server.
+
+---
+
+> **The following providers are planned but not yet wired into `cmd/server/main.go`** as first-class buttons. Most of them can be configured today as generic OIDC providers (above) — only Apple needs special handling because its "client secret" is a per-request signed JWT.
+>
+> Each provider's Go package is partially or fully implemented under `internal/federation/`; the gap is operator-facing config. Tracked as P8.
+
+### Apple, Sign in with Apple (planned)
+
+Apple doesn't fit the generic-OIDC mold. Their "client secret" is a per-request signed JWT built from a `.p8` private key, plus the team ID and key ID — there's no static secret to put in `OIDC_APPLE_CLIENT_SECRET`. Wiring this requires a few extra env vars and a special-case provider, deferred to P8.
+
+When it lands, the setup will go roughly:
+
+1. **Apple Developer** → Certificates, Identifiers & Profiles
+2. Identifiers → register a **Services ID** (becomes `APPLE_CLIENT_ID`)
+3. Configure the Services ID for "Sign in with Apple": primary App ID, Domains: `auth.example.com`, Return URLs: `https://auth.example.com/oauth/callback/apple`
+4. **Keys** → register a new key with "Sign in with Apple" enabled. Download the `.p8` file (once), note the Key ID (`APPLE_KEY_ID`)
+5. Find your Team ID in the developer portal (`APPLE_TEAM_ID`)
+
+Two Apple quirks worth knowing in advance:
+
+- Apple returns the user's name **only on the very first sign-in**. Subsequent sign-ins (or sign-ins after a user revokes consent) don't repeat it.
+- Apple users can opt to share a random relay email; you store whatever they send.
 
 ### Account linking behaviour
 
@@ -713,7 +736,139 @@ Returns `200 OK` on success (and also on "unknown token", RFC 7009).
 
 ---
 
-## Part 8, Common operational tasks
+## Part 8, Reverse-proxy companion (forward_auth)
+
+If you have a Caddy or Traefik reverse proxy in front of other apps, the IAM server can act as their gatekeeper. The pattern is called **forward auth**: for every incoming request, the proxy makes a quick sub-request to the IAM server to ask "is this user authenticated?". On yes, the request goes through with identifying headers attached; on no, the user is bounced to the login page.
+
+### The endpoint
+
+```
+GET /proxy/verify
+```
+
+What it accepts:
+
+- **Session cookie** (the same one issued by `/cas/login`). For this to reach `/proxy/verify` when the user is on `app.example.com`, the cookie must have been issued with `Domain=.example.com` — see `SESSION_COOKIE_DOMAIN` below.
+- **`Authorization: Bearer <oidc-access-token>`** for API/M2M clients. The token must be active (not revoked, not expired) and bound to a user (client_credentials tokens are rejected — this endpoint is per-user by design).
+
+What it returns:
+
+- **200** with these response headers:
+
+  | Header            | Value                                                               |
+  | ----------------- | ------------------------------------------------------------------- |
+  | `X-Auth-Sub`      | User UUID. The stable identifier; prefer this in upstream apps      |
+  | `X-Auth-User`     | Primary identifier: username if set, otherwise email, otherwise sub |
+  | `X-Auth-Username` | Username (may be empty)                                             |
+  | `X-Auth-Email`    | Primary email (may be empty)                                        |
+  | `X-Auth-Name`     | Display name (may be empty)                                         |
+  | `X-Auth-Groups`   | Comma-separated; currently `"admin"` for admins, empty otherwise    |
+
+  All values are sanitized — CR, LF, NUL, and control bytes are stripped so a hostile display name can't smuggle additional headers into the upstream request.
+
+- **401** with optional `Location` header. The Location is included only when the requested origin (reconstructed from `X-Forwarded-Proto` + `X-Forwarded-Host`) appears in `PROXY_ALLOWED_CALLBACK_ORIGINS`. Without that allowlist match, the user sees a bare 401 from the proxy — safe, just ugly. Operators opt in by listing every protected origin.
+
+### Required env vars
+
+```bash
+# Make the IAM session cookie readable across all subdomains under the parent.
+# Without this, the cookie is scoped to auth.example.com only and the
+# forward_auth sub-request gets no cookie to validate.
+SESSION_COOKIE_DOMAIN=.example.com
+
+# Every protected origin that may be redirected back to after login.
+# Comma-separated. Anything not in this list will see a bare 401 with no
+# Location header (no infinite redirect loop, but the UX is ugly).
+PROXY_ALLOWED_CALLBACK_ORIGINS=https://app.example.com,https://wiki.example.com
+```
+
+`BASE_URL` should be the externally visible https URL (e.g. `https://auth.example.com`) — that's what turns on the Secure flag on cookies. Behind a TLS-terminating proxy, set `BASE_URL` to the public URL, not the internal one.
+
+### Caddy
+
+The simpler of the two. The directive is `forward_auth` and lives in your site block:
+
+```caddyfile
+app.example.com {
+    forward_auth iam:8080 {
+        uri /proxy/verify
+        copy_headers X-Auth-Sub X-Auth-User X-Auth-Username X-Auth-Email X-Auth-Name X-Auth-Groups
+    }
+    reverse_proxy backend:3000
+}
+```
+
+`copy_headers` tells Caddy which of the `X-Auth-*` headers to propagate from the `/proxy/verify` response onto the request that goes to `backend:3000`. List every one your backend cares about.
+
+A complete runnable example — including Caddyfile, docker-compose, and a tiny demo backend that echoes the headers it received — lives at [`deployments/compose/caddy-example/`](deployments/compose/caddy-example/).
+
+### Traefik
+
+Traefik calls it `ForwardAuth`. Configured via labels (or YAML; labels shown here because Compose is the common case):
+
+```yaml
+services:
+  iam:
+    labels:
+      - "traefik.http.middlewares.iam-forwardauth.forwardauth.address=http://iam:8080/proxy/verify"
+      - "traefik.http.middlewares.iam-forwardauth.forwardauth.authResponseHeaders=X-Auth-Sub,X-Auth-User,X-Auth-Username,X-Auth-Email,X-Auth-Name,X-Auth-Groups"
+      - "traefik.http.middlewares.iam-forwardauth.forwardauth.trustForwardHeader=true"
+
+  protected-app:
+    labels:
+      - "traefik.http.routers.app.middlewares=iam-forwardauth@docker"
+```
+
+`authResponseHeaders` is the Traefik equivalent of Caddy's `copy_headers`.
+
+A complete runnable example lives at [`deployments/compose/traefik-example/`](deployments/compose/traefik-example/).
+
+### How the flow actually works
+
+```
+Browser ──────────►  Caddy/Traefik (app.example.com)
+                          │
+                          │  (1) Original request
+                          ▼
+                     Sub-request to iam:8080/proxy/verify
+                          │  with browser's cookies + X-Forwarded-*
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+            200 + X-Auth-*          401 + Location:
+              │                       │   https://auth.example.com/cas/login?rd=<original>
+              ▼                       ▼
+       Proxy → backend:3000     Browser → auth.example.com
+       (X-Auth-* copied                       │
+        onto request)                         ▼
+                                       User signs in
+                                              │
+                                              ▼
+                                       /cas/login validates rd=
+                                       against PROXY_ALLOWED_CALLBACK_ORIGINS,
+                                       then redirects browser to original URL
+                                              │
+                                              ▼
+                                       Back at app.example.com with a valid
+                                       session cookie → next /proxy/verify
+                                       returns 200
+```
+
+The `rd=` parameter on `/cas/login` is a CAS-protocol-aware cross-origin redirect — separate from `next=` (which is path-only, for first-party redirects). Both go through the same `PROXY_ALLOWED_CALLBACK_ORIGINS` check.
+
+### Common mistakes
+
+| Symptom                                                    | Cause                                                                      | Fix                                                                                                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Browser gets stuck in a redirect loop between app and auth | `SESSION_COOKIE_DOMAIN` not set — cookie isn't readable from app subdomain | Set it to the parent domain (`.example.com`)                                                                                         |
+| Bare 401 with no redirect when accessing protected app     | Origin not in `PROXY_ALLOWED_CALLBACK_ORIGINS`                             | Add the protected origin to the comma-separated list                                                                                 |
+| Backend sees no `X-Auth-*` headers despite 200 from verify | `copy_headers` / `authResponseHeaders` missing or incomplete               | List every header your backend reads                                                                                                 |
+| WebAuthn enrollment / login fails with RP mismatch         | RPID (derived from `BASE_URL` host) doesn't match what the browser sees    | Make `BASE_URL`'s host the registrable domain users will actually visit (e.g. `https://auth.example.com`, not an IP or alt hostname) |
+| API client gets 401 with valid bearer token                | Token is from `client_credentials` grant (no user attached)                | The endpoint is per-user; for M2M, validate via `/oauth2/introspect` instead                                                         |
+
+---
+
+## Part 9, Common operational tasks
 
 ### Rotate a leaked client secret
 
@@ -775,17 +930,16 @@ Order of operations:
 
 ---
 
-## Part 9, Troubleshooting
+## Part 10, Troubleshooting
 
-| Symptom                                                                              | Most likely cause                                                                                                   | Fix                                                                                      |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| "Service not authorized" on `/cas/login?service=...`                                 | Service URL isn't in `cas_services` table                                                                           | Register it in the SPA, or use `next=` for first-party redirects                         |
-| Browser drops session cookies (login appears to work, then immediately bounces back) | `COOKIES_SECURE=true` over plain HTTP, or `BASE_URL` doesn't match what the browser sees                            | Match `BASE_URL` exactly; set `COOKIES_SECURE=false` for HTTP testing                    |
-| OIDC client gets "invalid_redirect_uri"                                              | The redirect_uri sent doesn't exactly match a registered URI (trailing slash, port number, scheme)                  | Re-register with the exact URI the client uses                                           |
-| OIDC clients can't verify id_token signatures after a deploy                         | `signing.pem` regenerated; old tokens invalid                                                                       | Restore the original key from backup; never regenerate the key during routine deploys    |
-| Federated login lands on `/cas/login?error=…`                                        | Provider redirect URI mismatch; check the provider's console matches `{BASE_URL}/oauth/callback/{provider}` exactly | Update the provider; restart the IAM server isn't required                               |
-| WebAuthn enrollment fails with "RP ID mismatch"                                      | `MFA_WEBAUTHN_RP_ID` doesn't match the browser's host                                                               | Set RP ID to the registrable domain (no scheme, no port)                                 |
-| Apple sign-in fails with "invalid_client"                                            | `.p8` file path wrong, or `APPLE_KEY_ID` / `APPLE_TEAM_ID` mismatch                                                 | Check the file is readable by the service user; verify IDs in the Apple Developer portal |
+| Symptom                                                                              | Most likely cause                                                                                                                  | Fix                                                                                         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| "Service not authorized" on `/cas/login?service=...`                                 | Service URL isn't in `cas_services` table                                                                                          | Register it in the SPA, or use `next=` for first-party redirects                            |
+| Browser drops session cookies (login appears to work, then immediately bounces back) | `BASE_URL` scheme doesn't match what the browser sees (https vs http) — the server sets the Secure cookie flag based on `BASE_URL` | Make `BASE_URL` exactly the public URL users visit, including scheme and port               |
+| OIDC client gets "invalid_redirect_uri"                                              | The redirect_uri sent doesn't exactly match a registered URI (trailing slash, port number, scheme)                                 | Re-register with the exact URI the client uses                                              |
+| OIDC clients can't verify id_token signatures after a deploy                         | `signing.pem` regenerated; old tokens invalid                                                                                      | Restore the original key from backup; never regenerate the key during routine deploys       |
+| Federated login lands on `/cas/login?error=…`                                        | Provider redirect URI mismatch; check the provider's console matches `{BASE_URL}/oauth/callback/{provider}` exactly                | Update the provider; restart the IAM server isn't required                                  |
+| WebAuthn enrollment fails with "RP ID mismatch"                                      | RPID (derived from `BASE_URL` host) doesn't match what the browser address bar shows                                               | Make `BASE_URL` the registrable domain the user actually visits (not an IP or alt hostname) |
 
 ### Logs
 
@@ -805,7 +959,7 @@ Use `/readyz` for load balancer health checks; `/healthz` is for liveness probes
 
 ---
 
-## Part 10, What's TODO
+## Part 11, What's TODO
 
 - **No email/SMS delivery**, password resets and email verification require an out-of-band channel today. SMTP is P8.
 - **No global "force MFA" policy**, it's per-user (any enrolled method -> enforced) or per-client (`acr_values`). A blanket policy lever is P7.

@@ -17,6 +17,7 @@ import (
 	apihealth "github.com/lusopoint/lusoiam/internal/api/health"
 	apimfa "github.com/lusopoint/lusoiam/internal/api/mfa"
 	apioidc "github.com/lusopoint/lusoiam/internal/api/oidc"
+	apiproxy "github.com/lusopoint/lusoiam/internal/api/proxy"
 	apispa "github.com/lusopoint/lusoiam/internal/api/spa"
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
@@ -27,6 +28,7 @@ import (
 	"github.com/lusopoint/lusoiam/internal/config"
 	"github.com/lusopoint/lusoiam/internal/crypto"
 	"github.com/lusopoint/lusoiam/internal/federation"
+	genericoidc "github.com/lusopoint/lusoiam/internal/federation/generic_oidc"
 	"github.com/lusopoint/lusoiam/internal/federation/github"
 	"github.com/lusopoint/lusoiam/internal/federation/google"
 	"github.com/lusopoint/lusoiam/internal/middleware"
@@ -107,6 +109,7 @@ func run() error {
 		Signer: signer,
 		Cookie: session.CookieOptions{
 			Path:       "/",
+			Domain:     cfg.SessionCookieDomain,
 			SecureOnly: cfg.CookiesSecure(),
 			SameSite:   http.SameSiteLaxMode,
 		},
@@ -150,16 +153,36 @@ func run() error {
 	// infrastructure
 	apihealth.Register(mux, pool)
 
-	// CAS 1.0 / 2.0 / 3.0
+	// Build the per-slug display-name overrides for the login page
+	// Only OIDC providers carry an operator-supplied display name, the
+	// built-in google/github buttons keep their fixed labels
+	providerLabels := map[string]string{}
+	for _, p := range cfg.Federation.OIDC {
+		if p.DisplayName != "" {
+			providerLabels[p.Slug] = "Continue with " + p.DisplayName
+		}
+	}
+
 	apicas.New(apicas.Config{
-		Password:     passwordSvc,
-		Sessions:     sessionSvc,
-		CAS:          casSvc,
-		Registry:     registry,
-		MFA:          mfaSvc,
-		Signer:       signer,
-		CookieSecure: cfg.CookiesSecure(),
-		Audit:        auditSvc,
+		Password:             passwordSvc,
+		Sessions:             sessionSvc,
+		CAS:                  casSvc,
+		Registry:             registry,
+		MFA:                  mfaSvc,
+		Signer:               signer,
+		CookieSecure:         cfg.CookiesSecure(),
+		Audit:                auditSvc,
+		ProxyCallbackOrigins: cfg.Proxy.AllowedCallbackOrigins,
+	}).Register(mux)
+
+	// Reverse-proxy companion: Caddy `forward_auth` / Traefik
+	// `ForwardAuth`. Same allowlist as /cas/login's `rd=` parameter so
+	// the two endpoints can't drift on what's a legitimate callback.
+	apiproxy.New(apiproxy.Config{
+		Sessions:               sessionSvc,
+		Store:                  store,
+		BaseURL:                cfg.BaseURL,
+		AllowedCallbackOrigins: cfg.Proxy.AllowedCallbackOrigins,
 	}).Register(mux)
 
 	// upstream SSO OAuth2 / OIDC callbacks
@@ -284,6 +307,39 @@ func buildRegistry(ctx context.Context, cfg config.Config, logger *slog.Logger) 
 			RedirectURL:  base + "/oauth/callback/github",
 		}))
 		logger.Info("federation: github enabled")
+	}
+
+	// Generic OIDC providers (Microsoft Entra, GitLab, Okta, Auth0,
+	// Keycloak, Authentik, Zitadel, custom IdPs: anything OIDC-compliant).
+	// Each entry was already validated for completeness in config.Validate,
+	// so missing fields here would be a programming error. We still log
+	// and skip per-provider discovery failures rather than abort, so a
+	// flaky upstream IdP can't take the whole server down at startup
+	for _, p := range cfg.Federation.OIDC {
+		// A context timeout covers the case where the issuer URL is
+		// reachable but slow — without it a misconfigured corporate IdP
+		// could stall startup for minutes.
+		dctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		prov, err := genericoidc.New(dctx, genericoidc.Config{
+			Name:         p.Slug,
+			ClientID:     p.ClientID,
+			ClientSecret: p.ClientSecret,
+			IssuerURL:    p.IssuerURL,
+			RedirectURL:  base + "/oauth/callback/" + p.Slug,
+			Scopes:       p.Scopes,
+		})
+		cancel()
+		if err != nil {
+			// Log loudly, but keep the server running. The login page
+			// just won't show this provider's button until the IdP
+			// becomes reachable and the server is restarted.
+			logger.Error("federation: oidc provider failed",
+				"slug", p.Slug, "issuer", p.IssuerURL, "err", err)
+			continue
+		}
+		r.Register(prov)
+		logger.Info("federation: oidc provider enabled",
+			"slug", p.Slug, "issuer", p.IssuerURL)
 	}
 
 	return r
