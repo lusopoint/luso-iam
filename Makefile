@@ -33,7 +33,7 @@ test: ## run all unit tests (race detector, fresh cache)
 	go test ./... -race -count=1
 
 test-unit: ## run fast unit tests only (skip the future testcontainers-based suites)
-	go test ./internal/crypto/... ./internal/auth/mfa/... ./internal/api/cas/... ./pkg/... -race -count=1
+	go test ./internal/crypto/... ./internal/auth/mfa/... ./internal/api/mfa/... ./internal/config/... ./internal/api/cas/... ./pkg/... ./internal/oidc/... -race -count=1
 
 test-cover: ## run unit test only with -cover
 	go test -cover ./internal/crypto/... ./internal/auth/mfa/... ./internal/api/cas/... ./pkg/...
