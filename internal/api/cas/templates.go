@@ -18,6 +18,7 @@ type loginPageData struct {
 	Email     string
 	Service   string
 	Next      string // post-login destination for first-party redirects (no CAS ticket)
+	Redirect  string // post-login cross-origin destination (proxy companion); pre-validated against allowlist
 	Renew     bool
 	Gateway   bool
 	Error     string
