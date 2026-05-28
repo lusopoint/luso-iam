@@ -1,0 +1,88 @@
+# Caddy + IAM forward_auth example
+#
+# This stack shows how to put the IAM server behind Caddy and protect a
+# downstream application using Caddy's `forward_auth` directive
+#
+#   Browser ──────► caddy:443
+#                     │
+#                     │  (1) protected request to https://app.local/
+#                     ▼
+#                   forward_auth iam:8080
+#                     │  GET /proxy/verify, with cookies + X-Forwarded-*
+#                     │
+#                     ├── 200 + X-Auth-* headers → caddy copies them into
+#                     │   the request and proxies to demo-backend
+#                     │
+#                     └── 401 + Location → caddy redirects browser to
+#                         https://auth.local/cas/login?rd=https://app.local/
+#
+# requisites:
+#
+#   - Caddy can sign its own certs in local mode (or get real ones via ACME).
+#   - For the cookie sharing to work, the IAM session cookie must be issued
+#     with Domain=.local (or whatever parent domain you actually use), so
+#     it's readable both at auth.local and app.local. Set:
+#         SESSION_COOKIE_DOMAIN=.local
+#     in the iam service's env block.
+#
+#   - PROXY_ALLOWED_CALLBACK_ORIGINS must list every protected origin, or
+#     the 401s won't carry a Location header and the browser will just see
+#     a bare 401.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: iam
+      POSTGRES_PASSWORD: iam
+      POSTGRES_DB: iam
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iam -d iam"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  iam:
+    build:
+      context: ../../..
+      dockerfile: deployments/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://iam:iam@postgres:5432/iam?sslmode=disable
+      BASE_URL: https://auth.local
+      SESSION_SECRET: "00000000000000000000000000000000change-me-in-real-deployments"
+      SIGNING_KEY_PATH: /etc/iam/signing.pem
+      SESSION_COOKIE_DOMAIN: .local
+      PROXY_ALLOWED_CALLBACK_ORIGINS: https://app.local
+      AUTO_MIGRATE: "true"
+      COOKIES_SECURE: "true"
+      LOG_LEVEL: info
+    volumes:
+      #     openssl genrsa -out signing.pem 2048
+      - ./signing.pem:/etc/iam/signing.pem:ro
+
+  demo-app:
+    build:
+      context: .
+      dockerfile: demo-app.Dockerfile
+
+  caddy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - iam
+      - demo-app
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:

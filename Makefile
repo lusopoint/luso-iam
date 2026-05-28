@@ -2,7 +2,8 @@
         compose-up compose-down compose-logs compose-clear \
         migrate-up migrate-down migrate-new \
         web-install web-build web-dev web-clean \
-        keygen seed-client grant-admin seed-user
+        keygen seed-client grant-admin seed-user \
+        docker-build docker-run docker-push
 
 # TODO: should we just trust the one on the .env?
 DATABASE_URL ?= postgres://iam:iam@localhost:5432/iam?sslmode=disable
@@ -43,16 +44,16 @@ tidy: ## tidy go.mod and verify
 	go mod verify
 
 compose-up: ## local infra (Postgres)
-	docker compose -f deployments/compose/docker-compose.yml up -d
+	docker compose -f deployments/docker-compose.dev.yml up -d
 
 compose-down: ## down the services (without cleaning the volumes)
-	docker compose -f deployments/compose/docker-compose.yml down
+	docker compose -f deployments/docker-compose.dev.yml down
 
 compose-clear: ## down and fully clean the volumes
-	docker compose -f deployments/compose/docker-compose.yml down --remove-orphans --volumes
+	docker compose -f deployments/docker-compose.dev.yml down --remove-orphans --volumes
 
 compose-logs: ## display logs (only postgres)
-	docker compose -f deployments/compose/docker-compose.yml logs -f postgres
+	docker compose -f deployments/docker-compose.dev.yml logs -f postgres
 
 # migrations
 # automatic if AUTO_MIGRATE=true
@@ -115,3 +116,22 @@ seed-user: ## create a user: make seed-user email=l@main.com password=password12
 	  -password "$(password)" \
 	  $(if $(name),-name "$(name)") \
 	  $(if $(admin),-admin)
+
+# Docker
+# Build a production-ready container image
+DOCKER_FILE ?= deployments/Dockerfile
+IMAGE_TAG   ?= iam-server:$(VERSION)
+
+docker-build: ## Build the production container image
+	docker build \
+	  -f $(DOCKER_FILE) \
+	  --build-arg VERSION=$(VERSION) \
+	  -t $(IMAGE_TAG) \
+	  .
+
+docker-run: ## Boot the production compose stack (postgres + iam + caddy)
+	cd deployments && docker compose up -d
+
+docker-push: ## Push the image (requires IMAGE_TAG to point at a registry)
+	docker push $(IMAGE_TAG)
+

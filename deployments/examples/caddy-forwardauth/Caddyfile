@@ -1,0 +1,43 @@
+{
+    # Local mode: self-signed certs, no ACME calls.
+    local_certs
+    # auto_https off  # uncomment if you'd rather work in plain HTTP
+}
+
+# IAM itself — unprotected by definition; serves /cas/login etc.
+auth.local {
+    reverse_proxy iam:8080
+    encode zstd gzip
+}
+
+# Protected app — every request runs through /proxy/verify first.
+app.local {
+    # The forward_auth directive — Caddy's primitive for this pattern.
+    #
+    # Semantics:
+    #   - Caddy makes a GET sub-request to iam:8080/proxy/verify, copying
+    #     the client's cookies and adding X-Forwarded-* headers describing
+    #     the original request.
+    #   - 200 response  → request passes through; named response headers
+    #                     are copied onto the outgoing request to the
+    #                     upstream.
+    #   - 401 response  → if a Location header was set, Caddy redirects
+    #                     the browser there; otherwise it just 401s.
+    #
+    # copy_headers tells Caddy which X-Auth-* headers to forward to the
+    # demo-app. The demo backend reads these to identify the user.
+    forward_auth iam:8080 {
+        uri /proxy/verify
+        copy_headers X-Auth-Sub X-Auth-User X-Auth-Username X-Auth-Email X-Auth-Name X-Auth-Groups
+    }
+
+    reverse_proxy demo-app:3000
+
+    encode zstd gzip
+
+    log {
+        format json
+        output stdout
+    }
+}
+
