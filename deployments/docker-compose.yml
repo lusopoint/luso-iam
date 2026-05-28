@@ -1,0 +1,79 @@
+# Production docker-compose for the IAM server.
+#
+# Three services: postgres, iam, caddy. Caddy handles TLS (Let's
+# Encrypt) and reverse-proxies to the IAM container.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-iam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-iam}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-iam} -d $${POSTGRES_DB:-iam}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  iam:
+    image: ${IAM_IMAGE:-iam-server:local}
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-iam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iam}?sslmode=disable
+      BASE_URL: ${BASE_URL:?BASE_URL is required, e.g. https://auth.example.com}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required; generate with openssl rand -hex 32}
+      SIGNING_KEY_PATH: /etc/iam/signing.pem
+
+      # Production posture.
+      ENV: production
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+      # OK in a single-instance docker-compose deploy; set false + run migrations manually for multi-instance / blue-green
+      AUTO_MIGRATE: "true"
+
+      # MFA labels
+      MFA_ISSUER: ${MFA_ISSUER:-IAM}
+      MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-IAM}
+
+      # Optional federation, uncomment and set in .env to enable
+      # GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      # GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # OIDC_PROVIDERS: ${OIDC_PROVIDERS:-}
+      # (per-provider OIDC_<SLUG>_* vars also flow through, add them
+    volumes:
+      - ./signing/signing.pem:/etc/iam/signing.pem:ro
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - iam
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:

@@ -282,10 +282,24 @@ That's all the TLS, HSTS, and certificate management you need from the reverse p
 
 ### Shape B, Container
 
-The repo ships a Dockerfile under `deployments/docker/`. Build:
+The repo ships a multi-stage Dockerfile and a production-ready compose
+stack under `deployments/`. Two ways to use them:
+
+**Compose stack** (recommended: handles Postgres, IAM, and Caddy/TLS):
 
 ```bash
-docker build -f deployments/docker/Dockerfile -t iam-server:latest .
+cd deployments
+cp .env.example .env  &&  $EDITOR .env   # set BASE_URL, secrets, etc.
+mkdir -p signing && openssl genrsa -out signing/signing.pem 2048
+sudo chown 65532:65532 signing/signing.pem && chmod 600 signing/signing.pem
+docker compose up -d
+```
+
+**Image only** (build, push to a registry, deploy however you like):
+
+```bash
+make docker-build IMAGE_TAG=ghcr.io/you/iam-server:v1.0.0
+docker push ghcr.io/you/iam-server:v1.0.0
 ```
 
 Run with the env file you'd use bare-metal:
@@ -366,14 +380,12 @@ The IAM server can host any number of generic-OIDC providers side-by-side. Each 
 # preserved on the login page.
 OIDC_PROVIDERS=microsoft,okta
 
-# Microsoft Entra — using the OIDC v2 endpoint.
 OIDC_MICROSOFT_ISSUER=https://login.microsoftonline.com/common/v2.0
 OIDC_MICROSOFT_CLIENT_ID=...
 OIDC_MICROSOFT_CLIENT_SECRET=...
 OIDC_MICROSOFT_DISPLAY_NAME=Microsoft       # optional; defaults to title-cased slug
 OIDC_MICROSOFT_SCOPES=openid email profile  # optional; defaults to these three
 
-# Okta — corporate SSO.
 OIDC_OKTA_ISSUER=https://acme.okta.com
 OIDC_OKTA_CLIENT_ID=0oaXXXXXXXXXXXX
 OIDC_OKTA_CLIENT_SECRET=...
@@ -800,8 +812,6 @@ app.example.com {
 
 `copy_headers` tells Caddy which of the `X-Auth-*` headers to propagate from the `/proxy/verify` response onto the request that goes to `backend:3000`. List every one your backend cares about.
 
-A complete runnable example — including Caddyfile, docker-compose, and a tiny demo backend that echoes the headers it received — lives at [`deployments/compose/caddy-example/`](deployments/compose/caddy-example/).
-
 ### Traefik
 
 Traefik calls it `ForwardAuth`. Configured via labels (or YAML; labels shown here because Compose is the common case):
@@ -820,8 +830,6 @@ services:
 ```
 
 `authResponseHeaders` is the Traefik equivalent of Caddy's `copy_headers`.
-
-A complete runnable example lives at [`deployments/compose/traefik-example/`](deployments/compose/traefik-example/).
 
 ### How the flow actually works
 
