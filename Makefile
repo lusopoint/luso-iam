@@ -130,7 +130,7 @@ docker-build: ## Build the production container image
 	  .
 
 docker-run: ## Boot the production compose stack (postgres + iam + caddy)
-	cd deployments && docker compose up -d
+	cd deployments && docker compose up --detach --build
 
 docker-push: ## Push the image (requires IMAGE_TAG to point at a registry)
 	docker push $(IMAGE_TAG)
