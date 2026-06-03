@@ -35,19 +35,30 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/iam-server \
         ./cmd/server
 
+# we could want to seed the db with some admin
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/seed-user \
+        ./cmd/seed-user
 
-FROM gcr.io/distroless/static-debian12:nonroot AS final
+FROM alpine:3.20 AS final
 
 LABEL org.opencontainers.image.title="iam-server" \
       org.opencontainers.image.description="OpenID Connect provider + CAS server with MFA and federation" \
       org.opencontainers.image.source="https://github.com/lusopoint/lusoiam" \
       org.opencontainers.image.licenses="MIT"
 
-# The binary
+RUN adduser -D -u 65532 nonroot
+
 COPY --from=server-build --chown=nonroot:nonroot /out/iam-server /iam-server
+COPY --from=server-build --chown=nonroot:nonroot /out/seed-user /seed-user
+COPY --chown=nonroot:nonroot deployments/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
-USER nonroot:nonroot
-
-ENTRYPOINT ["/iam-server"]
-
+USER nonroot
+ENTRYPOINT ["/entrypoint.sh"]
