@@ -37,6 +37,10 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required; generate with openssl rand -hex 32}
       SIGNING_KEY_PATH: /etc/iam/signing.pem
 
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-password123}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@mail.com}
+      ADMIN_NAME: ${ADMIN_NAME:-admin}
+
       # Production posture.
       ENV: production
       LOG_LEVEL: info
