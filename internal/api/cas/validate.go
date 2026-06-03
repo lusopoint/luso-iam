@@ -169,6 +169,9 @@ func releaseAttributes(result *authcas.ValidationResult) map[string]string {
 	if result.User.DisplayName != nil {
 		all["displayName"] = *result.User.DisplayName
 	}
+	if result.User.Username != nil {
+		all["username"] = *result.User.Username
+	}
 
 	// Apply the service's attribute release policy (if any).
 	if result.Service == nil || len(result.Service.ReleasedAttributes) == 0 {
