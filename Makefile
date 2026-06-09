@@ -1,9 +1,9 @@
-.PHONY: help build run dev-server test test-unit test-cover lint tidy \
-        compose-up compose-down compose-logs compose-clear \
+.PHONY: help build run dev-server smoke-test test test-cover tidy \
+        compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new \
         web-install web-build web-dev web-clean \
-        keygen seed-client grant-admin seed-user \
-        docker-build docker-run docker-push
+        keygen rotate-key seed-client grant-admin seed-user \
+        prod-build prod-run prod-push
 
 # TODO: should we just trust the one on the .env?
 DATABASE_URL ?= postgres://iam:iam@localhost:5432/iam?sslmode=disable
@@ -30,29 +30,29 @@ dev-server: ## run the server directly with `go run` (uses stub SPA unless web-b
 	go run ./cmd/server
 
 # testing
-test: ## run all unit tests (race detector, fresh cache)
+test: ## run all unit tests
 	go test ./... -race -count=1
 
-test-unit: ## run fast unit tests only (skip the future testcontainers-based suites)
-	go test ./internal/crypto/... ./internal/auth/mfa/... ./internal/api/mfa/... ./internal/config/... ./internal/api/cas/... ./pkg/... ./internal/oidc/... -race -count=1
+test-cover: ## run test only with -cover
+	go test -cover ./...
 
-test-cover: ## run unit test only with -cover
-	go test -cover ./internal/crypto/... ./internal/auth/mfa/... ./internal/api/cas/... ./pkg/...
+smoke-test: ## black-box test against the running application (BASE_URL=http://localhost:8080)
+	@BASE_URL="$${BASE_URL:-http://localhost:8080}" ./scripts/smoke-test.sh
 
 tidy: ## tidy go.mod and verify
 	go mod tidy
 	go mod verify
 
-compose-up: ## local infra (Postgres)
+compose-dev-up: ## locally, just builds postgres
 	docker compose -f deployments/docker-compose.dev.yml up -d
 
-compose-down: ## down the services (without cleaning the volumes)
+compose-dev-down: ## down the services (without cleaning the volumes)
 	docker compose -f deployments/docker-compose.dev.yml down
 
-compose-clear: ## down and fully clean the volumes
+compose-dev-clear: ## down and fully clean the volumes
 	docker compose -f deployments/docker-compose.dev.yml down --remove-orphans --volumes
 
-compose-logs: ## display logs (only postgres)
+compose-dev-logs: ## display postgres logs
 	docker compose -f deployments/docker-compose.dev.yml logs -f postgres
 
 # migrations
@@ -68,12 +68,11 @@ migrate-new: ## create a new migration pair: - make migrate-new name=add_foo
 	@[ -n "$(name)" ] || (echo "usage: make migrate-new name=add_foo" && exit 1)
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
 
-# Web (react front end)
+# Web react front end
 # `make build` depends on web-build so a single command produces a binary
-# with the compiled SPA embedded. Web-build short-circuits via the
-# node_modules timestamp marker so iterative server builds aren't slow
+# with the compiled SPA embedded
 
-web-install: ## Install web dependencies (npm handles its own caching)
+web-install: ## Install react dependencies (npm handles its own caching)
 	cd $(WEB_DIR) && npm install --no-audit --no-fund
 
 web-build: web-install ## Build the React admin SPA into web/dist
@@ -91,6 +90,10 @@ web-clean: ## Remove web/dist (resets to stub on next web-build)
 keygen: ## Generate an RSA-2048 signing key at ./signing.pem (dev use)
 	openssl genrsa -out signing.pem 2048
 	@echo "Set SIGNING_KEY_PATH=$$PWD/signing.pem in your .env"
+
+rotate-key: ## generate a new signing key in a keys directory (rotate=path; ex. make rotate-key dir=/etc/iam/keys)
+	@[ -n "$(dir)" ] || (echo "usage: make rotate-key dir=/path/to/keys" && exit 1)
+	go run ./cmd/rotate-key -dir "$(dir)"
 
 # Seed helpers (dev only) it will help with the creation on admin users and other usefull commands
 
@@ -117,21 +120,20 @@ seed-user: ## create a user: make seed-user email=l@main.com password=password12
 	  $(if $(name),-name "$(name)") \
 	  $(if $(admin),-admin)
 
-# Docker
 # Build a production-ready container image
 DOCKER_FILE ?= deployments/Dockerfile
 IMAGE_TAG   ?= iam-server:$(VERSION)
 
-docker-build: ## Build the production container image
+prod-build: ## Build the production container image
 	docker build \
 	  -f $(DOCKER_FILE) \
 	  --build-arg VERSION=$(VERSION) \
 	  -t $(IMAGE_TAG) \
 	  .
 
-docker-run: ## Boot the production compose stack (postgres + iam + caddy)
+prod-run: ## Boot the production compose stack (postgres + iam + caddy)
 	cd deployments && docker compose up --detach --build
 
-docker-push: ## Push the image (requires IMAGE_TAG to point at a registry)
+prod-push: ## Push the image (requires IMAGE_TAG to point at a registry)
 	docker push $(IMAGE_TAG)
 
