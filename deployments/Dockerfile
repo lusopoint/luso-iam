@@ -22,6 +22,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY --from=web-build /src/web/dist ./web/dist
 COPY . .
 
+# we need to check versions release?
 ARG VERSION=dev
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

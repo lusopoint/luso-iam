@@ -1,19 +1,3 @@
-// this service basically generates a fresh RSA 2048 signing key inside a keys directory
-// naming is done with a sortable timestamp prefix so that the
-// IAM server multi key loader picks it up as the new primary on
-// the next restart
-//
-// for now we need to follow the steps:
-// - run the program to drop a new key file into the directory
-// - restart the IAM server, it loads the new key as primary
-//   the previous primary becomes retiring (still in JWKS
-//   for verifying not yet expired tokens)
-// - after max token TTL passes (normally 1h), we should
-//   delete the old key file and restart again to clear it from the JWKS
-// TODO: the server reads the key directory once at startup
-// a "rotate without restart" would required either a signal handler
-// or a filesystem watcher
-
 package main
 
 import (
@@ -38,7 +22,7 @@ func main() {
 		os.Exit(2)
 	}
 	if *bits != 2048 && *bits != 4096 {
-		fmt.Fprintln(os.Stderr, "error: -bits must be 2048 or 4096 (got %d)\n", *bits)
+		fmt.Fprintf(os.Stderr, "error: -bits must be 2048 or 4096 (got %d)\n", *bits)
 		os.Exit(2)
 	}
 
@@ -61,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Generate the key.
+	// generate the key
 	fmt.Printf("generating RSA-%d key...\n", *bits)
 	key, err := rsa.GenerateKey(rand.Reader, *bits)
 	if err != nil {
