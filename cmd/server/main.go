@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,16 +19,23 @@ import (
 	apihealth "github.com/lusopoint/lusoiam/internal/api/health"
 	apimfa "github.com/lusopoint/lusoiam/internal/api/mfa"
 	apioidc "github.com/lusopoint/lusoiam/internal/api/oidc"
+	apipwreset "github.com/lusopoint/lusoiam/internal/api/passwordreset"
 	apiproxy "github.com/lusopoint/lusoiam/internal/api/proxy"
+	apisignup "github.com/lusopoint/lusoiam/internal/api/signup"
 	apispa "github.com/lusopoint/lusoiam/internal/api/spa"
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
 	authfed "github.com/lusopoint/lusoiam/internal/auth/federation"
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
 	"github.com/lusopoint/lusoiam/internal/auth/password"
+	authpwreset "github.com/lusopoint/lusoiam/internal/auth/passwordreset"
 	"github.com/lusopoint/lusoiam/internal/auth/session"
+	authsignup "github.com/lusopoint/lusoiam/internal/auth/signup"
 	"github.com/lusopoint/lusoiam/internal/config"
 	"github.com/lusopoint/lusoiam/internal/crypto"
+	"github.com/lusopoint/lusoiam/internal/email"
+	emailnoop "github.com/lusopoint/lusoiam/internal/email/noop"
+	emailsmtp "github.com/lusopoint/lusoiam/internal/email/smtp"
 	"github.com/lusopoint/lusoiam/internal/federation"
 	genericoidc "github.com/lusopoint/lusoiam/internal/federation/generic_oidc"
 	"github.com/lusopoint/lusoiam/internal/federation/github"
@@ -74,6 +83,7 @@ func run() error {
 	defer pool.Close()
 
 	// migrations
+	// only if the AUTO_MIGRATE is enabled
 	if cfg.AutoMigrate {
 		if err := postgres.Migrate(cfg.DB.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -82,17 +92,13 @@ func run() error {
 		logger.Info("auto-migrate disabled; assuming schema is up to date")
 	}
 
-	// Signing key
-	// LoadOrGenerate: if SIGNING_KEY_PATH is set and the file exists, load
-	// the persistent key; otherwise generate a fresh ephemeral key.
-	// Ephemeral keys are fine in dev — tokens are invalidated on restart.
-	// Production should always set SIGNING_KEY_PATH to a persistent PEM file.
+	// signing key
 	keys, err := crypto.LoadOrGenerate(cfg.SigningKeyPath)
 	if err != nil {
 		return fmt.Errorf("signing key: %w", err)
 	}
 	if cfg.SigningKeyPath == "" {
-		logger.Warn("SIGNING_KEY_PATH not set — using ephemeral signing key; " +
+		logger.Warn("SIGNING_KEY_PATH not set: using ephemeral signing key; " +
 			"all tokens will be invalidated on restart")
 	} else {
 		logger.Info("signing key loaded", "path", cfg.SigningKeyPath, "kid", keys.KeyID())
@@ -101,9 +107,7 @@ func run() error {
 	// core services
 	store := postgres.NewStore(pool)
 	signer := crypto.NewCookieSigner(cfg.SessionSecret)
-
 	passwordSvc := password.New(store)
-
 	sessionSvc := session.New(session.Config{
 		Store:  store,
 		Signer: signer,
@@ -115,15 +119,11 @@ func run() error {
 		},
 		Lifetime: 24 * time.Hour,
 	})
-
 	casSvc := authcas.New(store)
 	fedSvc := authfed.New(store)
 	oidcSvc := oidcsvc.New(store, keys, cfg.BaseURL)
-
-	// Audit logger — used by admin handlers (and by auth/MFA flows in
-	// future phases as more events are wired in).
+	// audit logger, basically used by admin handlers
 	auditSvc := audit.New(store)
-
 	// MFA service — TOTP always on; WebAuthn enabled only when BASE_URL
 	// is parseable into an RPID and origin (essentially always, in practice).
 	rpID, origins := authmfa.DeriveWebAuthnConfig(cfg.BaseURL)
@@ -131,6 +131,7 @@ func run() error {
 		Store:           store,
 		Signer:          signer,
 		TOTPIssuer:      cfg.MFA.Issuer,
+		ForceMFA:        cfg.MFA.Force,
 		WebAuthnRPID:    rpID,
 		WebAuthnRPName:  cfg.MFA.WebAuthnRPName,
 		WebAuthnOrigins: origins,
@@ -138,10 +139,71 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("init mfa: %w", err)
 	}
+	if cfg.MFA.Force {
+		logger.Info("mfa: enforcement is global (FORCE_MFA=true)")
+	}
 	if mfaSvc.WebAuthnEnabled() {
 		logger.Info("mfa: webauthn enabled", "rp_id", rpID)
 	} else {
 		logger.Info("mfa: webauthn disabled (could not derive RPID from BASE_URL)")
+	}
+
+	// email sender
+	// development mode it will be logged in the looger
+	// production we need to set SMTP_HOST + SMTP_FROM
+	var sender email.Sender
+	if cfg.SMTP.Enabled() {
+		s, err := emailsmtp.New(emailsmtp.Config{
+			Host:     cfg.SMTP.Host,
+			Port:     cfg.SMTP.Port,
+			Username: cfg.SMTP.Username,
+			Password: cfg.SMTP.Password,
+			From:     cfg.SMTP.From,
+		})
+		if err != nil {
+			return fmt.Errorf("init smtp: %w", err)
+		}
+		sender = s
+		logger.Info("email: smtp configured",
+			"host", cfg.SMTP.Host,
+			"port", cfg.SMTP.Port,
+			"from", cfg.SMTP.From,
+		)
+	} else {
+		sender = emailnoop.New(logger)
+		logger.Warn("email: SMTP_HOST not set; using no-op sender (emails will be LOGGED, not delivered)")
+	}
+
+	// password reset, same thing applies here
+	pwResetSvc, err := authpwreset.New(authpwreset.Config{
+		Store:   store,
+		Sender:  sender,
+		BaseURL: cfg.BaseURL,
+		From:    fallback(cfg.SMTP.From, "IAM <noreply@lusupoint.com>"),
+	})
+	if err != nil {
+		return fmt.Errorf("init passwordreset: %w", err)
+	}
+
+	// signup only enabled if SIGNUP_ENABLED is true
+	var signupSvc *authsignup.Service
+	if cfg.Signup.Enabled {
+		if !cfg.SMTP.Enabled() {
+			logger.Warn("signup: SIGNUP_ENABLED=true but SMTP is not configured; verification emails will only be logged, not delivered")
+		}
+		ttl := time.Duration(cfg.Signup.TokenTTLHours) * time.Hour
+		signupSvc, err = authsignup.New(authsignup.Config{
+			Store:             store,
+			Sender:            sender,
+			BaseURL:           cfg.BaseURL,
+			From:              fallback(cfg.SMTP.From, "IAM <noreply@lusopoint.com>"),
+			TokenTTL:          ttl,
+			MinPasswordLength: cfg.Signup.MinPasswordLength,
+		})
+		if err != nil {
+			return fmt.Errorf("init signup: %w", err)
+		}
+		logger.Info("signup: enabled", "min_password_length", signupSvc.MinPasswordLength(), "token_ttl", signupSvc.TokenTTL())
 	}
 
 	// federation providers
@@ -149,20 +211,15 @@ func run() error {
 
 	// routes
 	mux := http.NewServeMux()
-
-	// infrastructure
 	apihealth.Register(mux, pool)
 
-	// Build the per-slug display-name overrides for the login page
-	// Only OIDC providers carry an operator-supplied display name, the
-	// built-in google/github buttons keep their fixed labels
+	// CAS 1.0 / 2.0 / 3.0
 	providerLabels := map[string]string{}
 	for _, p := range cfg.Federation.OIDC {
 		if p.DisplayName != "" {
 			providerLabels[p.Slug] = "Continue with " + p.DisplayName
 		}
 	}
-
 	apicas.New(apicas.Config{
 		Password:             passwordSvc,
 		Sessions:             sessionSvc,
@@ -173,11 +230,11 @@ func run() error {
 		CookieSecure:         cfg.CookiesSecure(),
 		Audit:                auditSvc,
 		ProxyCallbackOrigins: cfg.Proxy.AllowedCallbackOrigins,
+		ProviderLabels:       providerLabels,
+		SignupEnabled:        cfg.Signup.Enabled,
 	}).Register(mux)
 
-	// Reverse-proxy companion: Caddy `forward_auth` / Traefik
-	// `ForwardAuth`. Same allowlist as /cas/login's `rd=` parameter so
-	// the two endpoints can't drift on what's a legitimate callback.
+	// reverse-proxy
 	apiproxy.New(apiproxy.Config{
 		Sessions:               sessionSvc,
 		Store:                  store,
@@ -216,7 +273,15 @@ func run() error {
 		Audit:    auditSvc,
 	}).Register(mux)
 
-	// Admin REST API (consumed by the React SPA at /admin/*).
+	//password reset
+	apipwreset.New(pwResetSvc).Register(mux)
+
+	// signup + email verification
+	if signupSvc != nil {
+		apisignup.New(signupSvc, auditSvc).Register(mux)
+	}
+
+	// admin REST API
 	apiadmin.New(apiadmin.Config{
 		Store:      store,
 		Sessions:   sessionSvc,
@@ -226,23 +291,102 @@ func run() error {
 		BaseURL:    cfg.BaseURL,
 	}).Register(mux)
 
-	// Admin SPA — serves the React app from web/dist embedded at compile time.
-	// Any /admin path that isn't an API route falls through here; the SPA
-	// owns client-side routing for /admin/users, /admin/clients, etc.
+	// Admin SPA, serves the react from web/dist embedded at compile time
 	apispa.Register(mux)
 
-	// Root: redirect to the admin SPA. The SPA's auth check will bounce
-	// unauthenticated users to /cas/login. We deliberately do NOT serve a
-	// portal landing page here — there's nothing meaningful to show that
-	// isn't already in /admin (for admins) or /mfa/enroll (for everyone).
+	// redirect to /admin
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
+	})
+
+	// parse TRUSTED_PROXIES once and share across middlewares that
+	// need to derive the real client IP from X-Forwarded-For
+	trustedProxies := middleware.NewTrustedProxies(strings.Join(cfg.TrustedProxies, ","))
+
+	// Rate limiters
+	loginLimiter := middleware.NewLimiter(5, time.Minute)
+	tokenLimiter := middleware.NewLimiter(20, time.Minute)
+	defer loginLimiter.Close()
+	defer tokenLimiter.Close()
+
+	// perRouteLimit wraps the mux to apply per-route rate limits
+	// we don't use the middleware based wrapper from the rate limit
+	// package because Go stdlib mux doesn't support per-route
+	perRouteLimit := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == "POST" && r.URL.Path == "/cas/login":
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("login:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"login rate limit exceeded; wait and try again"}`))
+					return
+				}
+			case r.Method == "POST" && r.URL.Path == "/password/forgot":
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("forgot:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"reset-request rate limit exceeded"}`))
+					return
+				}
+			case r.Method == "POST" && r.URL.Path == "/password/reset":
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("reset:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"reset rate limit exceeded"}`))
+					return
+				}
+			case r.Method == "POST" && r.URL.Path == "/signup":
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("signup:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"signup rate limit exceeded"}`))
+					return
+				}
+			case r.Method == "POST" && r.URL.Path == "/oauth2/token":
+				key := tokenLimitKey(r, trustedProxies)
+				if ok, retry := tokenLimiter.Allow(key); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"error":"too_many_requests","error_description":"token endpoint rate limit exceeded"}`))
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	// SecurityHeaders runs early so its response headers are present even on rate-limit 429s and recovery panics
+	csrfMW := middleware.NewCSRF(middleware.CSRFConfig{
+		Secure: cfg.CookiesSecure(),
+		ExemptPaths: []string{
+			"/oauth2/token",
+			"/oauth2/introspect",
+			"/oauth2/revoke",
+			"/federation/", // covers /federation/<slug>/callback (provider redirects)
+			"/proxy/verify",
+			"/metrics",
+			"/healthz",
+			"/readyz",
+		},
 	})
 
 	handler := middleware.Chain(mux,
 		middleware.RequestID,
 		middleware.Recovery(logger),
-		middleware.AccessLog(logger),
+		middleware.AccessLog(logger, trustedProxies),
+		middleware.SecurityHeaders(cfg.CookiesSecure()),
+		perRouteLimit,
+		csrfMW,
 	)
 
 	srv := &http.Server{
@@ -284,9 +428,7 @@ func run() error {
 	return nil
 }
 
-// buildRegistry constructs the federation provider registry from config.
-// Providers are only registered when both credentials are set.
-// Errors (e.g. discovery doc unreachable) are logged; the provider is skipped.
+// buildRegistry constructs the federation provider registry from config
 func buildRegistry(ctx context.Context, cfg config.Config, logger *slog.Logger) *federation.Registry {
 	r := federation.NewRegistry()
 	base := cfg.BaseURL
@@ -309,16 +451,12 @@ func buildRegistry(ctx context.Context, cfg config.Config, logger *slog.Logger) 
 		logger.Info("federation: github enabled")
 	}
 
-	// Generic OIDC providers (Microsoft Entra, GitLab, Okta, Auth0,
-	// Keycloak, Authentik, Zitadel, custom IdPs: anything OIDC-compliant).
-	// Each entry was already validated for completeness in config.Validate,
-	// so missing fields here would be a programming error. We still log
-	// and skip per-provider discovery failures rather than abort, so a
-	// flaky upstream IdP can't take the whole server down at startup
+	// generic OIDC providers
+	// each entry was already validated for completeness in config.Validate
+	// so missing fields here would be a programming error, we still log
+	// and skip per provider discovery failures rather than abort
 	for _, p := range cfg.Federation.OIDC {
-		// A context timeout covers the case where the issuer URL is
-		// reachable but slow — without it a misconfigured corporate IdP
-		// could stall startup for minutes.
+		// a context timeout covers the case where the issuer URL is reachable but slow
 		dctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		prov, err := genericoidc.New(dctx, genericoidc.Config{
 			Name:         p.Slug,
@@ -330,9 +468,6 @@ func buildRegistry(ctx context.Context, cfg config.Config, logger *slog.Logger) 
 		})
 		cancel()
 		if err != nil {
-			// Log loudly, but keep the server running. The login page
-			// just won't show this provider's button until the IdP
-			// becomes reachable and the server is restarted.
 			logger.Error("federation: oidc provider failed",
 				"slug", p.Slug, "issuer", p.IssuerURL, "err", err)
 			continue
@@ -345,7 +480,7 @@ func buildRegistry(ctx context.Context, cfg config.Config, logger *slog.Logger) 
 	return r
 }
 
-// newLogger builds a structured slog.Logger from LogConfig.
+// newLogger builds a structured slog.Logger from LogConfig
 func newLogger(cfg config.LogConfig) *slog.Logger {
 	var level slog.Level
 	switch cfg.Level {
@@ -366,4 +501,23 @@ func newLogger(cfg config.LogConfig) *slog.Logger {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 	return slog.New(handler)
+}
+
+// tokenLimitKey computes the rate-limit key for /oauth2/token requests
+func tokenLimitKey(r *http.Request, tp *middleware.TrustedProxies) string {
+	if id, _, ok := r.BasicAuth(); ok && id != "" {
+		return "token:client:" + id
+	}
+	if id := r.URL.Query().Get("client_id"); id != "" {
+		return "token:client:" + id
+	}
+	return "token:ip:" + tp.ClientIP(r)
+}
+
+// used to derive an email From header when SMTP is in noop mode
+func fallback(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
