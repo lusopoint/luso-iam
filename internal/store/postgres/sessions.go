@@ -16,21 +16,20 @@ const sessionColumns = `
 	acr, amr
 `
 
-// CreateSessionParams is the input to CreateSession.
+// CreateSessionParams is the input to CreateSession
 type CreateSessionParams struct {
 	UserID    pgtype.UUID
 	ExpiresAt time.Time
-	IPAddress *string // dotted-decimal or "::1"; stored as inet
+	IPAddress *string
 	UserAgent *string
-	// ACR / AMR carry the authentication context. ACR="0" by default
-	// (single factor); the MFA service sets "1" once a second factor
-	// succeeds. AMR may be empty — defaults to {} in the schema.
+	// ACR / AMR carry the authentication context ACR="0" by default
+	// the MFA service sets "1" once a second factor
+	// succeeds, AMR may be empty, defaults to {} in the schema
 	ACR string
 	AMR []string
 }
 
-// CreateSession inserts a fresh session row and returns it. The id is
-// generated server-side via uuidv7().
+// CreateSession inserts a fresh session row and returns it
 func (s *Store) CreateSession(ctx context.Context, p CreateSessionParams) (*Session, error) {
 	acr := p.ACR
 	if acr == "" {
@@ -55,8 +54,7 @@ func (s *Store) CreateSession(ctx context.Context, p CreateSessionParams) (*Sess
 	return &sess, nil
 }
 
-// GetActiveSession returns the session iff it exists, is not revoked,
-// and has not expired. Otherwise ErrNotFound.
+// GetActiveSession returns the session if it exists, is not revoked and has not expired
 func (s *Store) GetActiveSession(ctx context.Context, id pgtype.UUID) (*Session, error) {
 	q := `SELECT ` + sessionColumns + ` FROM sessions
 	      WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()`
@@ -74,15 +72,12 @@ func (s *Store) GetActiveSession(ctx context.Context, id pgtype.UUID) (*Session,
 	return &sess, nil
 }
 
-// TouchSession updates last_seen_at to now(). Called on each request that
-// uses the session, supporting sliding expiry policies higher up.
 func (s *Store) TouchSession(ctx context.Context, id pgtype.UUID) error {
 	_, err := s.pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() WHERE id = $1`, id)
 	return err
 }
 
-// RevokeSession marks a session as revoked. Subsequent GetActiveSession
-// calls will return ErrNotFound.
+// RevokeSession marks a session as revoked
 func (s *Store) RevokeSession(ctx context.Context, id pgtype.UUID) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`,

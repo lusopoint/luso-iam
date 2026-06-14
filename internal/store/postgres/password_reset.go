@@ -10,8 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// PasswordResetToken is the row shape for the password_reset_tokens table.
-// token_hash is the only key — we never store the plaintext.
+// PasswordResetToken is the row shape for the password_reset_tokens table
 type PasswordResetToken struct {
 	TokenHash string      `db:"token_hash"`
 	UserID    pgtype.UUID `db:"user_id"`
@@ -22,9 +21,9 @@ type PasswordResetToken struct {
 	UserAgent *string     `db:"user_agent"`
 }
 
-// CreatePasswordResetToken inserts a fresh token row. The hash MUST be
-// already computed by the caller (we don't see the plaintext here).
-// requestIP and userAgent are optional context for audit purposes.
+// CreatePasswordResetToken inserts a fresh token row.
+// the hash MUST be already computed by the caller
+// requestIP and userAgent are optional context for audit purposes
 func (s *Store) CreatePasswordResetToken(ctx context.Context, tokenHash string, userID pgtype.UUID, expiresAt time.Time, requestIP, userAgent string) error {
 	var ip, ua any
 	if requestIP != "" {
@@ -42,10 +41,8 @@ func (s *Store) CreatePasswordResetToken(ctx context.Context, tokenHash string, 
 	return nil
 }
 
-// GetPasswordResetToken returns the row matching tokenHash, or
-// ErrNotFound. The caller is responsible for checking ExpiresAt and
-// UsedAt — we don't filter here, so the caller can emit precise
-// audit reasons ("expired" vs "already used" vs "unknown").
+// GetPasswordResetToken returns the row matching tokenHash, or ErrNotFound
+// The caller is responsible for checking ExpiresAt and UsedAt
 func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (*PasswordResetToken, error) {
 	q := `SELECT token_hash, user_id, expires_at, used_at, created_at, request_ip, user_agent
 	      FROM password_reset_tokens WHERE token_hash = $1`
@@ -63,9 +60,7 @@ func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (*P
 	return &t, nil
 }
 
-// MarkPasswordResetTokenUsed sets used_at = NOW() so this token can't
-// be used again. Idempotent — running it twice is safe; subsequent
-// lookups still find the row, with used_at non-NULL.
+// MarkPasswordResetTokenUsed sets used_at = NOW() so this token can't be used again
 func (s *Store) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string) error {
 	q := `UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = $1`
 	if _, err := s.pool.Exec(ctx, q, tokenHash); err != nil {
@@ -74,11 +69,7 @@ func (s *Store) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string
 	return nil
 }
 
-// DeletePasswordResetTokensForUser removes ALL outstanding tokens for
-// a user. Called when the user changes their password (any path —
-// admin reset, self-reset, or future signup-confirm). Ensures a
-// previously-emailed reset link can't be replayed after the user has
-// already chosen a new password through a different mechanism.
+// DeletePasswordResetTokensForUser removes all outstanding tokens for a user
 func (s *Store) DeletePasswordResetTokensForUser(ctx context.Context, userID pgtype.UUID) error {
 	q := `DELETE FROM password_reset_tokens WHERE user_id = $1`
 	if _, err := s.pool.Exec(ctx, q, userID); err != nil {

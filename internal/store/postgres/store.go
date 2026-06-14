@@ -8,37 +8,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ErrNotFound is the canonical store error for missing rows.
-// Higher layers translate this to HTTP 404 or domain-specific errors.
+// ErrNotFound is the canonical store error for missing rows
+// higher layers translate this to HTTP 404 or domain-specific errors
 var ErrNotFound = errors.New("store: not found")
 
-// Store is the data-access layer. Methods are grouped by entity into
-// separate files (users.go, sessions.go, …) but share the underlying
-// pool exposed here.
+// Store is the data-access layer, methods are grouped by entity into
+// separate files (users.go, sessions.go, ...) but share the underlying pool exposed here
 //
-// All methods accept context.Context as the first argument and use it
-// for the underlying query; callers are responsible for setting
-// timeouts and cancellation.
+// all methods accept context.Context as the first argument and use it
+// for the underlying query, callers are responsible for setting timeouts and cancellation
 type Store struct {
 	pool *pgxpool.Pool
 }
 
-// NewStore wraps a connection pool.
 func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-// Pool exposes the underlying pgxpool. Used sparingly — most callers
-// should go through typed methods.
+// Pool exposes the underlying pgxpool
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
-// Domain types
-//
-// Field names match column names case-insensitively so pgx can scan rows
-// directly via pgx.RowToStructByNameLax. Nullable columns use pointer
-// types or pgtype wrappers as appropriate.
-
-// User is the canonical user record from the users table.
 type User struct {
 	ID              pgtype.UUID
 	Email           *string
@@ -52,8 +41,6 @@ type User struct {
 	UpdatedAt       time.Time  `db:"updated_at"`
 	DeletedAt       *time.Time `db:"deleted_at"`
 }
-
-// Credential is a row from user_credentials.
 type Credential struct {
 	UserID            pgtype.UUID `db:"user_id"`
 	PasswordHash      string      `db:"password_hash"`
@@ -64,8 +51,6 @@ type Credential struct {
 	CreatedAt         time.Time   `db:"created_at"`
 	UpdatedAt         time.Time   `db:"updated_at"`
 }
-
-// Session is a row from sessions.
 type Session struct {
 	ID         pgtype.UUID
 	UserID     pgtype.UUID `db:"user_id"`
@@ -75,17 +60,11 @@ type Session struct {
 	UserAgent  *string     `db:"user_agent"`
 	CreatedAt  time.Time   `db:"created_at"`
 	RevokedAt  *time.Time  `db:"revoked_at"`
-	// ACR is the OIDC Authentication Context Class Reference.
-	// "0" = single-factor (password / federation), "1" = MFA used.
-	ACR string `db:"acr"`
-	// AMR is the OIDC Authentication Methods References — e.g.
-	// ["pwd"], ["pwd","otp"], ["fed"], ["hwk"]. Drives the amr claim
-	// in id_tokens issued from this session.
+	ACR        string      `db:"acr"`
+	// ["pwd"], ["pwd","otp"], ["fed"], ["hwk"]
 	AMR []string `db:"amr"`
 }
 
-// UserMFAMethod is a row from user_mfa_methods — one registered second
-// factor for one user.
 type UserMFAMethod struct {
 	ID          pgtype.UUID
 	UserID      pgtype.UUID `db:"user_id"`
@@ -100,7 +79,7 @@ type UserMFAMethod struct {
 	UpdatedAt   time.Time  `db:"updated_at"`
 }
 
-// UserBackupCode is a row from user_backup_codes.
+// UserBackupCode is a row from user_backup_codes
 type UserBackupCode struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID `db:"user_id"`
@@ -109,7 +88,7 @@ type UserBackupCode struct {
 	CreatedAt time.Time   `db:"created_at"`
 }
 
-// CASService is a registered CAS service URL pattern.
+// CASService is a registered CAS service URL pattern
 type CASService struct {
 	ID                 pgtype.UUID
 	Name               string
@@ -123,8 +102,6 @@ type CASService struct {
 	DeletedAt          *time.Time `db:"deleted_at"`
 }
 
-// UserIdentity is a row from user_identities — links a canonical user to
-// an upstream provider account (Google, GitHub, etc.).
 type UserIdentity struct {
 	ID          pgtype.UUID
 	UserID      pgtype.UUID `db:"user_id"`
@@ -138,7 +115,6 @@ type UserIdentity struct {
 	UpdatedAt   time.Time `db:"updated_at"`
 }
 
-// CASTicket is a service ticket from cas_tickets.
 type CASTicket struct {
 	ID         string
 	SessionID  pgtype.UUID `db:"session_id"`
@@ -149,7 +125,6 @@ type CASTicket struct {
 	CreatedAt  time.Time `db:"created_at"`
 }
 
-// OIDCClient is a registered OAuth 2.0 / OIDC client from oidc_clients.
 type OIDCClient struct {
 	ID                string
 	SecretHash        *string `db:"secret_hash"` // nil for public clients
@@ -169,11 +144,10 @@ type OIDCClient struct {
 	DeletedAt         *time.Time `db:"deleted_at"`
 }
 
-// Duration wraps time.Duration for pgx scanning of Postgres interval values.
-// pgx scans interval as time.Duration directly when the struct field is time.Duration.
+// Duration wraps time.Duration for pgx scanning of Postgres interval values
 type Duration = time.Duration
 
-// OIDCAuthCode is a row from oidc_auth_codes.
+// OIDCAuthCode is a row from oidc_auth_codes
 type OIDCAuthCode struct {
 	ID            string
 	ClientID      string      `db:"client_id"`
@@ -191,7 +165,6 @@ type OIDCAuthCode struct {
 	CreatedAt     time.Time  `db:"created_at"`
 }
 
-// OIDCAccessToken is a row from oidc_access_tokens.
 type OIDCAccessToken struct {
 	ID        string
 	ClientID  string       `db:"client_id"`
@@ -203,7 +176,6 @@ type OIDCAccessToken struct {
 	CreatedAt time.Time  `db:"created_at"`
 }
 
-// OIDCRefreshToken is a row from oidc_refresh_tokens.
 type OIDCRefreshToken struct {
 	ID         string
 	ClientID   string       `db:"client_id"`
@@ -217,8 +189,6 @@ type OIDCRefreshToken struct {
 	CreatedAt  time.Time  `db:"created_at"`
 }
 
-// AuditEvent is a row from audit_log. Events are append-only — there is
-// no Update method on the Store, by design.
 type AuditEvent struct {
 	ID        pgtype.UUID
 	EventType string       `db:"event_type"`

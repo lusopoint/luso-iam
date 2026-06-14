@@ -1,25 +1,14 @@
--- 0003_cas.up.sql
--- CAS service registry and ephemeral service tickets.
-
-BEGIN;
-
--- cas_services: registered CAS service URLs. The login flow validates
--- that the `service` query parameter matches one of these entries.
---
--- Matching: simple prefix match using SQL LIKE, with '*' wildcards in
--- service_url_pattern converted to '%'. We pre-compute the LIKE pattern
--- at insert time (stored in `match_pattern`) so lookups are a single
--- indexed predicate.
+-- cas_services, registered CAS service urls
 CREATE TABLE cas_services (
-    id                   uuid        PRIMARY KEY DEFAULT uuidv7(),
+    id                   uuid        PRIMARY KEY DEFAULT uuid(),
     name                 text        NOT NULL,
-    -- Human-authored pattern with '*' wildcards, e.g. 'https://app.example.com/*'
+    -- human authored pattern with '*' wildcards, example 'https://app.example.com/*'
     service_url_pattern  text        NOT NULL,
-    -- SQL LIKE pattern derived from service_url_pattern at write time.
+    -- SQL LIKE pattern derived from service_url_pattern at write time
     match_pattern        text        NOT NULL,
     description          text        NULL,
-    -- Attribute release policy (used by CAS 3.0 / SAML 1.1 validation).
-    -- Empty array means only the username is released.
+    -- attribute release policy (used by CAS 3.0 / SAML 1.1 validation)
+    -- empty array means only the username is released
     released_attributes  text[]      NOT NULL DEFAULT '{}',
     enabled              boolean     NOT NULL DEFAULT true,
     created_at           timestamptz NOT NULL DEFAULT now(),
@@ -39,13 +28,10 @@ CREATE TRIGGER cas_services_touch_updated_at
     BEFORE UPDATE ON cas_services
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- cas_tickets: ephemeral service tickets issued by /cas/login and
--- consumed by /cas/serviceValidate. Single-use, short-lived (~60s).
---
--- The ticket itself is the primary key — a server-generated random
--- string with the "ST-" prefix as required by the CAS spec.
+-- cas_tickets, ephemeral service tickets issued by /cas/login and
+-- consumed by /cas/serviceValidate, single use, short-lived (~60s)
 CREATE TABLE cas_tickets (
-    id           text        PRIMARY KEY,  -- e.g. "ST-<32 hex chars>"
+    id           text        PRIMARY KEY,  -- ex: "ST-<32 hex chars>"
     session_id   uuid        NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     service_url  text        NOT NULL,
     expires_at   timestamptz NOT NULL,
@@ -54,8 +40,5 @@ CREATE TABLE cas_tickets (
     created_at   timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX cas_tickets_expires_at_idx
-    ON cas_tickets (expires_at)
-    WHERE consumed_at IS NULL;
+CREATE INDEX cas_tickets_expires_at_idx ON cas_tickets (expires_at) WHERE consumed_at IS NULL;
 
-COMMIT;

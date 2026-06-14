@@ -15,7 +15,7 @@ const credentialColumns = `
 	failed_attempts, locked_until, created_at, updated_at
 `
 
-// GetCredential returns the credential row for userID, or ErrNotFound.
+// GetCredential returns the credential row for userID, or ErrNotFound
 func (s *Store) GetCredential(ctx context.Context, userID pgtype.UUID) (*Credential, error) {
 	q := `SELECT ` + credentialColumns + ` FROM user_credentials WHERE user_id = $1`
 	rows, err := s.pool.Query(ctx, q, userID)
@@ -32,8 +32,8 @@ func (s *Store) GetCredential(ctx context.Context, userID pgtype.UUID) (*Credent
 	return &c, nil
 }
 
-// UpsertCredential creates or replaces the password hash for the given user.
-// Resets failed_attempts and locked_until.
+// UpsertCredential creates or replaces the password hash for the given user
+// resets failed_attempts and locked_until
 func (s *Store) UpsertCredential(ctx context.Context, userID pgtype.UUID, passwordHash string) error {
 	q := `INSERT INTO user_credentials (user_id, password_hash)
 	      VALUES ($1, $2)
@@ -48,9 +48,7 @@ func (s *Store) UpsertCredential(ctx context.Context, userID pgtype.UUID, passwo
 	return nil
 }
 
-// IncrementFailedAttempts atomically bumps the failure counter.
-// Returns the new value so the caller can decide whether to lock the
-// account.
+// IncrementFailedAttempts atomically bumps the failure counter
 func (s *Store) IncrementFailedAttempts(ctx context.Context, userID pgtype.UUID) (int32, error) {
 	var n int32
 	q := `UPDATE user_credentials
@@ -64,7 +62,7 @@ func (s *Store) IncrementFailedAttempts(ctx context.Context, userID pgtype.UUID)
 	return n, nil
 }
 
-// ResetFailedAttempts zeroes the failure counter — call on successful login.
+// ResetFailedAttempts zeroes the failure counter, call on successful login
 func (s *Store) ResetFailedAttempts(ctx context.Context, userID pgtype.UUID) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE user_credentials SET failed_attempts = 0, locked_until = NULL WHERE user_id = $1`,
@@ -75,9 +73,7 @@ func (s *Store) ResetFailedAttempts(ctx context.Context, userID pgtype.UUID) err
 	return nil
 }
 
-// SetLockout marks the account as locked until the given time. The
-// failed_attempts counter is intentionally not reset here — that
-// happens after a successful login or an explicit admin unlock.
+// SetLockout marks the account as locked until the given time
 func (s *Store) SetLockout(ctx context.Context, userID pgtype.UUID, until time.Time) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE user_credentials SET locked_until = $2 WHERE user_id = $1`,

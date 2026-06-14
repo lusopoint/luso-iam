@@ -17,7 +17,7 @@ const userIdentityColumns = `
 `
 
 // GetUserIdentity returns the identity row for the given (provider, sub),
-// or ErrNotFound.
+// or ErrNotFound
 func (s *Store) GetUserIdentity(ctx context.Context, provider, sub string) (*UserIdentity, error) {
 	q := `SELECT ` + userIdentityColumns + ` FROM user_identities
 	      WHERE provider = $1 AND sub = $2`
@@ -56,7 +56,7 @@ func (s *Store) GetUserByProviderSub(ctx context.Context, provider, sub string) 
 	return &u, nil
 }
 
-// CreateUserIdentityParams is the input to CreateUserIdentity.
+// CreateUserIdentityParams is the input to CreateUserIdentity
 type CreateUserIdentityParams struct {
 	UserID      pgtype.UUID
 	Provider    string
@@ -67,7 +67,7 @@ type CreateUserIdentityParams struct {
 	RawClaims   map[string]any
 }
 
-// CreateUserIdentity inserts a new identity row.
+// CreateUserIdentity inserts a new identity row
 func (s *Store) CreateUserIdentity(ctx context.Context, p CreateUserIdentityParams) (*UserIdentity, error) {
 	raw, err := marshalClaims(p.RawClaims)
 	if err != nil {
@@ -90,8 +90,7 @@ func (s *Store) CreateUserIdentity(ctx context.Context, p CreateUserIdentityPara
 	return &id, nil
 }
 
-// UpdateUserIdentityParams carries the mutable fields refreshed on each
-// upstream login.
+// UpdateUserIdentityParams carries the mutable fields refreshed on each upstream login
 type UpdateUserIdentityParams struct {
 	Provider    string
 	Sub         string
@@ -101,9 +100,7 @@ type UpdateUserIdentityParams struct {
 	RawClaims   map[string]any
 }
 
-// UpdateUserIdentity refreshes the cached profile fields. Called every
-// time the user logs in via an upstream provider so the display
-// information stays current.
+// UpdateUserIdentity refreshes the cached profile fields
 func (s *Store) UpdateUserIdentity(ctx context.Context, p UpdateUserIdentityParams) error {
 	raw, err := marshalClaims(p.RawClaims)
 	if err != nil {
@@ -122,8 +119,7 @@ func (s *Store) UpdateUserIdentity(ctx context.Context, p UpdateUserIdentityPara
 	return nil
 }
 
-// ListUserIdentities returns all identity rows for a given user — used
-// in the profile portal and admin UI.
+// ListUserIdentities returns all identity rows for a given user
 func (s *Store) ListUserIdentities(ctx context.Context, userID pgtype.UUID) ([]UserIdentity, error) {
 	q := `SELECT ` + userIdentityColumns + ` FROM user_identities
 	      WHERE user_id = $1 ORDER BY created_at`
@@ -138,10 +134,8 @@ func (s *Store) ListUserIdentities(ctx context.Context, userID pgtype.UUID) ([]U
 	return ids, nil
 }
 
-// GetUserIdentityByID returns the user_identity row with the given id,
-// or ErrNotFound. Used by the admin unlink endpoint to verify
-// ownership before deleting (otherwise an attacker could probe IDs
-// belonging to other users).
+// GetUserIdentityByID returns the user_identity row with the given id, or ErrNotFound
+// Used by the admin unlink endpoint to verify
 func (s *Store) GetUserIdentityByID(ctx context.Context, id pgtype.UUID) (*UserIdentity, error) {
 	q := `SELECT ` + userIdentityColumns + ` FROM user_identities WHERE id = $1`
 	rows, err := s.pool.Query(ctx, q, id)
@@ -158,11 +152,11 @@ func (s *Store) GetUserIdentityByID(ctx context.Context, id pgtype.UUID) (*UserI
 	return &ui, nil
 }
 
-// DeleteUserIdentity removes a single user_identity row. We use a hard
-// delete (not a soft delete) because once unlinked, the (provider, sub)
-// pair must be free to re-link — either to the same user via /mfa/enroll
-// type flow, or to a different user if the upstream account changes
-// hands. A soft delete would leave the unique constraint occupied.
+// DeleteUserIdentity removes a single user_identity row,
+// We use a hard delete (not a soft delete) because once unlinked, the (provider, sub)
+// pair must be free to re link, either to the same user via /mfa/enroll
+// type flow, or to a different user if the upstream account changes hands
+// a soft delete would leave the unique constraint occupied
 func (s *Store) DeleteUserIdentity(ctx context.Context, id pgtype.UUID) error {
 	cmd, err := s.pool.Exec(ctx, `DELETE FROM user_identities WHERE id = $1`, id)
 	if err != nil {

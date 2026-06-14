@@ -10,12 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// EmailVerificationToken is the row shape for the
-// email_verification_tokens table. token_hash is the only key — we
-// never store the plaintext.
-//
-// Email is snapshotted at issue time so that an email-change
-// race can't accidentally verify the wrong address.
+// EmailVerificationToken is the row shape for the email_verification_tokens table, token_hash is the only key
 type EmailVerificationToken struct {
 	TokenHash string      `db:"token_hash"`
 	UserID    pgtype.UUID `db:"user_id"`
@@ -27,13 +22,13 @@ type EmailVerificationToken struct {
 	UserAgent *string     `db:"user_agent"`
 }
 
-// CreateEmailVerificationToken inserts a fresh token row. The hash
+// CreateEmailVerificationToken inserts a fresh token row, the hash
 // MUST be already computed by the caller (we don't see the plaintext
-// here). requestIP and userAgent are optional context for audit.
+// here), requestIP and userAgent are optional context for audit
 //
 // email is captured at issue time. If a user later changes their
 // email address, in-flight tokens for the old address are still
-// valid (verifying the OLD address) — which is the correct semantics
+// valid (verifying the OLD address), which is the correct semantics
 // for an "is this mailbox under your control" check. The signup
 // service shouldn't change the user's email_verified_at when an
 // old-email token is presented; it should check that the token's
@@ -55,10 +50,7 @@ func (s *Store) CreateEmailVerificationToken(ctx context.Context, tokenHash stri
 	return nil
 }
 
-// GetEmailVerificationToken returns the row matching tokenHash, or
-// ErrNotFound. The caller is responsible for checking ExpiresAt and
-// UsedAt — we don't filter here so the caller can emit precise audit
-// reasons ("expired" vs "already used" vs "unknown").
+// GetEmailVerificationToken returns the row matching tokenHash, or ErrNotFound
 func (s *Store) GetEmailVerificationToken(ctx context.Context, tokenHash string) (*EmailVerificationToken, error) {
 	q := `SELECT token_hash, user_id, email, expires_at, used_at, created_at, request_ip, user_agent
 	      FROM email_verification_tokens WHERE token_hash = $1`
@@ -76,8 +68,7 @@ func (s *Store) GetEmailVerificationToken(ctx context.Context, tokenHash string)
 	return &t, nil
 }
 
-// MarkEmailVerificationTokenUsed sets used_at = NOW() so this token
-// can't be used again. Idempotent.
+// MarkEmailVerificationTokenUsed sets used_at = NOW() so this token can't be used again (idempotent)
 func (s *Store) MarkEmailVerificationTokenUsed(ctx context.Context, tokenHash string) error {
 	q := `UPDATE email_verification_tokens SET used_at = NOW() WHERE token_hash = $1`
 	if _, err := s.pool.Exec(ctx, q, tokenHash); err != nil {
@@ -86,16 +77,7 @@ func (s *Store) MarkEmailVerificationTokenUsed(ctx context.Context, tokenHash st
 	return nil
 }
 
-// MarkUserEmailVerified sets the user's email_verified_at to NOW().
-// Idempotent — calling on an already-verified user is a no-op (the
-// timestamp is overwritten, which is fine; we don't care about the
-// "first verification" timestamp specifically).
-//
-// Lives next to the verification-token plumbing rather than in users.go
-// because it's part of the verification flow's contract; a generic
-// "update arbitrary user fields" method already exists in admin.go,
-// but a dedicated single-purpose method here makes the call site at
-// the signup service much clearer.
+// MarkUserEmailVerified sets the users email_verified_at to NOW()
 func (s *Store) MarkUserEmailVerified(ctx context.Context, userID pgtype.UUID) error {
 	q := `UPDATE users SET email_verified_at = NOW(), updated_at = NOW() WHERE id = $1`
 	if _, err := s.pool.Exec(ctx, q, userID); err != nil {
@@ -104,9 +86,7 @@ func (s *Store) MarkUserEmailVerified(ctx context.Context, userID pgtype.UUID) e
 	return nil
 }
 
-// DeleteEmailVerificationTokensForUser removes ALL outstanding
-// verification tokens for a user. Called after a successful
-// verification, and could also be called on email change in the future.
+// DeleteEmailVerificationTokensForUser removes ALL outstanding verification tokens for a user
 func (s *Store) DeleteEmailVerificationTokensForUser(ctx context.Context, userID pgtype.UUID) error {
 	q := `DELETE FROM email_verification_tokens WHERE user_id = $1`
 	if _, err := s.pool.Exec(ctx, q, userID); err != nil {

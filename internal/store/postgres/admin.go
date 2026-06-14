@@ -11,26 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Users
 // ListUsersFilter narrows ListUsers. All fields are optional.
 type ListUsersFilter struct {
-	// Search matches against email, username, and display_name (ILIKE).
+	// Search matches against email, username, and display_name
 	Search string
-	// Status filters by users.status (e.g. "active", "disabled"). Empty = any.
 	Status string
-	// Limit / Offset for pagination. Limit is capped at 200.
+	// Limit / Offset for pagination
 	Limit  int
 	Offset int
 }
 
-// ListUsersResult bundles the page and the total matching count, so the
-// UI can render pagination without a second roundtrip.
 type ListUsersResult struct {
 	Users []User
 	Total int
 }
 
-// ListUsers returns a paginated slice of non-deleted users matching filter.
+// ListUsers returns a paginated slice depending on the limit and offset
 func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersResult, error) {
 	limit := f.Limit
 	if limit <= 0 || limit > 200 {
@@ -40,9 +36,7 @@ func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersRes
 	if offset < 0 {
 		offset = 0
 	}
-
-	// Build the WHERE clause incrementally so we can pass typed args
-	// (rather than string-concat user input).
+	// valid users (non deleted)
 	where := []string{"deleted_at IS NULL"}
 	args := []any{}
 
@@ -58,15 +52,15 @@ func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersRes
 	}
 	whereSQL := strings.Join(where, " AND ")
 
-	// One round-trip: page + total via window function.
+	// one round trip: page + total via window function
 	q := `SELECT ` + userColumns + `, count(*) OVER () AS total_count
 	      FROM users
 	      WHERE ` + whereSQL + `
 	      ORDER BY created_at DESC
 	      LIMIT $` + fmt.Sprint(len(args)+1) + `
 	      OFFSET $` + fmt.Sprint(len(args)+2)
-	args = append(args, limit, offset)
 
+	args = append(args, limit, offset)
 	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
@@ -94,9 +88,7 @@ func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersRes
 	return out, nil
 }
 
-// UpdateUserParams carries the editable fields. Nil pointers mean "do not
-// change". DisplayName uses a sentinel struct so callers can distinguish
-// "leave alone" (nil) from "clear" (non-nil, value == "").
+// UpdateUserParams carries the editable fields, Nil pointers mean "do not change"
 type UpdateUserParams struct {
 	ID          pgtype.UUID
 	Email       *string
@@ -104,15 +96,11 @@ type UpdateUserParams struct {
 	DisplayName *string
 	Status      *string
 	IsAdmin     *bool
-	// EmailVerifiedAt: pass &time.Time{} (zero value) to clear, or a real
-	// timestamp to set. nil leaves the column untouched. Provided so the
-	// admin create-user flow can mark verified at insert time without
-	// adding the field to CreateUserParams (and growing the SQL).
+	// EmailVerifiedAt: pass &time.Time{} (zero value) to clear, or a real timestamp to set
 	EmailVerifiedAt *time.Time
 }
 
-// UpdateUser modifies the given user. Only non-nil fields are touched.
-// Returns the updated row.
+// UpdateUser modifies the given user, only non nil fields are touched returns the updated row
 func (s *Store) UpdateUser(ctx context.Context, p UpdateUserParams) (*User, error) {
 	sets := []string{}
 	args := []any{}
@@ -127,7 +115,7 @@ func (s *Store) UpdateUser(ctx context.Context, p UpdateUserParams) (*User, erro
 		add("username", *p.Username)
 	}
 	if p.DisplayName != nil {
-		// Empty string → store NULL so the UI can clear the field.
+		// empty string, store NULL so the front end can clear the field
 		if *p.DisplayName == "" {
 			add("display_name", nil)
 		} else {
@@ -141,7 +129,7 @@ func (s *Store) UpdateUser(ctx context.Context, p UpdateUserParams) (*User, erro
 		add("is_admin", *p.IsAdmin)
 	}
 	if p.EmailVerifiedAt != nil {
-		// Zero time clears the column; any real time stamps it.
+		// zero time clears the column, any real time stamps it
 		if p.EmailVerifiedAt.IsZero() {
 			add("email_verified_at", nil)
 		} else {
@@ -149,7 +137,7 @@ func (s *Store) UpdateUser(ctx context.Context, p UpdateUserParams) (*User, erro
 		}
 	}
 	if len(sets) == 0 {
-		// Nothing to do — return current row.
+		// nothing to do, return current row
 		return s.GetUserByID(ctx, p.ID)
 	}
 	args = append(args, p.ID)
@@ -171,9 +159,7 @@ func (s *Store) UpdateUser(ctx context.Context, p UpdateUserParams) (*User, erro
 	return &u, nil
 }
 
-// SoftDeleteUser marks the user deleted_at and disables the account.
-// We don't hard-delete — foreign keys cascade to credentials/sessions/etc.,
-// but audit history must remain queryable.
+// SoftDeleteUser marks the user deleted_at and disables the account
 func (s *Store) SoftDeleteUser(ctx context.Context, id pgtype.UUID) error {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE users SET deleted_at = now(), status = 'disabled'
@@ -187,8 +173,7 @@ func (s *Store) SoftDeleteUser(ctx context.Context, id pgtype.UUID) error {
 	return nil
 }
 
-// ListSessionsForUser returns all non-revoked sessions for a user, newest
-// first. Used by the admin UI to surface "where is this user logged in?".
+// ListSessionsForUser returns all non revoked sessions for a user, newest first
 func (s *Store) ListSessionsForUser(ctx context.Context, userID pgtype.UUID) ([]Session, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+sessionColumns+` FROM sessions
@@ -205,8 +190,6 @@ func (s *Store) ListSessionsForUser(ctx context.Context, userID pgtype.UUID) ([]
 	return sessions, nil
 }
 
-// RevokeAllSessionsForUser is the nuclear option after a credential
-// compromise or admin-initiated logout. Marks every active session revoked.
 func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE sessions SET revoked_at = now()
@@ -217,10 +200,7 @@ func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID pgtype.UUID
 	return tag.RowsAffected(), nil
 }
 
-// OIDC clients (admin CRUD)
-// ListOIDCClients returns all non-deleted clients, newest first.
-// Admin endpoints don't filter by enabled — admins need to see disabled rows
-// to re-enable them.
+// ListOIDCClients returns all clients, newest first
 func (s *Store) ListOIDCClients(ctx context.Context) ([]OIDCClient, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+oidcClientColumns+` FROM oidc_clients
@@ -235,10 +215,10 @@ func (s *Store) ListOIDCClients(ctx context.Context) ([]OIDCClient, error) {
 	return clients, nil
 }
 
-// CreateOIDCClientParams holds everything an admin can set when registering.
+// CreateOIDCClientParams holds everything an admin can set when registering
 type CreateOIDCClientParams struct {
 	ID                string
-	SecretHash        *string // nil for public clients
+	SecretHash        *string
 	Name              string
 	RedirectURIs      []string
 	AllowedScopes     []string
@@ -251,7 +231,7 @@ type CreateOIDCClientParams struct {
 	IDTokenTTL        time.Duration
 }
 
-// CreateOIDCClient inserts a new client.
+// CreateOIDCClient inserts a new client
 func (s *Store) CreateOIDCClient(ctx context.Context, p CreateOIDCClientParams) (*OIDCClient, error) {
 	q := `INSERT INTO oidc_clients
 	          (id, secret_hash, name, redirect_uris,
@@ -276,7 +256,7 @@ func (s *Store) CreateOIDCClient(ctx context.Context, p CreateOIDCClientParams) 
 	return &c, nil
 }
 
-// UpdateOIDCClientParams holds editable fields. Nil = unchanged.
+// UpdateOIDCClientParams holds editable fields, Nil = unchanged
 type UpdateOIDCClientParams struct {
 	ID                string
 	Name              *string
@@ -288,7 +268,7 @@ type UpdateOIDCClientParams struct {
 	Enabled           *bool
 }
 
-// UpdateOIDCClient applies the patch and returns the updated row.
+// UpdateOIDCClient applies the patch and returns the updated row
 func (s *Store) UpdateOIDCClient(ctx context.Context, p UpdateOIDCClientParams) (*OIDCClient, error) {
 	sets := []string{}
 	args := []any{}
@@ -318,7 +298,7 @@ func (s *Store) UpdateOIDCClient(ctx context.Context, p UpdateOIDCClientParams) 
 		add("enabled", *p.Enabled)
 	}
 	if len(sets) == 0 {
-		// No-op: return current.
+		// Noop: return current
 		return s.GetOIDCClientAny(ctx, p.ID)
 	}
 	args = append(args, p.ID)
@@ -339,8 +319,7 @@ func (s *Store) UpdateOIDCClient(ctx context.Context, p UpdateOIDCClientParams) 
 	return &c, nil
 }
 
-// RotateOIDCClientSecret stores a new secret hash. Caller is responsible
-// for showing the plaintext to the admin once — it's never recoverable.
+// RotateOIDCClientSecret stores a new secret hash
 func (s *Store) RotateOIDCClientSecret(ctx context.Context, id, newHash string) error {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE oidc_clients SET secret_hash = $2
@@ -354,8 +333,8 @@ func (s *Store) RotateOIDCClientSecret(ctx context.Context, id, newHash string) 
 	return nil
 }
 
-// SoftDeleteOIDCClient marks the client deleted. Existing tokens issued
-// to this client remain in the DB but the client can no longer authenticate.
+// SoftDeleteOIDCClient marks the client deleted, existing tokens issued
+// to this client remain in the db but the client can no longer authenticate
 func (s *Store) SoftDeleteOIDCClient(ctx context.Context, id string) error {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE oidc_clients SET deleted_at = now(), enabled = false
@@ -369,8 +348,8 @@ func (s *Store) SoftDeleteOIDCClient(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetOIDCClientAny is the admin-side getter — unlike GetOIDCClient it
-// returns disabled clients too (they may need to be re-enabled).
+// GetOIDCClientAny is the admin side getter, unlike GetOIDCClient it
+// returns disabled clients too (they may need to be re enabled)
 func (s *Store) GetOIDCClientAny(ctx context.Context, id string) (*OIDCClient, error) {
 	q := `SELECT ` + oidcClientColumns + ` FROM oidc_clients
 	      WHERE id = $1 AND deleted_at IS NULL`
@@ -388,10 +367,10 @@ func (s *Store) GetOIDCClientAny(ctx context.Context, id string) (*OIDCClient, e
 	return &c, nil
 }
 
-// CAS services (admin CRUD)
-// (casServiceColumns is defined in cas.go and reused here.)
+// CAS services
+// (casServiceColumns is defined in cas.go and reused here)
 
-// ListCASServices returns all non-deleted CAS services, newest first.
+// ListCASServices returns all non deleted CAS services, newest first
 func (s *Store) ListCASServices(ctx context.Context) ([]CASService, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+casServiceColumns+` FROM cas_services
@@ -406,7 +385,7 @@ func (s *Store) ListCASServices(ctx context.Context) ([]CASService, error) {
 	return services, nil
 }
 
-// GetCASService returns one CAS service by id, or ErrNotFound.
+// GetCASService returns one CAS service by id, or ErrNotFound
 func (s *Store) GetCASService(ctx context.Context, id pgtype.UUID) (*CASService, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+casServiceColumns+` FROM cas_services
@@ -424,7 +403,6 @@ func (s *Store) GetCASService(ctx context.Context, id pgtype.UUID) (*CASService,
 	return &svc, nil
 }
 
-// UpdateCASServiceParams holds editable fields. Nil = unchanged.
 type UpdateCASServiceParams struct {
 	ID                 pgtype.UUID
 	Name               *string
@@ -435,7 +413,7 @@ type UpdateCASServiceParams struct {
 	Enabled            *bool
 }
 
-// UpdateCASService applies the patch and returns the updated row.
+// UpdateCASService applies the patch and returns the updated row
 func (s *Store) UpdateCASService(ctx context.Context, p UpdateCASServiceParams) (*CASService, error) {
 	sets := []string{}
 	args := []any{}
@@ -486,7 +464,7 @@ func (s *Store) UpdateCASService(ctx context.Context, p UpdateCASServiceParams) 
 	return &svc, nil
 }
 
-// SoftDeleteCASService removes a CAS service from active use.
+// SoftDeleteCASService removes a CAS service from active use
 func (s *Store) SoftDeleteCASService(ctx context.Context, id pgtype.UUID) error {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE cas_services SET deleted_at = now(), enabled = false

@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Client
 const oidcClientColumns = `
 	id, secret_hash, name, redirect_uris,
 	allowed_scopes, allowed_grant_types,
@@ -19,7 +18,7 @@ const oidcClientColumns = `
 	enabled, created_at, updated_at, deleted_at
 `
 
-// GetOIDCClient returns the active, enabled client with the given id.
+// GetOIDCClient returns the active, enabled client with the given id
 func (s *Store) GetOIDCClient(ctx context.Context, id string) (*OIDCClient, error) {
 	q := `SELECT ` + oidcClientColumns + ` FROM oidc_clients
 	      WHERE id = $1 AND deleted_at IS NULL AND enabled`
@@ -37,8 +36,8 @@ func (s *Store) GetOIDCClient(ctx context.Context, id string) (*OIDCClient, erro
 	return &c, nil
 }
 
-// ValidateRedirectURI returns nil iff redirectURI is in the client's
-// registered redirect_uris list (exact match, per OIDC spec).
+// ValidateRedirectURI returns nil if redirectURI is in the clients
+// registered redirect_uris list (exact match, per OIDC spec)
 func (s *Store) ValidateRedirectURI(ctx context.Context, clientID, redirectURI string) error {
 	var ok bool
 	err := s.pool.QueryRow(ctx,
@@ -50,12 +49,10 @@ func (s *Store) ValidateRedirectURI(ctx context.Context, clientID, redirectURI s
 		return fmt.Errorf("validate redirect_uri: %w", err)
 	}
 	if !ok {
-		return ErrNotFound // caller converts to invalid_redirect_uri
+		return ErrNotFound
 	}
 	return nil
 }
-
-// Authorization codes
 
 const oidcAuthCodeColumns = `
 	id, client_id, user_id, session_id,
@@ -64,7 +61,7 @@ const oidcAuthCodeColumns = `
 	expires_at, consumed_at, created_at
 `
 
-// CreateOIDCAuthCodeParams carries all fields for a new auth code.
+// CreateOIDCAuthCodeParams carries all fields for a new auth code
 type CreateOIDCAuthCodeParams struct {
 	ID            string
 	ClientID      string
@@ -80,7 +77,7 @@ type CreateOIDCAuthCodeParams struct {
 	ExpiresAt     time.Time
 }
 
-// CreateOIDCAuthCode inserts a new authorization code.
+// CreateOIDCAuthCode inserts a new authorization code
 func (s *Store) CreateOIDCAuthCode(ctx context.Context, p CreateOIDCAuthCodeParams) error {
 	_, err := s.pool.Exec(ctx,
 		`INSERT INTO oidc_auth_codes
@@ -98,9 +95,7 @@ func (s *Store) CreateOIDCAuthCode(ctx context.Context, p CreateOIDCAuthCodePara
 	return nil
 }
 
-// ConsumeOIDCAuthCode atomically marks the code as consumed and returns it.
-// Returns ErrNotFound if the code is missing, already consumed, or expired.
-// Atomicity prevents replay — do not use a SELECT-then-UPDATE pattern.
+// ConsumeOIDCAuthCode atomically marks the code as consumed and returns it
 func (s *Store) ConsumeOIDCAuthCode(ctx context.Context, id string) (*OIDCAuthCode, error) {
 	rows, err := s.pool.Query(ctx,
 		`UPDATE oidc_auth_codes SET consumed_at = now()
@@ -126,17 +121,17 @@ const oidcAccessTokenColumns = `
 	scopes, expires_at, revoked_at, created_at
 `
 
-// CreateOIDCAccessTokenParams carries all fields for a new access token.
+// CreateOIDCAccessTokenParams carries all fields for a new access token
 type CreateOIDCAccessTokenParams struct {
 	ID        string
 	ClientID  string
-	UserID    *pgtype.UUID // nil for client_credentials
+	UserID    *pgtype.UUID
 	SessionID *pgtype.UUID
 	Scopes    []string
 	ExpiresAt time.Time
 }
 
-// CreateOIDCAccessToken inserts a new opaque access token.
+// CreateOIDCAccessToken inserts a new opaque access token
 func (s *Store) CreateOIDCAccessToken(ctx context.Context, p CreateOIDCAccessTokenParams) error {
 	_, err := s.pool.Exec(ctx,
 		`INSERT INTO oidc_access_tokens
@@ -150,8 +145,7 @@ func (s *Store) CreateOIDCAccessToken(ctx context.Context, p CreateOIDCAccessTok
 	return nil
 }
 
-// GetOIDCAccessToken returns the active (not revoked, not expired) access
-// token, or ErrNotFound.
+// GetOIDCAccessToken returns the active (not revoked, not expired) access token, or ErrNotFound
 func (s *Store) GetOIDCAccessToken(ctx context.Context, id string) (*OIDCAccessToken, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+oidcAccessTokenColumns+` FROM oidc_access_tokens
@@ -170,8 +164,7 @@ func (s *Store) GetOIDCAccessToken(ctx context.Context, id string) (*OIDCAccessT
 	return &t, nil
 }
 
-// GetOIDCAccessTokenAny returns the token regardless of expiry or revocation
-// status — used by introspection to report inactive tokens accurately.
+// GetOIDCAccessTokenAny returns the token regardless of expiry or revocation status
 func (s *Store) GetOIDCAccessTokenAny(ctx context.Context, id string) (*OIDCAccessToken, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+oidcAccessTokenColumns+` FROM oidc_access_tokens WHERE id = $1`, id)
@@ -188,7 +181,7 @@ func (s *Store) GetOIDCAccessTokenAny(ctx context.Context, id string) (*OIDCAcce
 	return &t, nil
 }
 
-// RevokeOIDCAccessToken marks the access token as revoked.
+// RevokeOIDCAccessToken marks the access token as revoked
 func (s *Store) RevokeOIDCAccessToken(ctx context.Context, id string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE oidc_access_tokens SET revoked_at = now()
@@ -204,7 +197,7 @@ const oidcRefreshTokenColumns = `
 	expires_at, rotated_at, revoked_at, created_at
 `
 
-// CreateOIDCRefreshTokenParams carries all fields for a new refresh token.
+// CreateOIDCRefreshTokenParams carries all fields for a new refresh token
 type CreateOIDCRefreshTokenParams struct {
 	ID         string
 	ClientID   string
@@ -215,7 +208,7 @@ type CreateOIDCRefreshTokenParams struct {
 	ExpiresAt  time.Time
 }
 
-// CreateOIDCRefreshToken inserts a new refresh token.
+// CreateOIDCRefreshToken inserts a new refresh token
 func (s *Store) CreateOIDCRefreshToken(ctx context.Context, p CreateOIDCRefreshTokenParams) error {
 	_, err := s.pool.Exec(ctx,
 		`INSERT INTO oidc_refresh_tokens
@@ -230,8 +223,7 @@ func (s *Store) CreateOIDCRefreshToken(ctx context.Context, p CreateOIDCRefreshT
 	return nil
 }
 
-// GetOIDCRefreshToken returns an active (not rotated, not revoked, not
-// expired) refresh token, or ErrNotFound.
+// GetOIDCRefreshToken returns an active (not rotated, not revoked, not expired) refresh token, or ErrNotFound
 func (s *Store) GetOIDCRefreshToken(ctx context.Context, id string) (*OIDCRefreshToken, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+oidcRefreshTokenColumns+` FROM oidc_refresh_tokens
@@ -252,10 +244,9 @@ func (s *Store) GetOIDCRefreshToken(ctx context.Context, id string) (*OIDCRefres
 	return &t, nil
 }
 
-// RotateOIDCRefreshToken atomically marks the existing token as rotated.
-// The caller should immediately issue a new token with PreviousID set.
-// If a rotated token is presented again, it indicates theft — the caller
-// should revoke the entire family.
+// RotateOIDCRefreshToken atomically marks the existing token as rotated
+// the caller should immediately issue a new token with PreviousID set
+// if a rotated token is presented again, it indicates theft, the caller should revoke the entire family
 func (s *Store) RotateOIDCRefreshToken(ctx context.Context, id string) error {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE oidc_refresh_tokens SET rotated_at = now()
@@ -270,8 +261,7 @@ func (s *Store) RotateOIDCRefreshToken(ctx context.Context, id string) error {
 	return nil
 }
 
-// RevokeOIDCRefreshToken marks the token (and its descendants via
-// previous_id chain) as revoked — used for logout and theft detection.
+// RevokeOIDCRefreshToken marks the token (and its descendants via previous_id chain) as revoked
 func (s *Store) RevokeOIDCRefreshToken(ctx context.Context, id string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE oidc_refresh_tokens SET revoked_at = now()
@@ -280,8 +270,7 @@ func (s *Store) RevokeOIDCRefreshToken(ctx context.Context, id string) error {
 	return err
 }
 
-// RevokeAllRefreshTokensForSession revokes all non-expired refresh tokens
-// tied to a session — called when the user explicitly logs out.
+// RevokeAllRefreshTokensForSession revokes all non expired refresh tokens tied to a session
 func (s *Store) RevokeAllRefreshTokensForSession(ctx context.Context, sessionID pgtype.UUID) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE oidc_refresh_tokens SET revoked_at = now()
@@ -290,9 +279,10 @@ func (s *Store) RevokeAllRefreshTokensForSession(ctx context.Context, sessionID 
 	return err
 }
 
-// DeleteExpiredOIDCTokens is a maintenance helper for a periodic job.
+// DeleteExpiredOIDCTokens is a maintenance helper for a periodic job
 func (s *Store) DeleteExpiredOIDCTokens(ctx context.Context) error {
-	cutoff := time.Now().Add(-time.Hour) // keep 1h post-expiry for audit
+	// keep 1h post-expiry for audit
+	cutoff := time.Now().Add(-time.Hour)
 	for _, q := range []string{
 		`DELETE FROM oidc_auth_codes WHERE expires_at < $1`,
 		`DELETE FROM oidc_access_tokens WHERE expires_at < $1`,
