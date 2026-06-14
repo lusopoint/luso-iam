@@ -12,13 +12,9 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/migrations"
 )
 
-// Migrate applies any pending migrations against the given Postgres URL.
-// It is safe to call repeatedly: if the database is already at the latest
-// version, it returns nil.
-//
-// Migration files are embedded by the internal/store/migrations package
-// (go:embed forbids '..' in patterns, which is why the FS lives there
-// rather than in this file).
+// migrate applies any pending migrations against the given postgres url
+// it is safe to call repeatedly: if the database is already at the latest
+// version, it returns nil
 func Migrate(databaseURL string) error {
 	src, err := iofs.New(migrations.FS, ".")
 	if err != nil {
@@ -30,7 +26,6 @@ func Migrate(databaseURL string) error {
 		return fmt.Errorf("init migrate: %w", err)
 	}
 	defer func() {
-		// Errors here are pool teardown noise; surface only at debug.
 		if srcErr, dbErr := m.Close(); srcErr != nil || dbErr != nil {
 			slog.Debug("migrate close", "src_err", srcErr, "db_err", dbErr)
 		}

@@ -16,12 +16,8 @@ const casServiceColumns = `
 	created_at, updated_at, deleted_at
 `
 
-// FindCASServiceForURL returns the enabled, non-deleted service whose
-// match_pattern matches the given URL via SQL LIKE. Returns ErrNotFound
-// if no service matches.
-//
-// We order by length of the pattern descending so the most specific
-// registration wins when several patterns overlap.
+// FindCASServiceForURL returns the enabled, non deleted service whose
+// match_pattern matches the given URL via SQL LIKE, returns ErrNotFound if no service matches
 func (s *Store) FindCASServiceForURL(ctx context.Context, serviceURL string) (*CASService, error) {
 	q := `SELECT ` + casServiceColumns + ` FROM cas_services
 	      WHERE deleted_at IS NULL
@@ -43,7 +39,6 @@ func (s *Store) FindCASServiceForURL(ctx context.Context, serviceURL string) (*C
 	return &svc, nil
 }
 
-// CreateCASServiceParams is the input to CreateCASService.
 type CreateCASServiceParams struct {
 	Name               string
 	ServiceURLPattern  string
@@ -52,7 +47,7 @@ type CreateCASServiceParams struct {
 	ReleasedAttributes []string
 }
 
-// CreateCASService registers a new CAS service.
+// CreateCASService registers a new CAS service
 func (s *Store) CreateCASService(ctx context.Context, p CreateCASServiceParams) (*CASService, error) {
 	q := `INSERT INTO cas_services
 	          (name, service_url_pattern, match_pattern, description, released_attributes)
@@ -72,16 +67,16 @@ func (s *Store) CreateCASService(ctx context.Context, p CreateCASServiceParams) 
 }
 
 // Tickets
-// CreateCASTicketParams is the input to CreateCASTicket.
+// CreateCASTicketParams is the input to CreateCASTicket
 type CreateCASTicketParams struct {
-	ID         string // caller-provided ticket value, e.g. "ST-<hex>"
+	ID         string // caller-provided ticket value, e.g. "ST-<...>"
 	SessionID  pgtype.UUID
 	ServiceURL string
 	ExpiresAt  time.Time
 	Renew      bool
 }
 
-// CreateCASTicket inserts a service ticket.
+// CreateCASTicket inserts a service ticket
 func (s *Store) CreateCASTicket(ctx context.Context, p CreateCASTicketParams) error {
 	q := `INSERT INTO cas_tickets (id, session_id, service_url, expires_at, renew)
 	      VALUES ($1, $2, $3, $4, $5)`
@@ -92,12 +87,8 @@ func (s *Store) CreateCASTicket(ctx context.Context, p CreateCASTicketParams) er
 	return nil
 }
 
-// ConsumeCASTicket atomically marks the ticket as consumed and returns
-// it. Returns ErrNotFound if the ticket doesn't exist, has already been
-// consumed, or has expired.
-//
-// This is the only correct way to validate a service ticket — a
-// SELECT-then-UPDATE would race under concurrent validation.
+// ConsumeCASTicket atomically marks the ticket as consumed and returns it
+// Returns ErrNotFound if the ticket doesn't exist, has already been consumed, or has expired
 func (s *Store) ConsumeCASTicket(ctx context.Context, id string) (*CASTicket, error) {
 	q := `UPDATE cas_tickets
 	      SET consumed_at = now()
@@ -119,8 +110,7 @@ func (s *Store) ConsumeCASTicket(ctx context.Context, id string) (*CASTicket, er
 	return &t, nil
 }
 
-// DeleteExpiredCASTickets removes old ticket rows. Intended for a
-// periodic cleanup goroutine; not invoked on the request hot path.
+// DeleteExpiredCASTickets removes old ticket rows
 func (s *Store) DeleteExpiredCASTickets(ctx context.Context) (int64, error) {
 	tag, err := s.pool.Exec(ctx,
 		`DELETE FROM cas_tickets WHERE expires_at < now() - interval '1 hour'`)

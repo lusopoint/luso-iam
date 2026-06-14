@@ -17,14 +17,11 @@ var userColumnNames = []string{
 	"created_at", "updated_at", "deleted_at",
 }
 
-// userColumns is the bare comma-separated list(no ambiguity possible).
+// userColumns is the bare comma-separated list(no ambiguity possible)
 var userColumns = strings.Join(userColumnNames, ", ")
 
-// userColumnsAs returns the column list with a table alias prepended,
-// for queries that JOIN another table sharing column names. Without
-// the prefix, columns like id/email/created_at/updated_at/display_name
-// (all of which also exist on user_identities) collide and Postgres
-// raises "column reference is ambiguous"
+// userColumnsAs returns the column list with a table alias prepended
+// JOIN fixes the issue with ambiguous
 func userColumnsAs(alias string) string {
 	parts := make([]string, len(userColumnNames))
 	for i, c := range userColumnNames {
@@ -33,9 +30,7 @@ func userColumnsAs(alias string) string {
 	return strings.Join(parts, ", ")
 }
 
-// GetUserByEmail returns the active user with the given email, or
-// ErrNotFound. Email comparison is case-insensitive because users.email
-// is typed as citext.
+// GetUserByEmail returns the active user with the given email
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	q := `SELECT ` + userColumns + ` FROM users
 	      WHERE email = $1 AND deleted_at IS NULL`
@@ -53,7 +48,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*User, error)
 	return &u, nil
 }
 
-// GetUserByID returns the active user with the given id, or ErrNotFound.
+// GetUserByID returns the active user with the given id
 func (s *Store) GetUserByID(ctx context.Context, id pgtype.UUID) (*User, error) {
 	q := `SELECT ` + userColumns + ` FROM users
 	      WHERE id = $1 AND deleted_at IS NULL`
@@ -71,14 +66,13 @@ func (s *Store) GetUserByID(ctx context.Context, id pgtype.UUID) (*User, error) 
 	return &u, nil
 }
 
-// CreateUserParams is the input to CreateUser.
 type CreateUserParams struct {
 	Email       *string
 	Username    *string
 	DisplayName *string
 }
 
-// CreateUser inserts a new user and returns the created row.
+// CreateUser inserts a new user and returns the created row
 func (s *Store) CreateUser(ctx context.Context, p CreateUserParams) (*User, error) {
 	q := `INSERT INTO users (email, username, display_name)
 	      VALUES ($1, $2, $3)
@@ -94,9 +88,7 @@ func (s *Store) CreateUser(ctx context.Context, p CreateUserParams) (*User, erro
 	return &u, nil
 }
 
-// TouchUserLastLogin updates last_login_at to now() for the given user.
-// Errors are returned but typically logged-and-swallowed by callers
-// since failure to record a login timestamp is non-fatal.
+// TouchUserLastLogin updates last_login_at to now() for the given user
 func (s *Store) TouchUserLastLogin(ctx context.Context, userID pgtype.UUID) error {
 	_, err := s.pool.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id = $1`, userID)
 	if err != nil {
