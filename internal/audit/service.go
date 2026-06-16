@@ -1,41 +1,22 @@
-// Package audit provides a typed event logger that writes to the
-// audit_log table. Every security-relevant action in the codebase
-// passes through this package — callers should never write to the
-// store's InsertAuditEvent directly.
-//
-// Audit writes are deliberately synchronous: events that we never
-// observed are worse than slightly slower handlers. Failure modes
-// (DB down, write timeout) are logged but do not abort the parent
-// operation — the audit log is best-effort durability, not a barrier.
 package audit
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/lusopoint/lusoiam/internal/store/postgres"
 	"log/slog"
 	"net/http"
 	"strings"
-
-	"github.com/jackc/pgx/v5/pgtype"
-
-	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// Service is the audit-log writer.
 type Service struct {
 	store *postgres.Store
 }
 
-// New returns a Service that writes via store.
 func New(store *postgres.Store) *Service {
 	return &Service{store: store}
 }
-
-// Event types
-//
-// The set of canonical event_type values. Keeping these as constants — not
-// magic strings — keeps the dashboard filters consistent and makes a
-// "find all logout sites" search trivial.
 
 const (
 	// Authentication
@@ -67,6 +48,7 @@ const (
 	EventUserDeleted         = "user_deleted"
 	EventUserLocked          = "user_locked"
 	EventUserUnlocked        = "user_unlocked"
+	EventEmailVerified       = "email_verified"
 	EventClientCreated       = "client_created"
 	EventClientUpdated       = "client_updated"
 	EventClientDeleted       = "client_deleted"
@@ -76,23 +58,19 @@ const (
 	EventCASServiceDeleted   = "cas_service_deleted"
 )
 
-// Event struct
-
-// Event is the input to Log. Fields are optional except EventType.
-// Metadata accepts any map; it is marshalled to JSON before storage.
+// Event is the input to Log. Fields are optional except EventType
+// Metadata accepts any map; it is marshalled to JSON before storage
 type Event struct {
 	Type     string
 	Actor    *pgtype.UUID
 	Target   *pgtype.UUID
 	Metadata map[string]any
 
-	// IP and UserAgent are typically pulled from the request via FromRequest.
+	// IP and UserAgent are typically pulled from the request via FromRequest
 	IP        string
 	UserAgent string
 }
 
-// Log writes one event. Errors are logged but never returned to the
-// caller — audit logging must not break the calling operation.
 func (s *Service) Log(ctx context.Context, e Event) {
 	var meta []byte
 	if len(e.Metadata) > 0 {
@@ -126,24 +104,18 @@ func (s *Service) Log(ctx context.Context, e Event) {
 	}
 }
 
-// Convenience helpers
-
-// FromRequest extracts the client IP and User-Agent from r and applies
-// them to e. Returns the same event for fluent chaining.
-//
-//	svc.Log(ctx, audit.FromRequest(r, audit.Event{Type: ..., Target: ...}))
+// svc.Log(ctx, audit.FromRequest(r, audit.Event{Type: ..., Target: ...}))
 func FromRequest(r *http.Request, e Event) Event {
 	e.IP = clientIP(r)
 	e.UserAgent = r.UserAgent()
 	return e
 }
 
-// clientIP returns the best guess at the originating IP. When the server
-// runs behind Caddy or Traefik, X-Forwarded-For is the source of truth;
-// otherwise RemoteAddr.
+// clientIP returns the best guess at the originating IP. When the server runs behind Caddy or Traefik
+// X-Forwarded-For is the source of truth;
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// XFF is "client, proxy1, proxy2" — first hop is the real client.
+		// XFF is "client, proxy1, proxy2", first hop is the real client.
 		if i := strings.IndexByte(xff, ','); i > 0 {
 			return strings.TrimSpace(xff[:i])
 		}
@@ -152,7 +124,7 @@ func clientIP(r *http.Request) string {
 	if xr := r.Header.Get("X-Real-IP"); xr != "" {
 		return xr
 	}
-	// RemoteAddr is "host:port"; strip the port.
+	// RemoteAddr is "host:port"; strip the port
 	addr := r.RemoteAddr
 	if i := strings.LastIndexByte(addr, ':'); i > 0 {
 		return addr[:i]
