@@ -1,6 +1,3 @@
-// Package crypto holds the small, focused cryptographic primitives used
-// throughout the server: argon2id password hashing, secure random
-// generation, and HMAC-signed cookie values.
 package crypto
 
 import (
@@ -14,24 +11,18 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// Argon2id parameters per project guidelines section 6.
-// These are fixed at compile time; if we ever need to change them, existing
-// hashes still validate because the parameters are encoded in the PHC string.
+// Argon2id parameters, for now we will make it fixed
 const (
 	argonTime    uint32 = 3
-	argonMemory  uint32 = 64 * 1024 // KiB → 64 MiB
+	argonMemory  uint32 = 64 * 1024 // KiB -> 64 MiB
 	argonThreads uint8  = 4
 	argonKeyLen  uint32 = 32
 	argonSaltLen uint32 = 16
 )
 
-// ErrInvalidHash is returned when the stored hash isn't a recognisable
-// argon2id PHC string.
+// if not a valid argon2id PHC string we return this error
 var ErrInvalidHash = errors.New("crypto: invalid argon2id hash format")
 
-// HashPassword returns the PHC-encoded argon2id hash of password.
-//
-//	$argon2id$v=19$m=65536,t=3,p=4$<salt-b64>$<hash-b64>
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
@@ -48,9 +39,7 @@ func HashPassword(password string) (string, error) {
 	), nil
 }
 
-// VerifyPassword constant-time compares password against the stored PHC
-// hash. Returns (true, nil) on match, (false, nil) on mismatch, and a
-// non-nil error only if the encoded hash is malformed.
+// VerifyPassword constant time compares password against the stored PHC hash
 func VerifyPassword(password, encoded string) (bool, error) {
 	params, salt, hash, err := decodeArgon2id(encoded)
 	if err != nil {
@@ -71,11 +60,10 @@ type argonParams struct {
 	threads uint8
 }
 
-// decodeArgon2id parses the PHC-format string back into its components.
-// Format: $argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>
+// $argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>
 func decodeArgon2id(s string) (argonParams, []byte, []byte, error) {
 	parts := strings.Split(s, "$")
-	// Leading empty + algo + version + params + salt + hash = 6 parts.
+	// leading empty + algo + version + params + salt + hash = 6 parts
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return argonParams{}, nil, nil, ErrInvalidHash
 	}
