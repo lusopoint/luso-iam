@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// JWTClaims is the minimal set of claims we extract from an OIDC id_token.
-// Providers may include additional claims in RawClaims.
+// JWTClaims is the minimal set of claims we extract from an OIDC id_token
+// Providers may include additional claims in RawClaims
 type JWTClaims struct {
 	Issuer    string         `json:"iss"`
 	Subject   string         `json:"sub"`
@@ -30,17 +30,16 @@ type JWTClaims struct {
 	RawClaims map[string]any // populated separately from the full payload
 }
 
-// audience handles the CAS where aud is either a string or []string.
+// audience handles the CAS where aud is either a string or []string
 type audience []string
 
 func (a *audience) UnmarshalJSON(b []byte) error {
-	// Try []string first.
 	var multi []string
 	if err := json.Unmarshal(b, &multi); err == nil {
 		*a = multi
 		return nil
 	}
-	// Fall back to single string.
+	// fall back to single string
 	var single string
 	if err := json.Unmarshal(b, &single); err != nil {
 		return err
@@ -49,20 +48,15 @@ func (a *audience) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// VerifyRS256 parses and verifies an RS256 JWT using keys from jwksURL.
-// It validates signature, expiry, issuer, and that clientID appears in aud.
-//
-// This is intentionally narrow:
-//   - Only RS256 is accepted — alg confusion attacks are impossible.
-//   - Clock skew tolerance: 5 minutes.
-//   - JWKS keys are cached per JWKSCache instance.
+// VerifyRS256 parses and verifies an RS256 JWT using keys from jwksURL
+// it validates signature, expiry, issuer, and that clientID appears in aud
 func VerifyRS256(ctx context.Context, tokenStr, clientID, expectedIssuer string, cache *JWKSCache) (*JWTClaims, error) {
 	parts := strings.Split(tokenStr, ".")
 	if len(parts) != 3 {
 		return nil, errors.New("jwt: malformed token (expected 3 parts)")
 	}
 
-	// Header
+	// header
 	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("jwt: decode header: %w", err)
@@ -78,7 +72,7 @@ func VerifyRS256(ctx context.Context, tokenStr, clientID, expectedIssuer string,
 		return nil, fmt.Errorf("jwt: unsupported algorithm %q (only RS256 accepted)", header.Alg)
 	}
 
-	// Signature
+	// signature
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return nil, fmt.Errorf("jwt: decode signature: %w", err)
@@ -94,7 +88,7 @@ func VerifyRS256(ctx context.Context, tokenStr, clientID, expectedIssuer string,
 		return nil, fmt.Errorf("jwt: invalid signature: %w", err)
 	}
 
-	// Claims
+	// claims
 	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("jwt: decode payload: %w", err)
@@ -103,7 +97,7 @@ func VerifyRS256(ctx context.Context, tokenStr, clientID, expectedIssuer string,
 	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
 		return nil, fmt.Errorf("jwt: parse claims: %w", err)
 	}
-	// Keep the raw map for callers that want extra claims.
+	// keep the raw map for callers that want extra claims
 	var raw map[string]any
 	_ = json.Unmarshal(payloadJSON, &raw)
 	claims.RawClaims = raw
@@ -134,11 +128,9 @@ func VerifyRS256(ctx context.Context, tokenStr, clientID, expectedIssuer string,
 	return &claims, nil
 }
 
-// JWKS cache
-
-// JWKSCache fetches and caches RSA public keys from a JWKS endpoint.
-// It is safe for concurrent use. Keys are refreshed when they expire or
-// when an unknown kid is requested (one retry).
+// JWKSCache fetches and caches RSA public keys from a JWKS endpoint
+// it is safe for concurrent use
+// keys are refreshed when they expire or when an unknown kid is requested (one retry)
 type JWKSCache struct {
 	mu        sync.RWMutex
 	keys      map[string]*rsa.PublicKey
@@ -148,8 +140,6 @@ type JWKSCache struct {
 	client    *http.Client
 }
 
-// NewJWKSCache creates a cache for the JWKS at url.
-// ttl controls how long fetched keys are reused before a refresh.
 func NewJWKSCache(url string, ttl time.Duration, client *http.Client) *JWKSCache {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
@@ -160,9 +150,9 @@ func NewJWKSCache(url string, ttl time.Duration, client *http.Client) *JWKSCache
 	return &JWKSCache{url: url, ttl: ttl, client: client}
 }
 
-// GetKey returns the RSA public key for kid, fetching JWKS if needed.
+// GetKey returns the RSA public key for kid, fetching JWKS if needed
 func (c *JWKSCache) GetKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
-	// Fast path: read lock only.
+	// fast path: read lock only
 	c.mu.RLock()
 	key, ok := c.keys[kid]
 	fresh := time.Now().Before(c.expiresAt)
@@ -172,7 +162,7 @@ func (c *JWKSCache) GetKey(ctx context.Context, kid string) (*rsa.PublicKey, err
 		return key, nil
 	}
 
-	// Slow path: refresh the keyset.
+	// slow path: refresh the keyset
 	if err := c.refresh(ctx); err != nil {
 		return nil, err
 	}
@@ -186,7 +176,7 @@ func (c *JWKSCache) GetKey(ctx context.Context, kid string) (*rsa.PublicKey, err
 	return key, nil
 }
 
-// refresh fetches the JWKS endpoint and updates the key map.
+// refresh fetches the JWKS endpoint and updates the key map
 func (c *JWKSCache) refresh(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
 	if err != nil {
@@ -218,7 +208,8 @@ func (c *JWKSCache) refresh(ctx context.Context) error {
 		}
 		pub, err := parseRSAPublicKey(k.N, k.E)
 		if err != nil {
-			continue // skip malformed keys; don't fail entirely
+			// skip malformed keys, don't fail entirely
+			continue
 		}
 		keys[k.Kid] = pub
 	}
@@ -231,7 +222,7 @@ func (c *JWKSCache) refresh(ctx context.Context) error {
 }
 
 // parseRSAPublicKey reconstructs an *rsa.PublicKey from the base64url-encoded
-// modulus (n) and exponent (e) found in a JWKS entry.
+// modulus (n) and exponent (e) found in a JWKS entry
 func parseRSAPublicKey(nStr, eStr string) (*rsa.PublicKey, error) {
 	nBytes, err := base64.RawURLEncoding.DecodeString(nStr)
 	if err != nil {

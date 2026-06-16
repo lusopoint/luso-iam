@@ -77,14 +77,14 @@ func TestArgon2MalformedHash(t *testing.T) {
 		name string
 		hash string
 	}{
-		{"empty",            ""},
-		{"no_dollar",        "argon2idsomething"},
-		{"wrong_algo",       "$bcrypt$v=19$m=65536,t=3,p=4$abc$def"},
-		{"missing_parts",    "$argon2id$v=19$abc$def"},
-		{"bad_version_str",  "$argon2id$vXX$m=65536,t=3,p=4$abc$def"},
-		{"bad_params",       "$argon2id$v=19$bogus$abc$def"},
-		{"bad_base64_salt",  "$argon2id$v=19$m=65536,t=3,p=4$!!!notb64!!!$def"},
-		{"bad_base64_hash",  "$argon2id$v=19$m=65536,t=3,p=4$YWJj$!!!notb64!!!"},
+		{"empty", ""},
+		{"no_dollar", "argon2idsomething"},
+		{"wrong_algo", "$bcrypt$v=19$m=65536,t=3,p=4$abc$def"},
+		{"missing_parts", "$argon2id$v=19$abc$def"},
+		{"bad_version_str", "$argon2id$vXX$m=65536,t=3,p=4$abc$def"},
+		{"bad_params", "$argon2id$v=19$bogus$abc$def"},
+		{"bad_base64_salt", "$argon2id$v=19$m=65536,t=3,p=4$!!!notb64!!!$def"},
+		{"bad_base64_hash", "$argon2id$v=19$m=65536,t=3,p=4$YWJj$!!!notb64!!!"},
 	}
 	for _, c := range cases {
 		c := c

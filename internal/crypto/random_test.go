@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestRandomTokenLength: 2n hex chars from n bytes — that's the API
+// TestRandomTokenLength: 2n hex chars from n bytes, that's the API
 // contract. The other thing we want is uniqueness across calls.
 func TestRandomTokenLength(t *testing.T) {
 	t.Parallel()
@@ -17,7 +17,7 @@ func TestRandomTokenLength(t *testing.T) {
 		if len(tok) != 2*n {
 			t.Fatalf("RandomToken(%d) length = %d, want %d", n, len(tok), 2*n)
 		}
-		// Verify it's hex — only 0-9, a-f.
+		// Verify it's hex, only 0-9, a-f.
 		for _, c := range tok {
 			if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
 				t.Fatalf("non-hex character in token: %q (full token: %q)", c, tok)
