@@ -5,23 +5,13 @@ import (
 	"testing"
 )
 
-// TestIsValidProviderSlug pins the slug-acceptance contract.
-//
-// Why this matters: the slug ends up in three places — URL paths
-// (/oauth/callback/<slug>), DB rows (user_identities.provider), and env
-// var names (OIDC_<SLUG>_*). Hyphens break the env var convention,
-// uppercase breaks lowercase-by-convention, special characters break
-// URL paths. The rule is "lowercase letters, digits, underscores".
-//
-// Also: google and github are reserved — they're first-class entries on
-// FederationConfig and shouldn't be redefinable via OIDC_*.
 func TestIsValidProviderSlug(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		slug string
 		want bool
 	}{
-		// ── Accepted ──────────────────────────────────────────────────
+		// accepted
 		{"okta", true},
 		{"microsoft", true},
 		{"gitlab", true},
@@ -30,10 +20,10 @@ func TestIsValidProviderSlug(t *testing.T) {
 		{"a", true},
 		{"keycloak_v2", true},
 
-		// ── Rejected: empty ───────────────────────────────────────────
+		// rejected: empty
 		{"", false},
 
-		// ── Rejected: case / character class ──────────────────────────
+		// rejected: case / character class
 		{"Okta", false},      // uppercase
 		{"MICROSOFT", false}, // uppercase
 		{"my-corp", false},   // hyphen
@@ -46,7 +36,7 @@ func TestIsValidProviderSlug(t *testing.T) {
 		{"foo+bar", false},
 		{"foo@bar", false},
 
-		// ── Rejected: reserved built-ins ──────────────────────────────
+		// rejected: reserved built-ins
 		{"google", false},
 		{"github", false},
 	}
