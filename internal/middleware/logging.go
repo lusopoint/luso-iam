@@ -7,8 +7,8 @@ import (
 )
 
 // statusRecorder wraps ResponseWriter to capture the status code and bytes
-// written for access logging. The zero value of status (200) is the
-// default Go behavior when WriteHeader is never called.
+// written for access logging, the zero value of status (200) is the
+// default Go behavior when WriteHeader is never called
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -29,10 +29,10 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// AccessLog emits one structured log line per request after the handler
-// completes. Logs are at info level for normal traffic, warn for 4xx, error
-// for 5xx.
-func AccessLog(logger *slog.Logger) Middleware {
+// AccessLog emits one structured log line per request after the handler completes
+// logs are at info level for normal traffic, warn for 4xx, error for 5xx
+// the trustedProxies argument controls how the client IP is derived from X-Forwarded-For headers
+func AccessLog(logger *slog.Logger, trustedProxies *TrustedProxies) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
@@ -46,7 +46,7 @@ func AccessLog(logger *slog.Logger) Middleware {
 				"status", rec.status,
 				"bytes", rec.bytes,
 				"duration_ms", time.Since(start).Milliseconds(),
-				"remote", clientIP(r),
+				"remote", clientIPFromTrustedProxies(trustedProxies, r),
 				"request_id", RequestIDFromContext(r.Context()),
 			}
 
@@ -62,18 +62,17 @@ func AccessLog(logger *slog.Logger) Middleware {
 	}
 }
 
-// clientIP returns the best-effort client IP. It trusts X-Forwarded-For
-// only when present — this is fine when running behind a known proxy
-// (Caddy/Traefik). Anything stricter belongs in a dedicated trust layer.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first hop.
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return xff[:i]
-			}
-		}
-		return xff
+// clientIPFromTrustedProxies returns the best client IP given a trusted proxy registry
+// when tp is nil, falls back to the raw peer address
+// the strictly correct default when no proxy is configured
+//
+// this used to be a standalone `clientIP` that unconditionally trusted X-Forwarded-For
+// that was a security bug (any internet user could spoof their logged IP by setting the header)
+// use TrustedProxies configured from the TRUSTED_PROXIES env var, or accept that audit
+// logs and rate limits will key off the raw peer
+func clientIPFromTrustedProxies(tp *TrustedProxies, r *http.Request) string {
+	if tp == nil {
+		return stripPort(r.RemoteAddr)
 	}
-	return r.RemoteAddr
+	return tp.ClientIP(r)
 }
