@@ -5,7 +5,7 @@ import "testing"
 // TestSafeRedirect_AllowlistEnforcement: the contract is "only
 // scheme://host pairs explicitly in proxyOrigins pass through; everything
 // else returns empty". The full URL (including path/query) is preserved
-// on a match — the user's intended destination shouldn't be truncated.
+// on a match, the user's intended destination shouldn't be truncated.
 func TestSafeRedirect_AllowlistEnforcement(t *testing.T) {
 	t.Parallel()
 
@@ -21,7 +21,6 @@ func TestSafeRedirect_AllowlistEnforcement(t *testing.T) {
 		in   string
 		want string
 	}{
-		// ── Accepted ──────────────────────────────────────────────────
 		{"exact_match", "https://app.example.com/", "https://app.example.com/"},
 		{"with_path", "https://app.example.com/dashboard", "https://app.example.com/dashboard"},
 		{"with_query", "https://app.example.com/x?a=1&b=2", "https://app.example.com/x?a=1&b=2"},
@@ -31,7 +30,6 @@ func TestSafeRedirect_AllowlistEnforcement(t *testing.T) {
 		{"uppercase_scheme", "HTTPS://app.example.com/", "HTTPS://app.example.com/"},
 		{"uppercase_host", "https://APP.example.com/", "https://APP.example.com/"},
 
-		// ── Rejected ──────────────────────────────────────────────────
 		{"empty", "", ""},
 		{"not_in_allowlist", "https://evil.example.org/path", ""},
 		{"subdomain_not_in_list", "https://other.example.com/", ""},
@@ -43,8 +41,7 @@ func TestSafeRedirect_AllowlistEnforcement(t *testing.T) {
 		{"unparseable", "ht!tp:!//bad", ""},
 		{"empty_host", "https:///path", ""},
 
-		// ── Subtle: the "match" is exact, not a prefix ────────────────
-		// (We have https://app.example.com — host with a port is
+		// (We have https://app.example.com, host with a port is
 		// different. The proxy companion has the same normalisation
 		// rule, so the two endpoints can't disagree on what's allowed.)
 		{"port_changes_origin", "https://app.example.com:8080/", ""},
@@ -63,7 +60,7 @@ func TestSafeRedirect_AllowlistEnforcement(t *testing.T) {
 
 // TestSafeRedirect_NoOrigins: empty handler allowlist rejects everything.
 // This is the deployment-default state when PROXY_ALLOWED_CALLBACK_ORIGINS
-// is unset — `rd=` is silently dropped, which is the safe default.
+// is unset, `rd=` is silently dropped, which is the safe default.
 func TestSafeRedirect_NoOrigins(t *testing.T) {
 	t.Parallel()
 	h := &Handler{proxyOrigins: nil}

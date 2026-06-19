@@ -10,7 +10,6 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// casServiceDTO is the wire shape for a registered CAS service.
 type casServiceDTO struct {
 	ID                 string   `json:"id"`
 	Name               string   `json:"name"`
@@ -40,8 +39,6 @@ func toCASServiceDTO(s *postgres.CASService) casServiceDTO {
 	}
 	return d
 }
-
-// List / Get
 
 // GET /admin/v1/cas-services
 func (h *Handler) listCASServices(w http.ResponseWriter, r *http.Request) {
@@ -78,9 +75,8 @@ func (h *Handler) getCASService(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toCASServiceDTO(svc))
 }
 
-// Create
-// createCASServiceRequest carries the new service's fields. The admin
-// supplies a URL pattern; we derive a SQL LIKE pattern from it.
+// createCASServiceRequest carries the new service's fields
+// the admin supplies a URL pattern; we derive a SQL LIKE pattern from it
 type createCASServiceRequest struct {
 	Name               string   `json:"name"`
 	ServiceURLPattern  string   `json:"service_url_pattern"`
@@ -141,9 +137,7 @@ func (h *Handler) createCASService(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toCASServiceDTO(svc))
 }
 
-// Update
-
-// updateCASServiceRequest mirrors the patchable fields.
+// updateCASServiceRequest mirrors the patchable fields
 type updateCASServiceRequest struct {
 	Name               *string   `json:"name,omitempty"`
 	ServiceURLPattern  *string   `json:"service_url_pattern,omitempty"`
@@ -174,7 +168,7 @@ func (h *Handler) updateCASService(w http.ResponseWriter, r *http.Request) {
 		ReleasedAttributes: req.ReleasedAttributes,
 		Enabled:            req.Enabled,
 	}
-	// Re-derive the match pattern if the URL pattern changed.
+	// re-derive the match pattern if the URL pattern changed
 	if req.ServiceURLPattern != nil {
 		mp := toLikePattern(*req.ServiceURLPattern)
 		params.MatchPattern = &mp
@@ -223,11 +217,9 @@ func (h *Handler) deleteCASService(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// helpers
-
 // toLikePattern converts an admin-supplied URL prefix into a SQL LIKE
 // pattern by appending '%'. If the admin already included '%' or '_'
-// metacharacters, we trust them and pass through unchanged.
+// metacharacters, we trust them and pass through unchanged
 func toLikePattern(s string) string {
 	if strings.ContainsAny(s, "%_") {
 		return s

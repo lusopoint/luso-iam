@@ -9,9 +9,9 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// auditDTO is the wire shape of an audit_log row. Metadata is returned
+// audit is the wire shape of an audit_log row, metadata is returned
 // as a generic map so the SPA can render whatever keys each event type
-// emitted without us hard-coding a schema per event.
+// emitted without us hard-coding a schema per event
 type auditDTO struct {
 	ID        string         `json:"id"`
 	EventType string         `json:"event_type"`
@@ -41,7 +41,7 @@ func toAuditDTO(e *postgres.AuditEvent) auditDTO {
 		d.TargetID = &s
 	}
 	if len(e.Metadata) > 0 {
-		// Best-effort decode, if the column got corrupted, surface raw text
+		// if the column got corrupted, surface raw text
 		// so the admin can still investigate.
 		var m map[string]any
 		if err := json.Unmarshal(e.Metadata, &m); err == nil {
@@ -62,9 +62,6 @@ type listAuditResponse struct {
 }
 
 // GET /admin/v1/audit
-//
-// Query params: event_type, actor_id, target_id, since (RFC3339),
-// until (RFC3339), limit, offset.
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 

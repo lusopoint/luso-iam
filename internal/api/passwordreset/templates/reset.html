@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reset password - IAM</title>
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --card: #ffffff;
+        --border: #e3e6ea;
+        --text: #1f2328;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --error: #b91c1c;
+        --error-bg: #fef2f2;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1115;
+          --card: #161922;
+          --border: #2a2f3a;
+          --text: #e6e8eb;
+          --muted: #9aa1ab;
+          --error: #fca5a5;
+          --error-bg: #3f1c1c;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 28px 28px 24px;
+        width: 100%;
+        max-width: 360px;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: var(--muted);
+        margin: 0 0 1.25rem;
+        font-size: 0.9rem;
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+        color: var(--muted);
+      }
+      input[type="password"] {
+        width: 100%;
+        padding: 9px 11px;
+        font: inherit;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 14px;
+      }
+      input:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 0;
+        border-color: var(--accent);
+      }
+      button {
+        width: 100%;
+        padding: 10px 12px;
+        font: inherit;
+        font-weight: 600;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--accent-hover);
+      }
+      .error {
+        color: var(--error);
+        background: var(--error-bg);
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin: -8px 0 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Choose a new password</h1>
+      <p class="sub">
+        Pick something memorable, at least {{ .MinPasswordLength }} characters.
+      </p>
+      {{ if .Error }}
+      <div class="error">{{ .Error }}</div>
+      {{ end }}
+      <form method="post" action="/password/reset" autocomplete="off">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+        <input type="hidden" name="token" value="{{ .Token }}" />
+        <label for="password">New password</label>
+        <input
+          id="password"
+          type="password"
+          name="password"
+          required
+          autofocus
+          minlength="{{ .MinPasswordLength }}"
+        />
+        <label for="password_confirm">Confirm password</label>
+        <input
+          id="password_confirm"
+          type="password"
+          name="password_confirm"
+          required
+          minlength="{{ .MinPasswordLength }}"
+        />
+        <button type="submit">Set new password</button>
+      </form>
+    </div>
+  </body>
+</html>

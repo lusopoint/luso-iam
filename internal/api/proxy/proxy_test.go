@@ -12,8 +12,6 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// ─── derefSafe — header injection defense ────────────────────────────────
-
 // TestDerefSafe_StripsCRLF: the whole point of this helper is to keep a
 // hostile display_name from smuggling new response headers. Anything
 // that would terminate a header line gets removed.
@@ -58,9 +56,7 @@ func TestDerefSafe_NilSafe(t *testing.T) {
 	}
 }
 
-// ─── writeAuthHeaders — output contract ──────────────────────────────────
-
-// userPtr builds a *string from a literal — terser than `s := "x"; &s` everywhere.
+// userPtr builds a *string from a literal, terser than `s := "x"; &s` everywhere.
 func userPtr(s string) *string { return &s }
 
 // mkUUID returns a deterministic UUID for tests.
@@ -138,7 +134,7 @@ func TestWriteAuthHeaders_FallbackUser(t *testing.T) {
 // TestWriteAuthHeaders_GroupsForNonAdmin: a non-admin user produces an
 // empty X-Auth-Groups. The header is still SET (with empty value) so
 // upstream Caddy config that copies X-Auth-Groups doesn't see a missing
-// header on some requests and a present one on others — that's the
+// header on some requests and a present one on others, that's the
 // kind of inconsistency that bites people writing access rules.
 func TestWriteAuthHeaders_GroupsForNonAdmin(t *testing.T) {
 	t.Parallel()
@@ -157,7 +153,7 @@ func TestWriteAuthHeaders_GroupsForNonAdmin(t *testing.T) {
 
 // TestWriteAuthHeaders_HostileDisplayName: a name carrying CRLF must
 // not produce an extra response header. This is the integration of the
-// derefSafe defense with the actual writeAuthHeaders code path —
+// derefSafe defense with the actual writeAuthHeaders code path
 // regression guard if anyone ever bypasses derefSafe for "performance".
 func TestWriteAuthHeaders_HostileDisplayName(t *testing.T) {
 	t.Parallel()
@@ -167,14 +163,12 @@ func TestWriteAuthHeaders_HostileDisplayName(t *testing.T) {
 		DisplayName: userPtr("Alice\r\nX-Admin: true"),
 	})
 	if v, ok := w.Header()["X-Admin"]; ok {
-		t.Errorf("injection succeeded — X-Admin header present: %v", v)
+		t.Errorf("injection succeeded, X-Admin header present: %v", v)
 	}
 	if got := w.Header().Get("X-Auth-Name"); strings.ContainsAny(got, "\r\n") {
 		t.Errorf("X-Auth-Name still contains CR/LF: %q", got)
 	}
 }
-
-// ─── buildLoginRedirect — origin allowlist enforcement ───────────────────
 
 func newHandlerWithOrigins(origins ...string) *Handler {
 	return New(Config{
@@ -214,7 +208,7 @@ func TestBuildLoginRedirect_AllowedOrigin(t *testing.T) {
 
 // TestBuildLoginRedirect_DisallowedOrigin: an origin not in the
 // allowlist results in ok=false. The disallowed value must NOT appear
-// in the returned string — that'd let an attacker probe what's
+// in the returned string, that'd let an attacker probe what's
 // accepted by varying the forwarded headers.
 func TestBuildLoginRedirect_DisallowedOrigin(t *testing.T) {
 	t.Parallel()
@@ -235,7 +229,7 @@ func TestBuildLoginRedirect_DisallowedOrigin(t *testing.T) {
 }
 
 // TestBuildLoginRedirect_MissingHeaders: if the proxy didn't set
-// X-Forwarded-Proto/Host, we can't build a sensible redirect — return
+// X-Forwarded-Proto/Host, we can't build a sensible redirect, return
 // ok=false and let the caller send a bare 401.
 func TestBuildLoginRedirect_MissingHeaders(t *testing.T) {
 	t.Parallel()
@@ -288,7 +282,7 @@ func TestBuildLoginRedirect_OriginNormalization(t *testing.T) {
 
 // TestBuildLoginRedirect_EmptyAllowlist: with no configured origins,
 // every request returns ok=false. This is the "operator hasn't opted
-// in to proxy redirects" path — endpoint still works, just no Location
+// in to proxy redirects" path, endpoint still works, just no Location
 // on 401s.
 func TestBuildLoginRedirect_EmptyAllowlist(t *testing.T) {
 	t.Parallel()
@@ -304,7 +298,7 @@ func TestBuildLoginRedirect_EmptyAllowlist(t *testing.T) {
 }
 
 // TestBuildLoginRedirect_PathFallback: when neither X-Forwarded-Uri
-// nor X-Forwarded-Path is set, the reconstruction uses "/" — the
+// nor X-Forwarded-Path is set, the reconstruction uses "/", the
 // user lands on the app's homepage after auth, which is the right
 // default when the proxy didn't tell us where they actually were.
 func TestBuildLoginRedirect_PathFallback(t *testing.T) {

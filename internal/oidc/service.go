@@ -1,6 +1,3 @@
-// Package oidc implements the server-side OIDC / OAuth 2.0 protocol logic.
-// It is independent of HTTP — handlers in internal/api/oidc call into this
-// package for all business decisions.
 package oidc
 
 import (
@@ -18,8 +15,6 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// Sentinel errors
-
 var (
 	ErrInvalidClient        = errors.New("oidc: invalid client")
 	ErrUnauthorizedClient   = errors.New("oidc: client not authorized for this grant")
@@ -32,10 +27,7 @@ var (
 	ErrInvalidToken         = errors.New("oidc: invalid token")
 )
 
-// Input / output types
-
-// AuthRequest carries the parsed, raw authorization request parameters.
-// Validation is done in Service.ValidateAuthRequest.
+// AuthRequest carries the parsed, raw authorization request parameters
 type AuthRequest struct {
 	ClientID      string
 	RedirectURI   string
@@ -48,7 +40,6 @@ type AuthRequest struct {
 	Prompt        string // "none" | "login" | "consent" | ""
 }
 
-// AuthorizeParams carries the validated context for issuing an auth code.
 type AuthorizeParams struct {
 	AuthRequest
 	UserID    pgtype.UUID
@@ -58,7 +49,6 @@ type AuthorizeParams struct {
 	AMR       []string
 }
 
-// TokenResponse is returned by all token-granting operations.
 type TokenResponse struct {
 	AccessToken  string
 	TokenType    string
@@ -68,7 +58,6 @@ type TokenResponse struct {
 	Scope        string
 }
 
-// IntrospectResponse is the RFC 7662 introspection response body.
 type IntrospectResponse struct {
 	Active    bool   `json:"active"`
 	ClientID  string `json:"client_id,omitempty"`
@@ -80,24 +69,19 @@ type IntrospectResponse struct {
 	TokenType string `json:"token_type,omitempty"`
 }
 
-// Service
-
-// Service is the OIDC protocol engine.
+// OIDC protocol engine
 type Service struct {
 	store   *postgres.Store
 	keys    *crypto.KeyManager
 	baseURL string
 }
 
-// New returns an OIDC service.
 func New(store *postgres.Store, keys *crypto.KeyManager, baseURL string) *Service {
 	return &Service{store: store, keys: keys, baseURL: baseURL}
 }
 
-// Authorization
-
 // ValidateAuthRequest validates the incoming authorization request and
-// returns the matching client. Call before showing the consent screen.
+// returns the matching client, call before showing the consent screen
 func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*postgres.OIDCClient, error) {
 	if req.ResponseType != "code" {
 		return nil, fmt.Errorf("%w: only response_type=code is supported", ErrInvalidGrant)
@@ -111,17 +95,17 @@ func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*po
 		return nil, err
 	}
 
-	// Redirect URI must be registered exactly.
+	// redirect URI must be registered exactly
 	if err := s.store.ValidateRedirectURI(ctx, req.ClientID, req.RedirectURI); err != nil {
 		return nil, ErrInvalidRedirectURI
 	}
 
-	// authorization_code must be in allowed grant types.
+	// authorization_code must be in allowed grant types
 	if !contains(client.AllowedGrantTypes, "authorization_code") {
 		return nil, ErrUnauthorizedClient
 	}
 
-	// PKCE is required for public clients and for clients with require_pkce.
+	// PKCE is required for public clients and for clients with require_pkce
 	if (client.IsPublic || client.RequirePKCE) && req.PKCEChallenge == "" {
 		return nil, ErrPKCERequired
 	}
@@ -129,7 +113,7 @@ func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*po
 		return nil, fmt.Errorf("%w: only S256 is supported", ErrPKCERequired)
 	}
 
-	// openid scope is required for OIDC; at minimum one scope must be allowed.
+	// openid scope is required for OIDC, at minimum one scope must be allowed
 	if !s.scopesAllowed(client, req.Scopes) {
 		return nil, ErrInvalidScope
 	}
@@ -137,7 +121,7 @@ func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*po
 	return client, nil
 }
 
-// Authorize mints a short-lived authorization code for a validated request.
+// Authorize short lived authorization code for a validated request
 func (s *Service) Authorize(ctx context.Context, p AuthorizeParams) (string, error) {
 	tok, err := crypto.RandomToken(32)
 	if err != nil {
@@ -182,9 +166,7 @@ func (s *Service) Authorize(ctx context.Context, p AuthorizeParams) (string, err
 	return id, nil
 }
 
-// Token exchange
-
-// ExchangeCode redeems an authorization code for tokens.
+// ExchangeCode redeems an authorization code for tokens
 func (s *Service) ExchangeCode(
 	ctx context.Context,
 	clientID, clientSecret,
@@ -211,7 +193,7 @@ func (s *Service) ExchangeCode(
 		return nil, ErrInvalidGrant
 	}
 
-	// PKCE verification.
+	// PKCE verification
 	if authCode.PKCEChallenge != nil {
 		if !crypto.VerifyPKCE(codeVerifier, *authCode.PKCEChallenge) {
 			return nil, ErrPKCEFailed
@@ -228,8 +210,8 @@ func (s *Service) ExchangeCode(
 	return s.issueTokens(ctx, client, user, &authCode.SessionID, authCode)
 }
 
-// RefreshTokens issues a new token set from a valid refresh token.
-// The old refresh token is rotated (consumed); a new one is returned.
+// RefreshTokens issues a new token set from a valid refresh token
+// the old refresh token is rotated (consumed), a new one is returned
 func (s *Service) RefreshTokens(
 	ctx context.Context,
 	clientID, clientSecret, refreshTokenID string,
@@ -255,7 +237,7 @@ func (s *Service) RefreshTokens(
 		return nil, ErrInvalidGrant
 	}
 
-	// Scope downgrade only — can't request scopes not in original grant.
+	// scope downgrade only, can't request scopes not in original grant
 	grantedScopes := rt.Scopes
 	if len(scopes) > 0 {
 		for _, sc := range scopes {
@@ -271,18 +253,19 @@ func (s *Service) RefreshTokens(
 		return nil, fmt.Errorf("load user: %w", err)
 	}
 
-	// Rotate the refresh token.
+	// rotate the refresh token
 	if err := s.store.RotateOIDCRefreshToken(ctx, rt.ID); err != nil {
 		return nil, fmt.Errorf("rotate refresh token: %w", err)
 	}
 
-	// Build a minimal synthetic auth code so issueTokensWithRotation can
-	// read scopes, AMR, ACR, and AuthTime. The SessionID field is not read
-	// from this struct — the real session ID is passed separately as rt.SessionID.
+	// build a minimal synthetic auth code so issueTokensWithRotation can
+	// read scopes, AMR, ACR, and AuthTime, The SessionID field is not read
+	// from this struct, the real session id is passed separately as rt.SessionID
 	synth := &postgres.OIDCAuthCode{
 		ClientID: clientID,
 		UserID:   rt.UserID,
-		// SessionID intentionally zero — unused; real value passed separately below.
+		// SessionID intentionally zero, unused
+		// real value passed separately below
 		Scopes:   grantedScopes,
 		ACR:      "0",
 		AMR:      []string{"pwd"},
@@ -296,7 +279,7 @@ func (s *Service) RefreshTokens(
 	return resp, nil
 }
 
-// ClientCredentials issues an access token for M2M flows (no user, no id_token).
+// ClientCredentials issues an access token for M2M flows (no user, no id_token)
 func (s *Service) ClientCredentials(
 	ctx context.Context,
 	clientID, clientSecret string,
@@ -338,14 +321,12 @@ func (s *Service) ClientCredentials(
 	}, nil
 }
 
-// Introspection & revocation
-
-// Introspect implements RFC 7662. Returns an active=false response (not
-// an error) for invalid or expired tokens.
+// Introspect implements RFC 7662, returns an active=false response
+// (not an error) for invalid or expired tokens
 func (s *Service) Introspect(ctx context.Context, token, tokenTypeHint string) (*IntrospectResponse, error) {
 	inactive := &IntrospectResponse{Active: false}
 
-	// Try access token first (or per hint).
+	// try access token first (or per hint)
 	if tokenTypeHint == "" || tokenTypeHint == "access_token" {
 		at, err := s.store.GetOIDCAccessTokenAny(ctx, token)
 		if err == nil {
@@ -372,7 +353,7 @@ func (s *Service) Introspect(ctx context.Context, token, tokenTypeHint string) (
 		}
 	}
 
-	// Try refresh token.
+	// try refresh token
 	if tokenTypeHint == "" || tokenTypeHint == "refresh_token" {
 		rt, err := s.store.GetOIDCRefreshToken(ctx, token)
 		if err == nil {
@@ -391,7 +372,7 @@ func (s *Service) Introspect(ctx context.Context, token, tokenTypeHint string) (
 	return inactive, nil
 }
 
-// Revoke implements RFC 7009. Silently succeeds for unknown tokens.
+// revoke implements, silently succeeds for unknown tokens
 func (s *Service) Revoke(ctx context.Context, token, tokenTypeHint string) error {
 	// Try access token.
 	if tokenTypeHint == "" || tokenTypeHint == "access_token" {
@@ -399,16 +380,14 @@ func (s *Service) Revoke(ctx context.Context, token, tokenTypeHint string) error
 			return nil
 		}
 	}
-	// Try refresh token.
+	// try refresh token
 	if err := s.store.RevokeOIDCRefreshToken(ctx, token); err == nil {
 		return nil
 	}
-	return nil // RFC 7009 §2.2: errors for unknown tokens are silent
+	return nil
 }
 
-// UserInfo
-
-// UserInfo validates the Bearer token and returns the authorized claims.
+// UserInfo validates the Bearer token and returns the authorized claims
 func (s *Service) UserInfo(ctx context.Context, accessToken string) (map[string]any, error) {
 	at, err := s.store.GetOIDCAccessToken(ctx, accessToken)
 	if err != nil {
@@ -418,7 +397,7 @@ func (s *Service) UserInfo(ctx context.Context, accessToken string) (map[string]
 		return nil, err
 	}
 	if at.UserID == nil || !at.UserID.Valid {
-		// client_credentials token — no user claims
+		// client_credentials token, no user claims
 		return nil, ErrInvalidToken
 	}
 
@@ -430,9 +409,7 @@ func (s *Service) UserInfo(ctx context.Context, accessToken string) (map[string]
 	return s.buildUserClaims(user, at.Scopes), nil
 }
 
-// Internal helpers
-
-// issueTokens is the canonical token-minting path for authorization_code.
+// issueTokens is the canonical token-minting path for authorization_code
 func (s *Service) issueTokens(
 	ctx context.Context,
 	client *postgres.OIDCClient,
@@ -455,7 +432,7 @@ func (s *Service) issueTokensWithRotation(
 	now := time.Now()
 	atExpiry := now.Add(client.AccessTokenTTL)
 
-	// Access token
+	// access token
 	atID := "at_" + mustRandom()
 	if err := s.store.CreateOIDCAccessToken(ctx, postgres.CreateOIDCAccessTokenParams{
 		ID:        atID,
@@ -468,7 +445,7 @@ func (s *Service) issueTokensWithRotation(
 		return nil, fmt.Errorf("create access token: %w", err)
 	}
 
-	// Refresh token (if offline_access in scope)
+	// refresh token (if offline_access in scope)
 	var rtID string
 	if contains(code.Scopes, "offline_access") && contains(client.AllowedGrantTypes, "refresh_token") {
 		rtID = "rt_" + mustRandom()
@@ -505,7 +482,7 @@ func (s *Service) issueTokensWithRotation(
 	}, nil
 }
 
-// mintIDToken builds and signs the OIDC id_token JWT.
+// mintIDToken builds and signs the OIDC id_token JWT
 func (s *Service) mintIDToken(
 	client *postgres.OIDCClient,
 	user *postgres.User,
@@ -515,7 +492,7 @@ func (s *Service) mintIDToken(
 ) (string, error) {
 
 	claims := jwt.MapClaims{
-		// Required OIDC Core claims
+		// required OIDC Core claims
 		"iss":       s.baseURL,
 		"sub":       uuidString(user.ID),
 		"aud":       client.ID,
@@ -524,16 +501,16 @@ func (s *Service) mintIDToken(
 		"auth_time": code.AuthTime.Unix(),
 		"acr":       code.ACR,
 		"amr":       code.AMR,
-		// at_hash — required when access token is issued with id_token
+		// at_hash, required when access token is issued with id_token
 		"at_hash": crypto.ATHash(accessTokenID),
 	}
 
-	// Nonce — must be echoed if provided in the original auth request.
+	// nonce, must be echoed if provided in the original auth request
 	if code.Nonce != nil && *code.Nonce != "" {
 		claims["nonce"] = *code.Nonce
 	}
 
-	// Scope-gated claims.
+	// Scope-gated claims
 	if contains(code.Scopes, "email") && user.Email != nil {
 		claims["email"] = *user.Email
 		claims["email_verified"] = user.EmailVerifiedAt != nil
@@ -552,7 +529,7 @@ func (s *Service) mintIDToken(
 	return s.keys.Sign(claims)
 }
 
-// buildUserClaims assembles the UserInfo response payload.
+// buildUserClaims assembles the UserInfo response payload
 func (s *Service) buildUserClaims(user *postgres.User, scopes []string) map[string]any {
 	m := map[string]any{
 		"sub": uuidString(user.ID),
@@ -575,8 +552,8 @@ func (s *Service) buildUserClaims(user *postgres.User, scopes []string) map[stri
 	return m
 }
 
-// authenticateClient verifies client credentials. Public clients are
-// identified by client_id alone; confidential clients require the secret.
+// authenticateClient verifies client credentials, public clients are
+// identified by client_id alone, confidential clients require the secret
 func (s *Service) authenticateClient(ctx context.Context, clientID, clientSecret string) (*postgres.OIDCClient, error) {
 	client, err := s.store.GetOIDCClient(ctx, clientID)
 	if err != nil {
@@ -609,13 +586,11 @@ func (s *Service) scopesAllowed(client *postgres.OIDCClient, scopes []string) bo
 	return true
 }
 
-// IntrospectAuth authenticates the party calling the introspect or revoke
-// endpoint. Any valid client may introspect — not just the token owner.
+// IntrospectAuth authenticates the party calling the introspect or revoke endpoint
+// any valid client may introspect, not just the token owner
 func (s *Service) IntrospectAuth(ctx context.Context, clientID, clientSecret string) (*postgres.OIDCClient, error) {
 	return s.authenticateClient(ctx, clientID, clientSecret)
 }
-
-// Utility
 
 func contains(slice []string, s string) bool {
 	for _, v := range slice {

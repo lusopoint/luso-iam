@@ -11,12 +11,8 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// DTO
-
-// clientDTO is the wire shape for an OIDC client
-// Note that the secret is NEVER included
-// admins receive the plaintext exactly once, in the
-// rotate response, and must store it themselves
+// client is the wire shape for an OIDC client note that the secret is never included
+// admins receive the plaintext exactly once, in the rotate response, and must store it themselves
 type clientDTO struct {
 	ID                string   `json:"id"`
 	Name              string   `json:"name"`
@@ -26,7 +22,7 @@ type clientDTO struct {
 	IsPublic          bool     `json:"is_public"`
 	RequirePKCE       bool     `json:"require_pkce"`
 	RequireConsent    bool     `json:"require_consent"`
-	// Go duration string, ex "1h"
+	// go duration string, ex "1h"
 	AccessTokenTTL  string `json:"access_token_ttl"`
 	RefreshTokenTTL string `json:"refresh_token_ttl"`
 	IDTokenTTL      string `json:"id_token_ttl"`
@@ -55,8 +51,6 @@ func toClientDTO(c *postgres.OIDCClient) clientDTO {
 		UpdatedAt:         c.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
-
-// List / Get
 
 // GET /admin/v1/clients
 func (h *Handler) listClients(w http.ResponseWriter, r *http.Request) {
@@ -89,10 +83,6 @@ func (h *Handler) getClient(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toClientDTO(c))
 }
 
-// Create
-// createClientRequest carries everything admins can set for a new client.
-// IsPublic defaults to false (confidential client); the server generates
-// a fresh secret unless IsPublic is true.
 type createClientRequest struct {
 	ID                string   `json:"id"`
 	Name              string   `json:"name"`
@@ -108,7 +98,7 @@ type createClientRequest struct {
 }
 
 // createClientResponse echoes the new client DTO plus a one-time plaintext
-// secret for confidential clients. The SPA must capture this immediately.
+// secret for confidential clients. The SPA must capture this immediately
 type createClientResponse struct {
 	Client clientDTO `json:"client"`
 	Secret string    `json:"secret,omitempty"`
@@ -127,7 +117,7 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Defaults.
+	// Defaults
 	scopes := req.AllowedScopes
 	if len(scopes) == 0 {
 		scopes = []string{"openid", "profile", "email"}
@@ -140,7 +130,7 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 	if req.RequirePKCE != nil {
 		requirePKCE = *req.RequirePKCE
 	}
-	// Public clients always require PKCE — enforce regardless of the flag.
+	// public clients always require PKCE
 	if req.IsPublic {
 		requirePKCE = true
 	}
@@ -164,7 +154,7 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate secret for confidential clients.
+	// generate secret for confidential clients
 	var plaintext string
 	var secretHash *string
 	if !req.IsPublic {
@@ -217,8 +207,6 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update
-
-// updateClientRequest mirrors the patchable fields.
 type updateClientRequest struct {
 	Name              *string   `json:"name,omitempty"`
 	RedirectURIs      *[]string `json:"redirect_uris,omitempty"`
@@ -285,7 +273,7 @@ func (h *Handler) deleteClient(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// rotateSecretResponse carries the one-time plaintext secret.
+// rotateSecretResponse carries the one-time plaintext secret
 type rotateSecretResponse struct {
 	Secret string `json:"secret"`
 }
@@ -336,9 +324,7 @@ func (h *Handler) rotateClientSecret(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rotateSecretResponse{Secret: plaintext})
 }
 
-// Validation
-// validateNewClient enforces the rules we want to surface as 400s rather
-// than discovering them via a constraint violation downstream.
+// validation
 func validateNewClient(req *createClientRequest) error {
 	if strings.TrimSpace(req.ID) == "" {
 		return errInvalid("id is required")
@@ -363,10 +349,9 @@ func validateNewClient(req *createClientRequest) error {
 type errInvalidVal string
 
 func (e errInvalidVal) Error() string { return string(e) }
+func errInvalid(msg string) error     { return errInvalidVal(msg) }
 
-func errInvalid(msg string) error { return errInvalidVal(msg) }
-
-// parseDurationOr returns d when s is empty, otherwise time.ParseDuration(s).
+// parseDurationOr returns d when s is empty, otherwise time.ParseDuration(s)
 func parseDurationOr(s string, d time.Duration) (time.Duration, error) {
 	if strings.TrimSpace(s) == "" {
 		return d, nil

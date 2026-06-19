@@ -14,10 +14,6 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// userDTO is the wire shape — all UUIDs as strings, optional fields as
-// pointers, no internal db tags exposed. Returning a hand-rolled DTO
-// (rather than the store struct) is intentional: it lets us change the
-// store schema without breaking SPA expectations.
 type userDTO struct {
 	ID            string  `json:"id"`
 	Email         *string `json:"email,omitempty"`
@@ -50,7 +46,7 @@ func toUserDTO(u *postgres.User) userDTO {
 	return d
 }
 
-// listUsersResponse is the paginated response envelope.
+// listUsersResponse is the paginated response envelope
 type listUsersResponse struct {
 	Users  []userDTO `json:"users"`
 	Total  int       `json:"total"`
@@ -58,7 +54,6 @@ type listUsersResponse struct {
 	Offset int       `json:"offset"`
 }
 
-// handlers
 // GET /admin/v1/users?search=&status=&limit=&offset=
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -89,19 +84,9 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// Create user
-
-// createUserRequest is the wire shape for POST /admin/v1/users.
-//
-// All fields are optional except email. If Password is empty the server
-// generates a random one (20 chars from a friendly alphabet) and returns
-// it in the response — shown ONCE, same pattern as a new OIDC client
-// secret. If Password is provided it must be ≥ 12 characters, the same
-// minimum as the admin password-reset endpoint.
-//
+// createUserRequest is the wire shape for POST /admin/v1/users
 // EmailVerified defaults to true because admin-created accounts skip
-// any verification flow (which doesn't exist yet anyway). Operators who
-// want to require verification can pass false explicitly.
+// any verification flow (which doesn't exist yet anyway)
 type createUserRequest struct {
 	Email         string  `json:"email"`
 	Username      *string `json:"username,omitempty"`
@@ -111,32 +96,13 @@ type createUserRequest struct {
 	EmailVerified *bool   `json:"email_verified,omitempty"`
 }
 
-// createUserResponse carries the new user plus, if we generated one,
-// the plaintext password. The caller is expected to communicate that
-// password to the new user out-of-band — there's no welcome-email flow.
+// createUserResponse carries the new user plus, if we generated one, the plaintext password
 type createUserResponse struct {
 	User              userDTO `json:"user"`
 	GeneratedPassword string  `json:"generated_password,omitempty"`
 }
 
 // POST /admin/v1/users
-//
-// Behaviour, in order:
-//  1. Email is normalised (trimmed + lowercased; users.email is citext).
-//  2. Conflict check — if an active row already exists, 409 Conflict.
-//  3. Password is validated (≥ 12 chars) or generated.
-//  4. User row inserted.
-//  5. Credential upserted with the argon2id hash.
-//  6. Follow-up UPDATE sets is_admin / email_verified_at if requested.
-//     Doing this as a second statement keeps CreateUserParams (and the
-//     INSERT) untouched — easier than threading optional columns
-//     through the store.
-//  7. user_created audit event with metadata flagging the generated
-//     password and admin promotion.
-//
-// On hash or credential failure after the user row exists we soft-delete
-// the user so the operator doesn't see a half-created account they
-// can't sign into.
 func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -145,8 +111,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Email — we don't enforce RFC 5322 strictly. citext + a "contains @"
-	// check is enough; a typo would fail at first sign-in anyway.
+	// "contains @" check is enough, a typo would fail at first sign-in anyway
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 	if email == "" || !strings.Contains(email, "@") {
 		writeProblem(w, http.StatusBadRequest, "invalid_email",
@@ -154,7 +119,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Conflict check.
+	// conflict check
 	if existing, err := h.store.GetUserByEmail(r.Context(), email); err == nil && existing != nil {
 		writeProblem(w, http.StatusConflict, "email_taken",
 			"A user with that email already exists.")
@@ -165,8 +130,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Password: validate or generate. 20 chars × 56-char alphabet ≈ 116
-	// bits — comfortable even after operator transcription.
+	// password validate or generate
 	password := req.Password
 	generated := false
 	if password == "" {
@@ -184,8 +148,6 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insert the user row first. UpsertCredential needs the ID, and a
-	// failed hash mustn't leak as a missing-FK error.
 	u, err := h.store.CreateUser(r.Context(), postgres.CreateUserParams{
 		Email:       &email,
 		Username:    req.Username,
@@ -211,10 +173,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Follow-up update for the optional admin flag + email verification
-	// timestamp. Both are no-ops if not requested. Failure here is
-	// soft — the user exists and can sign in; the admin can promote
-	// them after the fact.
+	// follow up update for the optional admin flag + email verification
 	verified := true
 	if req.EmailVerified != nil {
 		verified = *req.EmailVerified
@@ -274,7 +233,7 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toUserDTO(u))
 }
 
-// updateUserRequest mirrors UpdateUserParams but with JSON-friendly types.
+// updateUserRequest mirrors UpdateUserParams but with JSON-friendly types
 type updateUserRequest struct {
 	Email       *string `json:"email,omitempty"`
 	Username    *string `json:"username,omitempty"`
@@ -308,8 +267,6 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	actor := adminUserFromContext(r.Context())
 
-	// Guardrail: an admin cannot remove their own admin flag — at least one
-	// admin must remain reachable. Same for self-disable.
 	if actor != nil && actor.ID == id {
 		if req.IsAdmin != nil && !*req.IsAdmin {
 			writeProblem(w, http.StatusBadRequest, "self_demote",
@@ -372,7 +329,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 			"Could not delete user.")
 		return
 	}
-	// Also revoke any active sessions so the deleted account can't continue browsing.
+	// also revoke any active sessions so the deleted account can't continue browsing
 	_, _ = h.store.RevokeAllSessionsForUser(r.Context(), id)
 
 	h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
@@ -383,7 +340,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// POST /admin/v1/users/{id}/lock — sets users.status = 'disabled'.
+// POST /admin/v1/users/{id}/lock: sets users.status = 'disabled'
 func (h *Handler) lockUser(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUID(r.PathValue("id"))
 	if !ok {
@@ -417,7 +374,7 @@ func (h *Handler) lockUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toUserDTO(u))
 }
 
-// POST /admin/v1/users/{id}/unlock — re-enables a disabled account.
+// POST /admin/v1/users/{id}/unlock: re-enables a disabled account
 func (h *Handler) unlockUser(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUID(r.PathValue("id"))
 	if !ok {
@@ -437,8 +394,8 @@ func (h *Handler) unlockUser(w http.ResponseWriter, r *http.Request) {
 			"Could not unlock user.")
 		return
 	}
-	// Reset the auto-lockout counter so the user isn't immediately re-locked
-	// by the password service on their next attempt.
+	// reset the auto-lockout counter so the user isn't immediately re-locked
+	// by the password service on their next attempt
 	_ = h.store.ResetFailedAttempts(r.Context(), u.ID)
 
 	actor := adminUserFromContext(r.Context())
@@ -448,16 +405,12 @@ func (h *Handler) unlockUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toUserDTO(u))
 }
 
-// resetUserPasswordRequest carries the new plaintext password from the admin.
+// resetUserPasswordRequest carries the new plaintext password from the admin
 type resetUserPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
-// POST /admin/v1/users/{id}/password — admin-initiated password reset.
-// The new password is hashed with argon2id; the row is upserted into
-// user_credentials. No mail flow — the admin is expected to share the
-// new password with the user out-of-band (this is for forced-rotation
-// after a known compromise, not self-service).
+// POST /admin/v1/users/{id}/password: admin-initiated password reset
 func (h *Handler) resetUserPassword(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUID(r.PathValue("id"))
 	if !ok {
@@ -490,8 +443,8 @@ func (h *Handler) resetUserPassword(w http.ResponseWriter, r *http.Request) {
 			"Could not store credential.")
 		return
 	}
-	// Reset lockout state and revoke active sessions: any session that
-	// might have been opened with the old password is now stale.
+	// reset lockout state and revoke active sessions: any session that
+	// might have been opened with the old password is now stale
 	_ = h.store.ResetFailedAttempts(r.Context(), id)
 	_, _ = h.store.RevokeAllSessionsForUser(r.Context(), id)
 
@@ -503,9 +456,6 @@ func (h *Handler) resetUserPassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Sessions
-
-// sessionDTO is the wire shape for an active session row.
 type sessionDTO struct {
 	ID         string   `json:"id"`
 	UserID     string   `json:"user_id"`
@@ -548,7 +498,7 @@ func (h *Handler) listUserSessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sessions": out})
 }
 
-// POST /admin/v1/users/{id}/revoke-all — terminates every active session.
+// POST /admin/v1/users/{id}/revoke-all: terminates every active session
 func (h *Handler) revokeUserSessions(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUUID(r.PathValue("id"))
 	if !ok {
@@ -569,11 +519,6 @@ func (h *Handler) revokeUserSessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"revoked": n})
 }
 
-// helpers
-
-// changedFields builds a metadata map listing which fields the PATCH
-// touched (without leaking values). Useful for audit-log readers who
-// need to know what an admin changed without exposing secrets.
 func changedFields(r updateUserRequest) map[string]any {
 	m := map[string]any{}
 	if r.Email != nil {
@@ -594,7 +539,6 @@ func changedFields(r updateUserRequest) map[string]any {
 	return m
 }
 
-// parseUUID accepts the canonical 8-4-4-4-12 form.
 func parseUUID(s string) (pgtype.UUID, bool) {
 	var u pgtype.UUID
 	if err := u.Scan(s); err != nil {
@@ -603,7 +547,7 @@ func parseUUID(s string) (pgtype.UUID, bool) {
 	return u, u.Valid
 }
 
-// uuidString renders a pgtype.UUID into canonical hex form.
+// uuidString renders a pgtype.UUID into canonical hex form
 func uuidString(u pgtype.UUID) string {
 	if !u.Valid {
 		return ""

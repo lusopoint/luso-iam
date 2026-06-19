@@ -4,10 +4,8 @@ import (
 	"net/http"
 )
 
-// /me
-
 // meResponse is what the SPA reads on every page load to render the nav
-// (admin name) and to decide whether to redirect to /cas/login.
+// (admin name) and to decide whether to redirect to /cas/login
 type meResponse struct {
 	User userDTO `json:"user"`
 }
@@ -23,20 +21,28 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 }
 
 // /keys
-
-// keyDTO is the public-key envelope for the admin UI. We expose just
-// enough to identify the active signing key — full JWKS is already
-// available at /.well-known/jwks.json for clients.
+// key is the per-key shape returned by GET /admin/v1/keys
+// we surface the kid and a primary flag so operators can confirm which key new
+// id_tokens are being signed with vs which are kept around for backward
+// verification during a rotation grace period
 type keyDTO struct {
 	Kid       string `json:"kid"`
 	Algorithm string `json:"alg"`
+	Primary   bool   `json:"primary"`
+	Source    string `json:"source,omitempty"`
 }
 
 // GET /admin/v1/keys
 func (h *Handler) listKeys(w http.ResponseWriter, r *http.Request) {
-	out := []keyDTO{{
-		Kid:       h.keys.KeyID(),
-		Algorithm: "RS256",
-	}}
+	infos := h.keys.Keys()
+	out := make([]keyDTO, 0, len(infos))
+	for _, k := range infos {
+		out = append(out, keyDTO{
+			Kid:       k.Kid,
+			Algorithm: "RS256",
+			Primary:   k.Primary,
+			Source:    k.Source,
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"keys": out})
 }

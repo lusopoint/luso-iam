@@ -9,19 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Pinger is the minimal interface we need from the database — defined here
-// so tests can supply a fake without spinning up Postgres.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// Register attaches /healthz and /readyz to the given mux.
 func Register(mux *http.ServeMux, db Pinger) {
 	mux.HandleFunc("GET /healthz", handleLive)
 	mux.HandleFunc("GET /readyz", handleReady(db))
 }
 
-// MustPinger ensures *pgxpool.Pool satisfies Pinger at compile time.
+// MustPinger ensures *pgxpool.Pool satisfies Pinger at compile time
 var _ Pinger = (*pgxpool.Pool)(nil)
 
 func handleLive(w http.ResponseWriter, _ *http.Request) {

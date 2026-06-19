@@ -1,6 +1,3 @@
-// Package mfa implements the HTTP layer for multi-factor authentication:
-// the challenge page shown after password login, the enrollment UI, and
-// the WebAuthn ceremony endpoints.
 package mfa
 
 import (
@@ -19,17 +16,15 @@ import (
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 	"github.com/lusopoint/lusoiam/internal/crypto"
+	"github.com/lusopoint/lusoiam/internal/middleware"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
 //go:embed templates/*.html
 var templatesFS embed.FS
-
 var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
 
-// handler
-
-// Handler owns all /mfa/* endpoints.
+// handler owns all /mfa/* endpoints
 type Handler struct {
 	mfa      *authmfa.Service
 	sessions *session.Service
@@ -37,10 +32,8 @@ type Handler struct {
 	cas      *authcas.Service
 	signer   *crypto.CookieSigner
 	secure   bool
-	audit    *audit.Service // optional — nil disables audit logging
+	audit    *audit.Service // optional, nil disables audit logging
 }
-
-// Config is the constructor input.
 type Config struct {
 	MFA      *authmfa.Service
 	Sessions *session.Service
@@ -51,7 +44,6 @@ type Config struct {
 	Audit    *audit.Service
 }
 
-// New constructs an MFA Handler.
 func New(c Config) *Handler {
 	return &Handler{
 		mfa:      c.MFA,
@@ -64,17 +56,13 @@ func New(c Config) *Handler {
 	}
 }
 
-// Register attaches all /mfa/* routes.
 func (h *Handler) Register(mux *http.ServeMux) {
-	// Challenge flow (pending-auth required).
 	mux.HandleFunc("GET /mfa", h.challengeGET)
 	mux.HandleFunc("POST /mfa/totp", h.challengeTOTP)
 	mux.HandleFunc("GET /mfa/backup", h.backupGET)
 	mux.HandleFunc("POST /mfa/backup", h.challengeBackup)
 	mux.HandleFunc("POST /mfa/webauthn/begin", h.challengeWebAuthnBegin)
 	mux.HandleFunc("POST /mfa/webauthn/finish", h.challengeWebAuthnFinish)
-
-	// Enrollment / management (active session required).
 	mux.HandleFunc("GET /mfa/enroll", h.enrollGET)
 	mux.HandleFunc("GET /mfa/enroll/totp", h.enrollTOTPGET)
 	mux.HandleFunc("POST /mfa/enroll/totp/confirm", h.enrollTOTPConfirm)
@@ -84,9 +72,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /mfa/methods/{id}/delete", h.deleteMethod)
 }
 
-// Challenge flow
-
-// challengeGET renders the method-picker / TOTP code entry page.
+// challengeGET renders the method-picker / TOTP code entry page
 func (h *Handler) challengeGET(w http.ResponseWriter, r *http.Request) {
 	ch, err := authmfa.ReadChallenge(r, h.signer)
 	if err != nil {
@@ -95,6 +81,7 @@ func (h *Handler) challengeGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := challengeData{
+		CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
 		HasTOTP:     contains(ch.Methods, "totp"),
 		HasWebAuthn: contains(ch.Methods, "webauthn") && h.mfa.WebAuthnEnabled(),
 		HasBackup:   ch.HasBackup,
@@ -103,7 +90,7 @@ func (h *Handler) challengeGET(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "challenge.html", http.StatusOK, data)
 }
 
-// challengeTOTP handles POST /mfa/totp.
+// challengeTOTP handles POST /mfa/totp
 func (h *Handler) challengeTOTP(w http.ResponseWriter, r *http.Request) {
 	ch, err := authmfa.ReadChallenge(r, h.signer)
 	if err != nil {
@@ -137,18 +124,19 @@ func (h *Handler) challengeTOTP(w http.ResponseWriter, r *http.Request) {
 	h.completeChallenge(w, r, ch, userID, []string{"pwd", "otp"})
 }
 
-// backupGET renders the backup-code entry form.
+// backupGET renders the backup-code entry form
 func (h *Handler) backupGET(w http.ResponseWriter, r *http.Request) {
 	if _, err := authmfa.ReadChallenge(r, h.signer); err != nil {
 		http.Redirect(w, r, "/cas/login", http.StatusFound)
 		return
 	}
 	renderTemplate(w, "backup.html", http.StatusOK, simpleData{
-		Error: r.URL.Query().Get("error"),
+		CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+		Error:     r.URL.Query().Get("error"),
 	})
 }
 
-// challengeBackup handles POST /mfa/backup.
+// challengeBackup handles POST /mfa/backup
 func (h *Handler) challengeBackup(w http.ResponseWriter, r *http.Request) {
 	ch, err := authmfa.ReadChallenge(r, h.signer)
 	if err != nil {
@@ -182,7 +170,7 @@ func (h *Handler) challengeBackup(w http.ResponseWriter, r *http.Request) {
 	h.completeChallenge(w, r, ch, userID, []string{"pwd", "mfa"})
 }
 
-// challengeWebAuthnBegin returns the assertion options for navigator.credentials.get().
+// challengeWebAuthnBegin returns the assertion options for navigator.credentials.get()
 func (h *Handler) challengeWebAuthnBegin(w http.ResponseWriter, r *http.Request) {
 	ch, err := authmfa.ReadChallenge(r, h.signer)
 	if err != nil {
@@ -209,7 +197,7 @@ func (h *Handler) challengeWebAuthnBegin(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, opts)
 }
 
-// challengeWebAuthnFinish verifies the assertion and completes the challenge.
+// challengeWebAuthnFinish verifies the assertion and completes the challenge
 func (h *Handler) challengeWebAuthnFinish(w http.ResponseWriter, r *http.Request) {
 	ch, err := authmfa.ReadChallenge(r, h.signer)
 	if err != nil {
@@ -240,9 +228,9 @@ func (h *Handler) challengeWebAuthnFinish(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// We need to complete the challenge but return JSON (since the
+	// we need to complete the challenge but return JSON (since the
 	// browser called us via fetch). Mint the session + ticket here and
-	// return the redirect URL.
+	// return the redirect URL
 	dest, err := h.finishChallenge(w, r, ch, userID, []string{"pwd", "hwk"})
 	if err != nil {
 		http.Error(w, "could not complete sign-in", http.StatusInternalServerError)
@@ -251,8 +239,7 @@ func (h *Handler) challengeWebAuthnFinish(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]string{"redirect": dest})
 }
 
-// Enrollment flow (requires active session)
-
+// enrollment flow (requires active session)
 func (h *Handler) enrollGET(w http.ResponseWriter, r *http.Request) {
 	sess, err := h.requireSession(w, r)
 	if err != nil {
@@ -267,6 +254,7 @@ func (h *Handler) enrollGET(w http.ResponseWriter, r *http.Request) {
 	remaining, _ := h.store.CountUnusedBackupCodes(r.Context(), sess.UserID)
 
 	data := enrollData{
+		CSRFToken:            middleware.CSRFTokenFromContext(r.Context()),
 		WebAuthnEnabled:      h.mfa.WebAuthnEnabled(),
 		HasBackupCodes:       remaining > 0,
 		BackupCodesRemaining: remaining,
@@ -280,8 +268,8 @@ func (h *Handler) enrollGET(w http.ResponseWriter, r *http.Request) {
 		if m.LastUsedAt != nil {
 			v.LastUsed = m.LastUsedAt.UTC().Format("Jan 2, 2006")
 		}
-		// Skip unconfirmed entries (e.g. abandoned TOTP enrollments) —
-		// they shouldn't show up in the management UI.
+		// skip unconfirmed entries (e.g. abandoned TOTP enrollments)
+		// they shouldn't show up in the management UI
 		if m.ConfirmedAt == nil {
 			continue
 		}
@@ -292,7 +280,6 @@ func (h *Handler) enrollGET(w http.ResponseWriter, r *http.Request) {
 			data.WebAuthnMethods = append(data.WebAuthnMethods, v)
 		}
 	}
-
 	renderTemplate(w, "enroll.html", http.StatusOK, data)
 }
 
@@ -316,6 +303,7 @@ func (h *Handler) enrollTOTPGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderTemplate(w, "totp_enroll.html", http.StatusOK, totpEnrollData{
+		CSRFToken:  middleware.CSRFTokenFromContext(r.Context()),
 		MethodID:   uuidToString(secret.MethodID),
 		Secret:     secret.Base32,
 		QRCodeData: template.URL(secret.QRCodeData),
@@ -340,7 +328,7 @@ func (h *Handler) enrollTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	code := strings.TrimSpace(r.FormValue("code"))
 
-	// Ownership check: only the method's user may confirm it.
+	// ownership check: only the method's user may confirm it
 	method, err := h.store.GetMFAMethod(r.Context(), methodID)
 	if err != nil || !bytesEq(method.UserID.Bytes[:], sess.UserID.Bytes[:]) {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -348,12 +336,11 @@ func (h *Handler) enrollTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.mfa.ConfirmTOTPEnrollment(r.Context(), methodID, code); err != nil {
-		// Re-rendering the QR would require keeping the otpauth URL around,
-		// which we don't. Send the user back to the enrollment start.
+		// re-rendering the QR would require keeping the otpauth URL around,
+		// which we don't, send the user back to the enrollment start
 		http.Redirect(w, r, "/mfa/enroll/totp?error=invalid", http.StatusFound)
 		return
 	}
-
 	if h.audit != nil {
 		h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
 			Type:     audit.EventMFAEnrolled,
@@ -361,7 +348,6 @@ func (h *Handler) enrollTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 			Metadata: map[string]any{"method": "totp", "method_id": uuidToString(methodID)},
 		}))
 	}
-
 	http.Redirect(w, r, "/mfa/enroll", http.StatusFound)
 }
 
@@ -460,11 +446,8 @@ func (h *Handler) deleteMethod(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/mfa/enroll", http.StatusFound)
 }
 
-// Common helpers
-
 // completeChallenge is invoked from the form-based challenge endpoints
-// (TOTP, backup) — creates the real session, clears the challenge cookie,
-// and redirects to the destination.
+// (TOTP, backup), creates the real session, clears the challenge cookie, and redirects to the destination
 func (h *Handler) completeChallenge(
 	w http.ResponseWriter, r *http.Request,
 	ch *authmfa.Challenge, userID pgtype.UUID, amr []string,
@@ -478,13 +461,12 @@ func (h *Handler) completeChallenge(
 	http.Redirect(w, r, dest, http.StatusFound)
 }
 
-// finishChallenge does the side-effect-y bits and returns the redirect URL.
-// Shared between the form and JSON (WebAuthn) paths.
+// finishChallenge does the side-effect-y bits and returns the redirect URL
 func (h *Handler) finishChallenge(
 	w http.ResponseWriter, r *http.Request,
 	ch *authmfa.Challenge, userID pgtype.UUID, amr []string,
 ) (string, error) {
-	// Clear the pending-MFA cookie first.
+	// clear the pending-MFA cookie first
 	authmfa.ClearChallenge(w, h.secure)
 
 	sess, err := h.sessions.Create(r.Context(), w, r, session.CreateParams{
@@ -496,8 +478,8 @@ func (h *Handler) finishChallenge(
 		return "", err
 	}
 
-	// Audit the successful second factor + the resulting authenticated
-	// session. Two events because the operator may filter on either.
+	// audit the successful second factor + the resulting authenticated sessions
+	// 2 events because the operator may filter on either
 	if h.audit != nil {
 		method := "totp"
 		if len(amr) > 1 {
@@ -515,14 +497,14 @@ func (h *Handler) finishChallenge(
 		}))
 	}
 
-	// Resolve the destination. Priority:
-	//   1. CAS service ticket (downstream app login completed via CAS)
-	//   2. ch.NextURL — first-party in-server path (admin UI, etc.)
-	//   3. ch.Redirect — cross-origin URL for the reverse-proxy companion
-	//      (Caddy/Traefik forward_auth flow). Already validated against
-	//      the configured PROXY_ALLOWED_CALLBACK_ORIGINS allowlist at the
-	//      time the challenge was issued, so we trust it here.
-	//   4. root
+	// resolve the destination
+	// 1. CAS service ticket (downstream app login completed via CAS)
+	// 2. ch.NextURL, first-party in-server path (admin UI, ...)
+	// 3. ch.Redirect, cross-origin URL for the reverse-proxy companion
+	//    (Caddy/Traefik forward_auth flow), already validated against
+	//    the configured PROXY_ALLOWED_CALLBACK_ORIGINS allowlist at the
+	//    time the challenge was issued, so we trust it here
+	// 4. root
 	if ch.Service != "" {
 		if _, err := h.cas.ResolveService(r.Context(), ch.Service); err == nil {
 			ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, ch.Service, false)
@@ -540,8 +522,6 @@ func (h *Handler) finishChallenge(
 	return "/", nil
 }
 
-// requireSession returns the active session for r or 302-redirects to the
-// login page and returns ErrNoSession.
 func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (*postgres.Session, error) {
 	sess, err := h.sessions.Get(r.Context(), r)
 	if err != nil {
@@ -555,11 +535,13 @@ func (h *Handler) redirectToChallenge(w http.ResponseWriter, r *http.Request, ms
 	http.Redirect(w, r, "/mfa?error="+esc(msg), http.StatusFound)
 }
 
-// Template payloads
-
-type simpleData struct{ Error string }
+type simpleData struct {
+	CSRFToken string
+	Error     string
+}
 
 type challengeData struct {
+	CSRFToken   string
 	HasTOTP     bool
 	HasWebAuthn bool
 	HasBackup   bool
@@ -567,17 +549,9 @@ type challengeData struct {
 }
 
 type totpEnrollData struct {
-	MethodID string
-	Secret   string
-	// QRCodeData is rendered into an <img src="..."> attribute. The value
-	// comes from our own service (base64-encoded PNG built by pquerna/otp
-	// in-process — no operator or user input touches it), so it's safe.
-	//
-	// html/template's URL sanitiser otherwise rewrites any data: URL to
-	// "#ZgotmplZ" because data: URLs *can* carry script in <a href>
-	// contexts. Marking the value as template.URL tells the templater we
-	// vetted it; the type is scoped to URL attributes so an accidental
-	// {{.}} into a body context still gets the normal HTML escaping.
+	CSRFToken  string
+	MethodID   string
+	Secret     string
 	QRCodeData template.URL
 	Error      string
 }
@@ -594,6 +568,7 @@ type methodView struct {
 }
 
 type enrollData struct {
+	CSRFToken            string
 	TOTPMethods          []methodView
 	WebAuthnMethods      []methodView
 	WebAuthnEnabled      bool
@@ -601,7 +576,7 @@ type enrollData struct {
 	BackupCodesRemaining int
 }
 
-// Render helpers, TODO: not sure but we could try to move this to the web (react)
+// render helpers, TODO: not sure but we could try to move this to the web (react)
 
 func renderTemplate(w http.ResponseWriter, name string, status int, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -617,14 +592,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// Utilities
-
-// esc percent-encodes a value for inclusion in a query string.
+// esc percent-encodes a value for inclusion in a query string
 func esc(s string) string {
 	return url.QueryEscape(s)
 }
 
-// parseUUID accepts a canonical 8-4-4-4-12 UUID string.
+// parseUUID accepts a canonical 8-4-4-4-12 UUID string
 func parseUUID(s string) (pgtype.UUID, bool) {
 	var u pgtype.UUID
 	if err := u.Scan(s); err != nil {
@@ -681,7 +654,7 @@ func bytesEq(a, b []byte) bool {
 	return true
 }
 
-// userLabel picks the best human-readable account label for TOTP QR codes.
+// userLabel picks the best human-readable account label for TOTP QR codes
 func userLabel(u *postgres.User) string {
 	if u.Email != nil {
 		return *u.Email
@@ -692,7 +665,7 @@ func userLabel(u *postgres.User) string {
 	return uuidToString(u.ID)
 }
 
-// appendTicket appends ?ticket=<t> to serviceURL (shared with api/cas).
+// appendTicket appends ?ticket=<t> to serviceURL (shared with api/cas)
 func appendTicket(serviceURL, ticket string) string {
 	sep := "?"
 	for _, ch := range serviceURL {
@@ -704,10 +677,6 @@ func appendTicket(serviceURL, ticket string) string {
 	return serviceURL + sep + "ticket=" + ticket
 }
 
-// errorMessage translates internal short codes (used in query params on
-// redirect-after-failure) into user-facing strings. Anything we don't
-// recognise turns into the empty string so attacker-supplied query
-// parameters can't inject arbitrary text into the page.
 func errorMessage(code string) string {
 	switch code {
 	case "":

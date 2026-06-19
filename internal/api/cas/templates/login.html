@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in · IAM</title>
+    <title>Sign in - IAM</title>
     <style>
       :root {
         --bg: #f4f5f7;
@@ -221,6 +221,7 @@
       <div class="divider">or continue with email</div>
       {{ end }} {{/* ── Password form ── */}}
       <form method="POST" action="/cas/login" autocomplete="on">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
         {{ if .Service }}<input
           type="hidden"
           name="service"
@@ -266,6 +267,19 @@
           />
         </div>
         <button class="btn-primary" type="submit">Sign in</button>
+        <p style="margin-top: 0.75rem; text-align: center; font-size: 0.85rem">
+          <a
+            href="/password/forgot"
+            style="color: var(--muted); text-decoration: none"
+            >Forgot password?</a
+          >
+          {{ if .SignupEnabled }}
+          <span style="color: var(--muted); margin: 0 0.4rem">·</span>
+          <a href="/signup" style="color: var(--muted); text-decoration: none"
+            >Create account</a
+          >
+          {{ end }}
+        </p>
       </form>
 
       {{ if .Service }}

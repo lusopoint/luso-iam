@@ -20,8 +20,8 @@ func TestTitleCaseSlug(t *testing.T) {
 		// We don't normalize beyond underscores; if someone slips through
 		// with mixed case, leave it alone rather than guessing.
 		{"alreadyTitled", "AlreadyTitled"},
-		// Trailing or repeated underscores produce empty segments — we
-		// pass those through, which results in extra spaces. That's
+		// Trailing or repeated underscores produce empty segments
+		// we pass those through, which results in extra spaces. That's
 		// acceptable because Validate() ensures slugs don't contain
 		// these shapes in the first place.
 		{"foo__bar", "Foo  Bar"},

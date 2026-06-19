@@ -7,9 +7,7 @@ import (
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 )
 
-// userinfo handles GET and POST /oauth2/userinfo (RFC 5849 §4).
-// The access token is expected as a Bearer token in the Authorization header.
-// POST with token in the body is also supported per OIDC Core §5.3.
+// userinfo handles GET and POST /oauth2/userinfo
 func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 	token := bearerToken(r)
 	if token == "" && r.Method == http.MethodPost {

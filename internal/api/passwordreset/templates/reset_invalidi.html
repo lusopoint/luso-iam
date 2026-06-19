@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign-in error - IAM</title>
+    <title>Link expired - IAM</title>
     <style>
       :root {
         --bg: #f4f5f7;
@@ -26,17 +26,16 @@
         box-sizing: border-box;
       }
       body {
-        margin: 0;
-        padding: 1rem;
-        min-height: 100vh;
         background: var(--bg);
         color: var(--text);
         font:
           15px/1.5 -apple-system,
           BlinkMacSystemFont,
-          "Segoe UI",
           system-ui,
           sans-serif;
+        margin: 0;
+        padding: 1rem;
+        min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -45,33 +44,36 @@
         background: var(--card);
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 2rem;
-        max-width: 480px;
+        padding: 28px;
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
       }
       h1 {
+        font-size: 1.25rem;
         margin: 0 0 0.5rem;
-        font-size: 1.3rem;
       }
       p {
         color: var(--muted);
-        margin: 0 0 0.75rem;
       }
       a {
         color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
       }
-      code {
-        font-size: 0.85rem;
-        word-break: break-all;
+      a:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
   <body>
-    <main class="card">
-      <h1>{{ .Title }}</h1>
-      <p>{{ .Message }}</p>
-      {{ if .Detail }}
-      <p><code>{{ .Detail }}</code></p>
-      {{ end }}
-    </main>
+    <div class="card">
+      <h1>Link expired or invalid</h1>
+      <p>
+        This reset link no longer works. It may have expired, already been used,
+        or be invalid.
+      </p>
+      <p><a href="/password/forgot">Request a new reset link</a></p>
+    </div>
   </body>
 </html>

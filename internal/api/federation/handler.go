@@ -1,8 +1,3 @@
-// Package federation implements the HTTP endpoints for upstream provider
-// OAuth2 / OIDC flows.
-//
-//	GET /oauth/authorize/{provider}  — redirect to upstream provider
-//	GET /oauth/callback/{provider}   — handle redirect back from provider
 package federation
 
 import (
@@ -29,31 +24,30 @@ const (
 	stateCookieTTL  = 10 * time.Minute
 )
 
-// Handler handles the two-leg OAuth2 / OIDC redirect flow.
+// OAuth2 / OIDC redirect flow
 type Handler struct {
 	registry *federation.Registry
 	fedSvc   *authfed.Service
 	sessions *session.Service
 	casSvc   *authcas.Service
-	mfa      *authmfa.Service // optional — if nil, MFA enforcement is skipped
+	mfa      *authmfa.Service // optional, if nil, MFA enforcement is skipped
 	signer   *crypto.CookieSigner
-	audit    *audit.Service // optional — nil disables audit logging
+	audit    *audit.Service // optional, nil disables audit logging
 	secure   bool           // whether to set Secure flag on the state cookie
 }
 
-// Config bundles the constructor dependencies.
+// config bundles the constructor dependencies
 type Config struct {
 	Registry *federation.Registry
 	FedSvc   *authfed.Service
 	Sessions *session.Service
 	CASSvc   *authcas.Service
-	MFA      *authmfa.Service // optional — if nil, MFA enforcement is skipped
+	MFA      *authmfa.Service // optional, if nil, MFA enforcement is skipped
 	Signer   *crypto.CookieSigner
 	Audit    *audit.Service
 	Secure   bool
 }
 
-// New returns a configured federation Handler.
 func New(cfg Config) *Handler {
 	return &Handler{
 		registry: cfg.Registry,
@@ -67,16 +61,12 @@ func New(cfg Config) *Handler {
 	}
 }
 
-// Register attaches the two federation endpoints to mux.
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /oauth/authorize/{provider}", h.authorize)
 	mux.HandleFunc("GET /oauth/callback/{provider}", h.callback)
 }
 
-// oauthState
-
-// oauthState is the data we round-trip through the state cookie. It carries
-// everything needed to resume the flow after the provider redirect.
+// oauthState is the data we round-trip through the state cookie
 type oauthState struct {
 	State    string `json:"s"`   // random nonce for CSRF protection
 	Verifier string `json:"v"`   // PKCE code_verifier
@@ -85,11 +75,7 @@ type oauthState struct {
 	Expires  int64  `json:"exp"` // unix timestamp
 }
 
-// authorize
-
-// authorize handles GET /oauth/authorize/{provider}.
-// It generates PKCE + state, persists them in a signed cookie, and
-// redirects the browser to the upstream provider's authorization URL.
+// authorize handles GET /oauth/authorize/{provider}
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 	provider, ok := h.registry.Get(providerName)
@@ -100,7 +86,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 
 	serviceURL := r.URL.Query().Get("service")
 
-	// Generate PKCE pair.
+	// generate PKCE pair
 	verifier, challenge, err := crypto.NewPKCE()
 	if err != nil {
 		slog.Error("federation: generate pkce", "err", err)
@@ -108,7 +94,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate random state nonce.
+	// generate random state nonce
 	stateNonce, err := crypto.RandomToken(16)
 	if err != nil {
 		slog.Error("federation: generate state", "err", err)
@@ -116,7 +102,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Persist state in a short-lived signed cookie.
+	// persist state in a short-lived signed cookie
 	st := oauthState{
 		State:    stateNonce,
 		Verifier: verifier,
@@ -129,16 +115,10 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-
-	// Redirect to provider.
 	http.Redirect(w, r, provider.AuthURL(stateNonce, challenge), http.StatusFound)
 }
 
-// callback
-
-// callback handles GET /oauth/callback/{provider}.
-// It validates the state, exchanges the code, resolves the IAM user,
-// creates a session, and redirects to the original destination.
+// callback handles GET /oauth/callback/{provider}
 func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 	provider, ok := h.registry.Get(providerName)
@@ -147,7 +127,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate state
+	// validate state
 	st, err := h.readStateCookie(r)
 	if err != nil || st.Provider != providerName {
 		slog.Warn("federation: invalid state cookie",
@@ -168,7 +148,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for provider error
+	// check for provider error
 	if errParam := r.URL.Query().Get("error"); errParam != "" {
 		desc := r.URL.Query().Get("error_description")
 		slog.Info("federation: provider returned error",
@@ -183,7 +163,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Exchange code for identity
+	// exchange code for identity
 	identity, err := provider.Exchange(r.Context(), code, st.Verifier)
 	if err != nil {
 		slog.Error("federation: exchange code", "provider", providerName, "err", err)
@@ -191,7 +171,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Link or create IAM user
+	// link or create IAM user
 	user, isNewLink, err := h.fedSvc.LinkOrCreate(r.Context(), providerName, identity)
 	if err != nil {
 		slog.Error("federation: link or create", "provider", providerName, "err", err)
@@ -204,9 +184,6 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record the link event the first time we tie this upstream identity
-	// to an IAM user. Subsequent logins via the same provider are
-	// indistinguishable to LinkOrCreate, so this fires only on first link.
 	if h.audit != nil && isNewLink {
 		h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
 			Type:     audit.EventUpstreamLinked,
@@ -216,11 +193,6 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// MFA gate
-	// A user authenticated via an upstream provider may still have local
-	// MFA enrolled (e.g. they enrolled TOTP after first signing up via
-	// Google). In that case we don't create the session yet — we issue a
-	// pending-MFA cookie and redirect to /mfa. The MFA handler will mint
-	// the real session once verification succeeds.
 	if h.mfa != nil {
 		status, err := h.mfa.StatusForUser(r.Context(), user.ID)
 		if err != nil {
@@ -245,9 +217,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create session
-	// AMR for federation is "fed" + the provider slug. The upstream
-	// provider's own MFA, if any, is opaque to us — we trust the redirect.
+	// create session
 	sess, err := h.sessions.Create(r.Context(), w, r, session.CreateParams{
 		UserID: user.ID,
 		ACR:    "0",
@@ -267,7 +237,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		}))
 	}
 
-	// Issue CAS ticket if service was set
+	// issue CAS ticket if service was set
 	destination := "/"
 	if st.Service != "" {
 		if _, regErr := h.casSvc.ResolveService(r.Context(), st.Service); regErr == nil {
@@ -282,14 +252,10 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		} else if !errors.Is(regErr, authcas.ErrUnauthorizedService) {
 			slog.Error("federation: resolve service", "err", regErr)
 		}
-		// Unregistered service: ignore and send to portal root.
-		// We don't error here because the user IS authenticated.
 	}
 
 	http.Redirect(w, r, destination, http.StatusFound)
 }
-
-// state cookie helpers
 
 func (h *Handler) writeStateCookie(w http.ResponseWriter, st oauthState) error {
 	payload, err := json.Marshal(st)
@@ -336,11 +302,8 @@ func (h *Handler) clearStateCookie(w http.ResponseWriter) {
 	})
 }
 
-// callbackError redirects to the login page with an error message
-// embedded as a query parameter. It does NOT use a template directly
-// here so the CAS login page owns the error display.
 func (h *Handler) callbackError(w http.ResponseWriter, r *http.Request, msg string) {
-	// Best effort — don't expose internal details.
+	// best effort, don't expose internal details
 	http.Redirect(w, r, "/cas/login?error="+encodeMsg(msg), http.StatusFound)
 }
 
@@ -348,7 +311,6 @@ func encodeMsg(msg string) string {
 	return (&url.URL{RawQuery: "e=" + msg}).Query().Get("e")
 }
 
-// appendTicket appends ?ticket=<t> to serviceURL (re-used from api/cas).
 func appendTicket(serviceURL, ticket string) string {
 	sep := "?"
 	for _, ch := range serviceURL {
@@ -360,8 +322,6 @@ func appendTicket(serviceURL, ticket string) string {
 	return serviceURL + sep + "ticket=" + ticket
 }
 
-// uuidToString renders a pgtype.UUID in canonical hex form. Used to
-// embed the user id in the MFA challenge cookie.
 func uuidToString(u pgtype.UUID) string {
 	if !u.Valid {
 		return ""
