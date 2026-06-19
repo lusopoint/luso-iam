@@ -1,6 +1,3 @@
-// Package session manages browser sessions: creation, validation, sliding
-// expiry, and revocation. The session id travels in an HMAC-signed
-// cookie; this package owns the cookie format.
 package session
 
 import (
@@ -15,17 +12,14 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// CookieName is the cookie that carries the signed session id.
-// The same cookie acts as the CAS Ticket-Granting Cookie — we
-// deliberately do not separate them since the session row is the TGT.
+// CookieName is the cookie that carries the signed session id
+// the same cookie acts as the CAS Ticket-Granting Cookie
 const CookieName = "iam_session"
 
 // ErrInvalidSession is returned when the cookie is missing, malformed,
-// signature-invalid, or refers to a session that's been revoked or
-// expired.
+// signature-invalid, or refers to a session that's been revoked or expired
 var ErrInvalidSession = errors.New("session: invalid")
 
-// Service is the session manager.
 type Service struct {
 	store    *postgres.Store
 	signer   *crypto.CookieSigner
@@ -33,25 +27,21 @@ type Service struct {
 	lifetime time.Duration
 }
 
-// CookieOptions controls cookie flags. SecureOnly should be true in
-// production; we keep it configurable so local development over plain
-// HTTP works.
+// CookieOptions controls cookie flags
 type CookieOptions struct {
 	Domain     string
 	Path       string
-	SecureOnly bool
+	SecureOnly bool // true in production
 	SameSite   http.SameSite
 }
 
-// Config bundles everything the service needs at construction.
 type Config struct {
 	Store    *postgres.Store
 	Signer   *crypto.CookieSigner
 	Cookie   CookieOptions
-	Lifetime time.Duration // session absolute lifetime
+	Lifetime time.Duration
 }
 
-// New returns a configured session service.
 func New(c Config) *Service {
 	if c.Cookie.Path == "" {
 		c.Cookie.Path = "/"
@@ -70,21 +60,18 @@ func New(c Config) *Service {
 	}
 }
 
-// CreateParams carries the authentication context for a new session.
-// All callers go through this to make AMR/ACR explicit at every call site.
+// CreateParams carries the authentication context for a new session
 type CreateParams struct {
 	UserID pgtype.UUID
-	// ACR is the OIDC Authentication Context Class Reference.
-	// "0" = single factor, "1" = MFA satisfied. Defaults to "0".
+	// ACR is the OIDC Authentication Context Class Reference
+	// "0" = single factor, "1" = MFA satisfied. Defaults to "0"
 	ACR string
-	// AMR lists the authentication methods used to establish the
-	// session — e.g. {"pwd"}, {"pwd","otp"}, {"fed"}. Required.
+	// AMR lists the authentication methods used to establish the session
+	// example {"pwd"}, {"pwd","otp"}, {"fed"}
 	AMR []string
 }
 
-// Create persists a new session for the given user and writes the
-// signed cookie on w. AMR/ACR come from p so callers must spell out
-// the authentication context.
+// Create persists a new session for the given user and writes the signed cookie on response
 func (s *Service) Create(ctx context.Context, w http.ResponseWriter, r *http.Request, p CreateParams) (*postgres.Session, error) {
 	ua, ip := r.UserAgent(), clientIP(r)
 	expiresAt := time.Now().Add(s.lifetime)
@@ -105,9 +92,8 @@ func (s *Service) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 	return sess, nil
 }
 
-// Get validates the cookie on r and returns the associated session.
-// On success, last_seen_at is updated. ErrInvalidSession is returned
-// for any failure mode without distinction.
+// Get validates the cookie on response and returns the associated session
+// on success, last_seen_at is updated
 func (s *Service) Get(ctx context.Context, r *http.Request) (*postgres.Session, error) {
 	c, err := r.Cookie(CookieName)
 	if err != nil {
@@ -131,13 +117,12 @@ func (s *Service) Get(ctx context.Context, r *http.Request) (*postgres.Session, 
 		return nil, err
 	}
 
-	// Sliding expiry: bump last_seen_at. Failure is non-fatal.
+	// sliding expiry: bump last_seen_at
 	_ = s.store.TouchSession(ctx, sess.ID)
 	return sess, nil
 }
 
-// Destroy revokes the session referred to by the cookie (if any) and
-// clears the cookie. Idempotent.
+// Destroy revokes the session referred to by the cookie and clears the cookie
 func (s *Service) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	c, err := r.Cookie(CookieName)
 	if err == nil {
@@ -180,9 +165,7 @@ func (s *Service) clearCookie(w http.ResponseWriter) {
 	})
 }
 
-// helpers
-
-// uuidToString renders pgtype.UUID in canonical 8-4-4-4-12 form.
+// uuidToString renders pgtype.UUID in canonical 8-4-4-4-12 form
 func uuidToString(u pgtype.UUID) string {
 	if !u.Valid {
 		return ""
@@ -213,7 +196,7 @@ func clientIP(r *http.Request) string {
 		}
 		return xff
 	}
-	// r.RemoteAddr is host:port; strip port.
+	// r.RemoteAddr is host:port; strip port
 	host := r.RemoteAddr
 	for i := len(host) - 1; i >= 0; i-- {
 		if host[i] == ':' {
