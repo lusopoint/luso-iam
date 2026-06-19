@@ -13,26 +13,28 @@ var templatesFS embed.FS
 // fail fast at startup if a template is malformed.
 var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
 
-// loginPageData drives the login.html template.
+// loginPageData drives the login.html template
 type loginPageData struct {
-	Email     string
-	Service   string
-	Next      string // post-login destination for first-party redirects (no CAS ticket)
-	Redirect  string // post-login cross-origin destination (proxy companion); pre-validated against allowlist
-	Renew     bool
-	Gateway   bool
-	Error     string
-	Providers []providerInfo // enabled upstream SSO providers
+	CSRFToken     string // double-submit cookie value; rendered into a hidden field
+	Email         string
+	Service       string
+	Next          string // post-login destination for first-party redirects (no CAS ticket)
+	Redirect      string // post-login cross-origin destination (proxy companion); pre-validated against allowlist
+	Renew         bool
+	Gateway       bool
+	Error         string
+	Providers     []providerInfo // enabled upstream SSO providers
+	SignupEnabled bool           // when true, render a "Create account" link
 }
 
-// providerInfo is passed to the login template for each upstream provider.
+// providerInfo is passed to the login template for each upstream provider
 type providerInfo struct {
 	Slug  string // "google", "github"
 	Label string // "Continue with Google"
 	Icon  string // inline SVG path data
 }
 
-// errorPageData drives the error.html template.
+// errorPageData drives the error.html template
 type errorPageData struct {
 	Title   string
 	Message string
@@ -44,7 +46,7 @@ func renderLogin(w http.ResponseWriter, status int, data loginPageData) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	if err := templates.ExecuteTemplate(w, "login.html", data); err != nil {
-		// Headers are already sent; nothing useful to do with the error.
+		// Headers are already sent; nothing useful to do with the error
 		// AccessLog middleware captures status.
 		return
 	}

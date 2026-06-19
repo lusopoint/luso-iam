@@ -1,4 +1,3 @@
-// Package cas implements the HTTP layer for CAS 2.0 and 3.0 endpoints.
 package cas
 
 import (
@@ -17,51 +16,41 @@ import (
 	"github.com/lusopoint/lusoiam/internal/federation"
 )
 
+// Handler holds the dependencies for all CAS HTTP endpoints
 type Handler struct {
-	password *password.Service
-	sessions *session.Service
-	cas      *authcas.Service
-	// upstream SSO providers; may be empty
-	registry *federation.Registry
-
-	// nil disables the MFA gate
-	mfa *authmfa.Service
-
-	// signs the pending-MFA cookie
-	signer *crypto.CookieSigner
-
-	// mirrors session cookie Secure flag
-	cookieSecure bool
-
-	// optional — nil disables audit logging
-	audit *audit.Service
-
+	password     *password.Service
+	sessions     *session.Service
+	cas          *authcas.Service
+	registry     *federation.Registry // SSO providers
+	mfa          *authmfa.Service     // nil disables the MFA gate
+	signer       *crypto.CookieSigner // signs the pending-MFA cookie
+	cookieSecure bool                 // mirrors session cookie Secure flag
+	audit        *audit.Service       // optional: nil disables audit logging
 	// proxyOrigins is the set of accepted cross-origin redirect targets
-	// for the `rd=` parameter (used by the reverse-proxy companion).
-	// Map for O(1) lookup; keys are scheme://host[:port] lowercased.
+	// for the `rd=` parameter (used by the reverse-proxy companion)
 	proxyOrigins map[string]struct{}
-
 	// providerLabels overrides the default "Continue with <slug>" button
-	// text for specific slugs. Populated from the OIDC providers' optional
-	// DISPLAY_NAME env var; built-in providers (google, github) use the
-	// fixed labels in defaultProviderLabels.
+	// text for specific slugs, populated from the OIDC providers optional
+	// DISPLAY_NAME env var, built-in providers (google, github) use the
+	// fixed labels in defaultProviderLabels
 	providerLabels map[string]string
+	// signupEnabled toggles the "Create account" link on the login page
+	// when false, no link is rendered, when true, the link points at /signup
+	// the link is purely a UI affordance, actual gating of
+	// the /signup routes happens in main.go via conditional registration
+	signupEnabled bool
 }
 
 // Config is the constructor argument bundle.
 type Config struct {
-	Password *password.Service
-	Sessions *session.Service
-	CAS      *authcas.Service
-	// pass an empty registry if no providers configured
-	Registry *federation.Registry
-	// optional — if nil, MFA enforcement is skipped
-	MFA *authmfa.Service
-	// required when MFA is set
-	Signer       *crypto.CookieSigner
+	Password     *password.Service
+	Sessions     *session.Service
+	CAS          *authcas.Service
+	Registry     *federation.Registry // pass an empty registry if no providers configured
+	MFA          *authmfa.Service     // optional: if nil, MFA enforcement is skipped
+	Signer       *crypto.CookieSigner // required when MFA is set
 	CookieSecure bool
-	// optional, events are silently dropped when nil
-	Audit *audit.Service
+	Audit        *audit.Service // optional: events are silently dropped when nil
 	// ProxyCallbackOrigins enumerates the cross-origin URLs that may
 	// appear in the `rd=` query parameter on /cas/login. The proxy
 	// companion (/proxy/verify) uses the same allowlist; both lists
@@ -73,6 +62,9 @@ type Config struct {
 	// the value is the button label ("Continue with Google"). Slugs not
 	// in this map fall through to a sensible auto-generated label.
 	ProviderLabels map[string]string
+	// SignupEnabled mirrors cfg.Signup.Enabled, controls whether the
+	// login page renders a "Create account" link, default false
+	SignupEnabled bool
 }
 
 func New(cfg Config) *Handler {
@@ -94,9 +86,11 @@ func New(cfg Config) *Handler {
 		audit:          cfg.Audit,
 		proxyOrigins:   origins,
 		providerLabels: cfg.ProviderLabels,
+		signupEnabled:  cfg.SignupEnabled,
 	}
 }
 
+// Register attaches all CAS routes
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /cas/login", h.loginGET)
 	mux.HandleFunc("POST /cas/login", h.loginPOST)
@@ -109,19 +103,17 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /cas/serviceValidate", h.serviceValidate(false))
 	mux.HandleFunc("GET /cas/proxyValidate", h.serviceValidate(false))
 
-	// CAS 3.0 XML with attribute release and JSON
+	// CAS 3.0 XML with attribute release
 	mux.HandleFunc("GET /cas/p3/serviceValidate", h.serviceValidate(true))
 	mux.HandleFunc("GET /cas/p3/proxyValidate", h.serviceValidate(true))
 }
 
-// providerLabels maps provider slugs to their display labels
 var defaultProviderLabels = map[string]string{
 	"google": "Continue with Google",
 	"github": "Continue with GitHub",
 }
 
-// providers returns the providerInfo list for the login template
-// built from the federation registry
+// providers returns the providerInfo list for the login template, built from the federation registry
 func (h *Handler) providers() []providerInfo {
 	if h.registry == nil || h.registry.Empty() {
 		return nil
@@ -144,9 +136,9 @@ func (h *Handler) providers() []providerInfo {
 	return infos
 }
 
-// titleCaseSlug turns "mycorp_okta" into "Mycorp Okta". Reserved for
-// the no-label-configured case; nothing fancy because the operator
-// always has the DISPLAY_NAME escape hatch if this doesn't look right.
+// titleCaseSlug turns "mycorp_okta" into "Mycorp Okta", reserved for
+// the no-label-configured case, nothing fancy because the operator
+// always has the DISPLAY_NAME escape hatch if this doesn't look right
 func titleCaseSlug(slug string) string {
 	parts := strings.Split(slug, "_")
 	for i, p := range parts {
@@ -173,9 +165,6 @@ func appendTicket(serviceURL, ticket string) string {
 	return u.String()
 }
 
-// uuidToString renders a pgtype.UUID in canonical 8-4-4-4-12 hex form.
-// Local to this package because pulling pgtype's String() requires Valid
-// to be true and we want a deterministic format for cookie payloads.
 func uuidToString(u pgtype.UUID) string {
 	if !u.Valid {
 		return ""

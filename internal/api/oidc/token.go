@@ -7,8 +7,8 @@ import (
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 )
 
-// token handles POST /oauth2/token.
-// Dispatches to the correct grant handler based on grant_type.
+// token handles POST /oauth2/token
+// dispatches to the correct grant handler based on grant_type
 func (h *Handler) token(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		oauthError(w, http.StatusBadRequest, "invalid_request", "Cannot parse request body.")
@@ -46,7 +46,7 @@ func (h *Handler) tokenAuthCode(w http.ResponseWriter, r *http.Request, clientID
 }
 
 func (h *Handler) tokenRefresh(w http.ResponseWriter, r *http.Request, clientID, clientSecret string) {
-	// Parse scope — if omitted, original scopes are kept.
+	// parse scope, if omitted, original scopes are kept
 	var scopes []string
 	if s := r.FormValue("scope"); s != "" {
 		scopes = splitScope(s)
@@ -74,7 +74,6 @@ func (h *Handler) tokenClientCredentials(w http.ResponseWriter, r *http.Request,
 	writeTokenResponse(w, resp)
 }
 
-// writeTokenResponse emits a successful token response.
 func writeTokenResponse(w http.ResponseWriter, resp *oidcsvc.TokenResponse) {
 	body := map[string]any{
 		"access_token": resp.AccessToken,
@@ -91,7 +90,7 @@ func writeTokenResponse(w http.ResponseWriter, resp *oidcsvc.TokenResponse) {
 	writeJSON(w, http.StatusOK, body)
 }
 
-// tokenError maps service errors to OAuth2 error codes.
+// tokenError maps service errors to OAuth2 error codes
 func tokenError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, oidcsvc.ErrInvalidClient):

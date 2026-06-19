@@ -13,30 +13,7 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// Federation admin endpoints. Two read-only surfaces plus one mutation:
-//
-//	GET    /admin/v1/federation/providers          — list configured providers
-//	GET    /admin/v1/users/{id}/federation         — list a user's linked identities
-//	DELETE /admin/v1/users/{id}/federation/{linkId} — unlink one identity
-//
-// Provider configuration itself is intentionally NOT manageable from the
-// UI. Provider credentials are deployment-shaped (set once at boot, via
-// env vars) and putting them in the database would widen the secret
-// surface for marginal operator convenience. The UI just surfaces what's
-// already wired up so admins can verify it without grepping env files.
-//
-// We don't expose client IDs either — they're not strictly secret, but
-// the operator looking at this page doesn't need them for anything
-// admin-shaped, and surfacing them would invite confusion ("why isn't
-// my new client ID showing up?"). The page answers a single question:
-// which providers can a user sign in with right now?
-
-// Provider status
-
-// providerDTO is the small public shape of a configured provider.
-// Deliberately minimal: name, the friendly display label, and the
-// redirect URI an admin would paste into the provider's console when
-// registering the OAuth client.
+// federation admin endpoints
 type providerDTO struct {
 	Name        string `json:"name"`         // slug: "google", "github", ...
 	DisplayName string `json:"display_name"` // "Google", "GitHub", ...
@@ -66,10 +43,6 @@ func (h *Handler) listFederationProviders(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, out)
 }
 
-// displayNameForProvider returns a polished label for a known slug, or
-// title-cases the slug for unknown ones. Hard-coded for the providers
-// that have an established brand capitalization ("GitHub", not "Github"),
-// the rest fall through to Title-Case.
 func displayNameForProvider(slug string) string {
 	switch slug {
 	case "google":
@@ -88,7 +61,7 @@ func displayNameForProvider(slug string) string {
 		if slug == "" {
 			return ""
 		}
-		// Replace underscores with spaces and Title-case each word.
+		// replace underscores with spaces and title-case each word
 		parts := strings.Split(slug, "_")
 		for i, p := range parts {
 			if len(p) > 0 {
@@ -99,8 +72,7 @@ func displayNameForProvider(slug string) string {
 	}
 }
 
-// Per-user federation
-
+// per user federation
 type userFederationDTO struct {
 	ID           string  `json:"id"`
 	Provider     string  `json:"provider"`
@@ -154,26 +126,7 @@ func toUserFederationDTO(ui postgres.UserIdentity) userFederationDTO {
 }
 
 // Unlink
-
 // DELETE /admin/v1/users/{id}/federation/{linkId}
-//
-// Removes one provider link from a user. The lockout guard refuses the
-// delete when removing this link would leave the user with no way to
-// sign in:
-//
-//   - no password credential on file, AND
-//   - this is their last (or only) federation identity
-//
-// In that case we return 409 Conflict with a code the SPA reads to show
-// a friendlier "Set a password first" message. The admin can either
-// trigger a password reset or use a different recovery path before
-// retrying.
-//
-// We do NOT consider MFA enrollment in the lockout check. MFA is a
-// second factor — without a first factor (password or federation) the
-// user has no way to start authenticating, even with a perfectly valid
-// TOTP secret. Skipping MFA here keeps the check focused on what
-// actually unblocks login.
 func (h *Handler) unlinkUserFederation(w http.ResponseWriter, r *http.Request) {
 	userID, ok := parseUUID(r.PathValue("id"))
 	if !ok {
@@ -186,9 +139,9 @@ func (h *Handler) unlinkUserFederation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load and verify ownership. Using a separate lookup over the
+	// load and verify ownership using a separate lookup over the
 	// list+filter approach because the typical case has one or two
-	// identities; the join cost isn't worth the cleanup.
+	// identities, the join cost isn't worth the cleanup
 	link, err := h.store.GetUserIdentityByID(r.Context(), linkID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
@@ -200,17 +153,10 @@ func (h *Handler) unlinkUserFederation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if link.UserID.Bytes != userID.Bytes {
-		// 404, not 403: revealing "this exists but isn't yours" is a
-		// minor probing oracle. The list endpoint is the legitimate
-		// way to discover IDs.
 		writeProblem(w, http.StatusNotFound, "not_found", "Identity not found.")
 		return
 	}
 
-	// Lockout guard
-	// Two checks: does the user have a password? And how many other
-	// federation links would remain after this delete? If neither, we
-	// refuse with a 409 + code the SPA can recognize.
 	hasPassword, err := h.userHasPasswordCredential(r.Context(), userID)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error",
@@ -218,7 +164,7 @@ func (h *Handler) unlinkUserFederation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hasPassword {
-		// Need to ensure at least one OTHER identity will remain.
+		// need to ensure at least one OTHER identity will remain
 		others, err := h.store.ListUserIdentities(r.Context(), userID)
 		if err != nil {
 			writeProblem(w, http.StatusInternalServerError, "internal_error",
@@ -260,11 +206,8 @@ func (h *Handler) unlinkUserFederation(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// userHasPasswordCredential reports whether the user has a usable
-// password on file. "Usable" means the row exists; we don't try to
-// distinguish a locked-but-set-password from an unlocked one — even a
-// locked password can be administratively reset, so for lockout-check
-// purposes any credential row counts as "they have a path".
+// userHasPasswordCredential reports whether the user has a usable password on file
+// "usable" means the row exists, we don't try to distinguish a locked but set password from an unlocked one
 func (h *Handler) userHasPasswordCredential(ctx context.Context, userID pgtype.UUID) (bool, error) {
 	_, err := h.store.GetCredential(ctx, userID)
 	if err == nil {

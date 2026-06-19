@@ -7,19 +7,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/lusopoint/lusoiam/internal/middleware"
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// authorize handles GET /oauth2/authorize.
-//
-// Flow:
-//  1. Parse + validate the authorization request parameters.
-//  2. Check for an existing IAM session.
-//     - No session → redirect to login with ?next= pointing back here.
-//     - prompt=none + no session → return login_required to client.
-//  3. Session found + no consent required → issue code immediately.
-//  4. Session found + consent required → show consent screen.
+// authorize handles GET /oauth2/authorize
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	req := oidcsvc.AuthRequest{
@@ -34,19 +27,16 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		Prompt:        q.Get("prompt"),
 	}
 
-	// Validate before touching the session — redirect_uri must be registered
-	// before we can redirect errors there.
+	// validate before touching the session, redirect_uri must be registered
+	// before we can redirect errors there
 	client, err := h.svc.ValidateAuthRequest(r.Context(), req)
 	if err != nil {
 		h.authorizeError(w, r, req, err)
 		return
 	}
-
-	// Check session.
 	sess, sessErr := h.sessions.Get(r.Context(), r)
-
 	if sessErr != nil {
-		// No valid session.
+		// no valid session
 		if req.Prompt == "none" {
 			redirectError(w, r, req.RedirectURI, req.State,
 				"login_required", "Authentication required.")
@@ -57,14 +47,14 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// prompt=login forces re-authentication even with a valid session.
+	// prompt=login forces re-authentication even with a valid session
 	if req.Prompt == "login" {
 		loginURL := "/cas/login?next=" + url.QueryEscape(r.URL.RequestURI())
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
 
-	// Consent check.
+	// consent check
 	if client.RequireConsent {
 		if req.Prompt == "none" {
 			redirectError(w, r, req.RedirectURI, req.State,
@@ -72,6 +62,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		renderConsent(w, http.StatusOK, consentData{
+			CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
 			ClientName:  client.Name,
 			Scopes:      req.Scopes,
 			ClientID:    req.ClientID,
@@ -84,12 +75,10 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	// Auto-approve: issue code and redirect.
 	h.issueCodeAndRedirect(w, r, req, sess)
 }
 
-// authorizeConsent handles POST /oauth2/authorize (consent form submission).
+// authorizeConsent handles POST /oauth2/authorize (consent form submission)
 func (h *Handler) authorizeConsent(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -106,35 +95,29 @@ func (h *Handler) authorizeConsent(w http.ResponseWriter, r *http.Request) {
 		PKCEChallenge: r.FormValue("code_challenge"),
 		PKCEMethod:    r.FormValue("code_challenge_method"),
 	}
-
 	if r.FormValue("decision") != "allow" {
 		redirectError(w, r, req.RedirectURI, req.State,
 			"access_denied", "User denied the request.")
 		return
 	}
-
 	sess, err := h.sessions.Get(r.Context(), r)
 	if err != nil {
 		redirectError(w, r, req.RedirectURI, req.State,
 			"login_required", "Session expired.")
 		return
 	}
-
 	h.issueCodeAndRedirect(w, r, req, sess)
 }
 
-// issueCodeAndRedirect mints an auth code and redirects to redirect_uri.
-// The session's ACR and AMR are propagated into the auth code so the
-// resulting id_token reflects the authentication context — without this,
-// an MFA login would still mint id_tokens with acr=0/amr=[pwd].
+// issueCodeAndRedirect auth code and redirects to redirect_uri
+// the session's ACR and AMR are propagated into the auth code so the
+// resulting id_token reflects the authentication context
 func (h *Handler) issueCodeAndRedirect(
 	w http.ResponseWriter,
 	r *http.Request,
 	req oidcsvc.AuthRequest,
 	sess *postgres.Session,
 ) {
-	// Default to single-factor if the session pre-dates the MFA migration
-	// or was never populated (defensive — should not happen post-P4).
 	acr := sess.ACR
 	if acr == "" {
 		acr = "0"
@@ -158,7 +141,6 @@ func (h *Handler) issueCodeAndRedirect(
 			"server_error", "Could not issue authorization code.")
 		return
 	}
-
 	dest := req.RedirectURI + "?code=" + url.QueryEscape(code)
 	if req.State != "" {
 		dest += "&state=" + url.QueryEscape(req.State)
@@ -166,9 +148,9 @@ func (h *Handler) issueCodeAndRedirect(
 	http.Redirect(w, r, dest, http.StatusFound)
 }
 
-// authorizeError handles validation errors on the authorization request.
-// If redirect_uri is valid, errors are forwarded there.
-// If redirect_uri itself is invalid, we show an error page (can't redirect).
+// authorizeError handles validation errors on the authorization request
+// if redirect_uri is valid, errors are forwarded there
+// if redirect_uri itself is invalid, we show an error page (can't redirect)
 func (h *Handler) authorizeError(w http.ResponseWriter, r *http.Request, req oidcsvc.AuthRequest, err error) {
 	code := "invalid_request"
 	desc := err.Error()
@@ -177,7 +159,7 @@ func (h *Handler) authorizeError(w http.ResponseWriter, r *http.Request, req oid
 		code = "unauthorized_client"
 		desc = "Unknown or disabled client."
 	case errors.Is(err, oidcsvc.ErrInvalidRedirectURI):
-		// Cannot redirect — show a page.
+		// cannot redirect, show a page
 		http.Error(w, "Invalid redirect_uri: not registered for this client.", http.StatusBadRequest)
 		return
 	case errors.Is(err, oidcsvc.ErrPKCERequired):
@@ -190,8 +172,7 @@ func (h *Handler) authorizeError(w http.ResponseWriter, r *http.Request, req oid
 	redirectError(w, r, req.RedirectURI, req.State, code, desc)
 }
 
-// redirectError sends the OAuth2 error to the client's redirect_uri.
-// If redirect_uri is empty, falls back to a JSON error response.
+// redirectError sends the OAuth2 error to the client's redirect_uri
 func redirectError(w http.ResponseWriter, r *http.Request, redirectURI, state, code, desc string) {
 	if redirectURI == "" {
 		oauthError(w, http.StatusBadRequest, code, desc)

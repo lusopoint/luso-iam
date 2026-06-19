@@ -10,14 +10,14 @@ import (
 // Notably:
 //   - The top-level wrapper key is `serviceResponse` (camelCase).
 //   - On success, exactly one sub-key: `authenticationSuccess`.
-//   - `attributes` is a map[string][]string — every value MUST be an
+//   - `attributes` is a map[string][]string, every value MUST be an
 //     array, even when there's only one entry, because real CAS clients
 //     unconditionally index `[0]` into attribute values (LDAP attrs are
 //     multi-valued, and Apereo preserves that shape).
 //
 // If this test starts failing because someone "simplified" attribute
 // values to bare strings, that's a breaking change for every CAS
-// client integration — back it out.
+// client integration, back it out
 func TestJSONSuccessShape(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +62,7 @@ func TestJSONSuccessShape(t *testing.T) {
 }
 
 // TestJSONSuccessNoAttributes: when attrs is nil we still emit a clean
-// envelope. CAS 2.0 endpoints take this path — the user identifier is
+// envelope. CAS 2.0 endpoints take this path, the user identifier is
 // the only thing released.
 func TestJSONSuccessNoAttributes(t *testing.T) {
 	t.Parallel()

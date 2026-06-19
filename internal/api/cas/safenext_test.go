@@ -4,7 +4,7 @@ import "testing"
 
 // safeNext is the open-redirect guard for the post-login `next` query
 // parameter. A regression here is a phishing vector, so we test it
-// exhaustively. The rule is simple: same-origin paths only — must
+// exhaustively. The rule is simple: same-origin paths only, must
 // begin with exactly one "/", no scheme, no protocol-relative URLs,
 // no CR/LF, no backslash.
 func TestSafeNext(t *testing.T) {
@@ -48,7 +48,7 @@ func TestSafeNext(t *testing.T) {
 		{"crlf_in_path", "/admin\r\nfoo", ""},
 
 		// Rejected: backslash
-		// Some user-agents treat "\" as "/" — especially on Windows,
+		// Some user-agents treat "\" as "/", especially on Windows,
 		// which can flip "/\evil.com" into "//evil.com" after browser
 		// normalisation. Reject defensively.
 		{"backslash_path", "/\\evil.com", ""},

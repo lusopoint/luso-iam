@@ -8,15 +8,15 @@ import (
 
 //go:embed templates/consent.html
 var oidcTemplatesFS embed.FS
-
 var oidcTemplates = template.Must(
 	template.ParseFS(oidcTemplatesFS, "templates/consent.html"),
 )
 
-// consentData is the template data for the consent screen.
-// All form values are round-tripped as hidden inputs so the POST handler
-// has everything it needs without a server-side session lookup.
+// consentData is the template data for the consent screen
+// all form values are round-tripped as hidden inputs so the POST handler
+// has everything it needs without a server-side session lookup
 type consentData struct {
+	CSRFToken   string
 	ClientName  string
 	Scopes      []string
 	ClientID    string

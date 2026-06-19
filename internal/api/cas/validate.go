@@ -10,17 +10,8 @@ import (
 	pkgcas "github.com/lusopoint/lusoiam/pkg/cas"
 )
 
-// CAS 1.0
-
-// v1Validate handles GET /cas/validate (CAS 1.0 protocol).
-//
-// Response format (always HTTP 200):
-//
-//	"yes\n<username>\n"  on success
-//	"no\n\n"             on any failure
-//
 // CAS 1.0 is retained for legacy clients. New integrations should use
-// /cas/serviceValidate or /cas/p3/serviceValidate.
+// /cas/serviceValidate or /cas/p3/serviceValidate
 func (h *Handler) v1Validate(w http.ResponseWriter, r *http.Request) {
 	service := r.URL.Query().Get("service")
 	ticket := r.URL.Query().Get("ticket")
@@ -37,19 +28,9 @@ func (h *Handler) v1Validate(w http.ResponseWriter, r *http.Request) {
 }
 
 // CAS 2.0 / 3.0
-
-// serviceValidate returns an http.HandlerFunc that validates a service
-// ticket and returns a CAS response.
-//
-// When p3 is false (CAS 2.0), the attributes block is omitted.
-// When p3 is true (CAS 3.0), released attributes are included.
-//
-// HTTP status is always 200 — success/failure is communicated in the
-// body per the CAS protocol specification.
-//
 // Response format follows the `format` query parameter:
-//   - `format=json`  → Apereo-compatible JSON
-//   - anything else  → the canonical XML response (default)
+//   - `format=json`  -> Apereo-compatible JSON
+//   - anything else  -> the canonical XML response (default)
 func (h *Handler) serviceValidate(p3 bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		service := r.URL.Query().Get("service")
@@ -77,8 +58,6 @@ func (h *Handler) serviceValidate(p3 bool) http.HandlerFunc {
 		writeSuccess(w, jsonFormat, principalName(result), attrs)
 	}
 }
-
-// Response writers
 
 // writeSuccess dispatches to JSON or XML based on the format flag.
 func writeSuccess(w http.ResponseWriter, jsonFormat bool, user string, attrs map[string]string) {
@@ -110,9 +89,6 @@ func writeFailure(w http.ResponseWriter, jsonFormat bool, code, message string) 
 	writeXMLFailure(w, code, message)
 }
 
-// writeJSON sends a JSON body with the standard CAS no-store headers.
-// HTTP 200 is required by the protocol even for ticket-validation
-// failures — clients read success/failure from the body.
 func writeJSON(w http.ResponseWriter, body []byte) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -143,10 +119,7 @@ func writeXMLFailure(w http.ResponseWriter, code, message string) {
 	_ = enc.Encode(pkgcas.NewFailure(code, message))
 }
 
-// Domain helpers
-
-// principalName returns the CAS principal identifier for the user.
-// Prefers username, falls back to email.
+// principalName returns the CAS principal identifier for the user
 func principalName(result *authcas.ValidationResult) string {
 	if result.User.Username != nil && *result.User.Username != "" {
 		return *result.User.Username
@@ -195,7 +168,7 @@ func releaseAttributes(result *authcas.ValidationResult) map[string]string {
 
 // casErrorToXML maps auth/cas sentinel errors to CAS protocol failure
 // codes and human-readable messages. The detail level is intentionally
-// low to avoid leaking information to service back-channels.
+// low to avoid leaking information to service back-channels
 func casErrorToXML(err error) (code, message string) {
 	switch {
 	case errors.Is(err, authcas.ErrInvalidTicket):
