@@ -39,7 +39,7 @@ export default function Keys() {
     <>
       <PageHeader
         title="Signing keys"
-        subtitle="Active keys used to sign OIDC id_tokens. Rotation arrives in P7."
+        subtitle="Active keys used to sign OIDC id_tokens. Use `make rotate-key` to generate a new key file."
       />
 
       {error ? (
@@ -55,10 +55,11 @@ export default function Keys() {
                   <th className="table-th">Key ID</th>
                   <th className="table-th">Algorithm</th>
                   <th className="table-th">Role</th>
+                  <th className="table-th">Source</th>
                 </tr>
               </thead>
               <tbody>
-                {keys.map((k, idx) => (
+                {keys.map((k) => (
                   <tr key={k.kid} className="table-row">
                     <td className="table-td">
                       <code className="font-mono text-xs">{k.kid}</code>
@@ -67,11 +68,16 @@ export default function Keys() {
                       <span className="badge-slate">{k.alg}</span>
                     </td>
                     <td className="table-td">
-                      {idx === 0 ? (
-                        <span className="badge-green">active</span>
+                      {k.primary ? (
+                        <span className="badge-green">primary</span>
                       ) : (
-                        <span className="badge-slate">validation-only</span>
+                        <span className="badge-slate">retiring</span>
                       )}
+                    </td>
+                    <td className="table-td">
+                      <code className="font-mono text-xs text-slate-500 dark:text-slate-400">
+                        {k.source || "—"}
+                      </code>
                     </td>
                   </tr>
                 ))}
