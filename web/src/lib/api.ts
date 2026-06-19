@@ -51,6 +51,23 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     body = JSON.stringify(opts.body);
   }
 
+  // CSRF: the server's middleware issues an `iam_csrf` cookie that the
+  // SPA must echo as X-CSRF-Token on every state-mutating request. We
+  // attach it on POST/PATCH/DELETE only; GET requests don't get checked
+  // server-side so the header would be wasted bytes there.
+  //
+  // The cookie is intentionally NOT HttpOnly so document.cookie can read
+  // it — this is the standard double-submit pattern. Same-origin XSS
+  // could read it too, but same-origin XSS already has full session
+  // access via the session cookie; CSRF protects against cross-origin
+  // attacks, not on-page code execution.
+  if (method !== "GET") {
+    const token = readCSRFCookie();
+    if (token) {
+      headers["X-CSRF-Token"] = token;
+    }
+  }
+
   const res = await fetch(url, {
     method,
     headers,
@@ -99,6 +116,27 @@ function buildURL(path: string, query?: RequestOpts["query"]): string {
 
 function isProblem(v: unknown): v is ApiProblem {
   return typeof v === "object" && v !== null && "status" in v && "title" in v;
+}
+
+/**
+ * Reads the iam_csrf cookie from document.cookie. Returns "" when the
+ * cookie isn't set yet — typically only on the very first page load
+ * before any GET has bounced through the CSRF middleware.
+ *
+ * Hand-parses document.cookie because the standard says cookie values
+ * can contain "=" (base64url tokens may end with padding, though ours
+ * don't) and the simple split-on-"=" approach is wrong in general.
+ */
+function readCSRFCookie(): string {
+  const name = "iam_csrf=";
+  const cookies = document.cookie.split(";");
+  for (const c of cookies) {
+    const trimmed = c.trimStart();
+    if (trimmed.startsWith(name)) {
+      return trimmed.slice(name.length);
+    }
+  }
+  return "";
 }
 
 /* ─── Resource-level helpers ─────────────────────────────────────────────

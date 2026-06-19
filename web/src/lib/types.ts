@@ -184,6 +184,14 @@ export interface ListAuditResponse {
 export interface SigningKey {
   kid: string;
   alg: string;
+  // primary=true marks the key currently used for signing new tokens.
+  // Other entries are "retiring" — kept in JWKS so already-issued
+  // tokens still verify until they expire, then removed by operator
+  // after the next rotation grace period.
+  primary: boolean;
+  // source is the filename the key was loaded from (multi-key directory
+  // mode). Empty for single-file mode and ephemeral keys.
+  source?: string;
 }
 
 /** RFC 7807 problem envelope returned by every admin API on error. */
