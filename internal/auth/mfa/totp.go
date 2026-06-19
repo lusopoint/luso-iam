@@ -16,26 +16,23 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// TOTPSecret is what the enrollment UI needs to display: the human-
-// readable base32 secret (for manual entry) and a data:image/png QR
-// code (for scanning). The method ID is opaque — the UI returns it
-// with the verification code to confirm enrollment.
+// TOTPSecret is what the enrollment UI needs to display data:image/png QR code (for scanning)
 type TOTPSecret struct {
 	MethodID   pgtype.UUID
-	Base32     string // the shared secret, base32-encoded
+	Base32     string // the shared secret
 	OTPAuthURL string // otpauth://totp/Issuer:account?secret=...
 	QRCodeData string // data:image/png;base64,... for <img src=...>
 }
 
-// totpDigits — 6 digits is the universal default.
+// totpDigits 6 digits is the universal default
 const totpDigits = otp.DigitsSix
 
-// totpPeriod — 30 seconds is the RFC 6238 default.
+// totpPeriod 30 seconds is the RFC 6238 default
 const totpPeriod = uint(30)
 
 // BeginTOTPEnrollment generates a new TOTP secret for the user and
-// persists an unconfirmed row. The user must verify a generated code
-// to call ConfirmTOTPEnrollment, which marks the method usable.
+// persists an unconfirmed row, the user must verify a generated code
+// to call ConfirmTOTPEnrollment, which marks the method usable
 func (s *Service) BeginTOTPEnrollment(ctx context.Context, userID pgtype.UUID, accountLabel, label string) (*TOTPSecret, error) {
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      s.totpIssuer,
@@ -48,8 +45,8 @@ func (s *Service) BeginTOTPEnrollment(ctx context.Context, userID pgtype.UUID, a
 		return nil, fmt.Errorf("generate totp key: %w", err)
 	}
 
-	// Render the QR as an inline PNG data URL — avoids an extra request
-	// and works without any client-side QR library.
+	// render the QR as an inline PNG data URL, avoids an extra request
+	// and works without any QR library
 	img, err := key.Image(240, 240)
 	if err != nil {
 		return nil, fmt.Errorf("render qr image: %w", err)
@@ -83,8 +80,8 @@ func (s *Service) BeginTOTPEnrollment(ctx context.Context, userID pgtype.UUID, a
 }
 
 // ConfirmTOTPEnrollment verifies code against the secret stored on the
-// given unconfirmed method and, on success, marks the method confirmed.
-// Once confirmed, the method counts toward the user's MFA requirement.
+// given unconfirmed method and, on success, marks the method confirmed
+// once confirmed, the method counts toward the users MFA requirement
 func (s *Service) ConfirmTOTPEnrollment(ctx context.Context, methodID pgtype.UUID, code string) error {
 	method, err := s.store.GetMFAMethod(ctx, methodID)
 	if err != nil {
@@ -106,14 +103,14 @@ func (s *Service) ConfirmTOTPEnrollment(ctx context.Context, methodID pgtype.UUI
 	return nil
 }
 
-// VerifyTOTP is called during a login challenge. It walks every
-// confirmed TOTP method for the user and accepts on the first match.
-// On success, returns the method id used so we can bump last_used_at.
+// VerifyTOTP is called during a login challenge, it walks every confirmed TOTP
+// method for the user and accepts on the first match
+// on success, returns the method id used so we can bump last_used_at
 //
-// The single-validation-step is intentional: TOTP codes are short
+// the single-validation-step is intentional: TOTP codes are short
 // (1M possibilities) so we apply an aggressive per-challenge attempt
-// limit higher up the stack (in the HTTP handler) rather than trying
-// to track per-method failures here.
+// limit higher up the stack (in the http handler) rather than trying
+// to track per-method failures here
 func (s *Service) VerifyTOTP(ctx context.Context, userID pgtype.UUID, code string) (*postgres.UserMFAMethod, error) {
 	methods, err := s.store.ListConfirmedMFAMethods(ctx, userID)
 	if err != nil {
@@ -131,8 +128,7 @@ func (s *Service) VerifyTOTP(ctx context.Context, userID pgtype.UUID, code strin
 			Algorithm: otp.AlgorithmSHA1,
 		})
 		if err != nil {
-			// Malformed code or secret — treat as a verification failure,
-			// not a system error.
+			// malformed code or secret, treat as a verification failure not a system error
 			continue
 		}
 		if valid {

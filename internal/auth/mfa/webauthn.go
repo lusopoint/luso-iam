@@ -14,11 +14,11 @@ import (
 )
 
 // webauthnUser adapts a postgres.User + its credentials to the
-// webauthn.User interface required by the library. Credentials are
-// loaded lazily from the store on each ceremony — never cached, so
-// revocations take effect immediately.
+// webauthn.User interface required by the library
+// credentials are loaded lazily from the store on each ceremony never cached
+// so revocations take effect immediately
 type webauthnUser struct {
-	id          []byte // raw 16-byte UUID — the WebAuthn user handle
+	id          []byte // raw 16-byte UUID the WebAuthn user handle
 	name        string // username for the credential
 	displayName string
 	creds       []wa.Credential
@@ -31,14 +31,13 @@ func (u *webauthnUser) WebAuthnCredentials() []wa.Credential { return u.creds }
 func (u *webauthnUser) WebAuthnIcon() string                 { return "" } // deprecated in spec
 
 // buildWebAuthnUser loads the user and all confirmed WebAuthn methods
-// from the store, decoding each stored credential JSON.
 func (s *Service) buildWebAuthnUser(ctx context.Context, user *postgres.User) (*webauthnUser, []postgres.UserMFAMethod, error) {
 	methods, err := s.store.ListConfirmedMFAMethods(ctx, user.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list methods: %w", err)
 	}
 
-	// Filter to webauthn only and decode each credential blob.
+	// filter to webauthn only and decode each credential blob
 	creds := make([]wa.Credential, 0, len(methods))
 	keep := make([]postgres.UserMFAMethod, 0, len(methods))
 	for _, m := range methods {
@@ -47,8 +46,7 @@ func (s *Service) buildWebAuthnUser(ctx context.Context, user *postgres.User) (*
 		}
 		var c wa.Credential
 		if err := json.Unmarshal(m.Credential, &c); err != nil {
-			// Don't fail the whole ceremony; log later when we have a logger
-			// in scope. For now skip the malformed row.
+			// do not fail the whole ceremony we should log when we have a proper logger
 			continue
 		}
 		creds = append(creds, c)
@@ -74,16 +72,12 @@ func (s *Service) buildWebAuthnUser(ctx context.Context, user *postgres.User) (*
 	}, keep, nil
 }
 
-// Registration
-
-// webauthnSessionCookieName carries the SessionData (challenge) between
-// the Begin and Finish steps of a ceremony. Cookie is signed.
 const webauthnSessionCookieName = "iam_webauthn_session"
 
-// BeginWebAuthnRegistration starts the registration ceremony for a user.
-// Returns the CredentialCreation options to send to the browser's
-// navigator.credentials.create() call. The opaque session blob must be
-// round-tripped to FinishWebAuthnRegistration via the response writer.
+// BeginWebAuthnRegistration starts the registration ceremony for a user
+// returns the CredentialCreation options to send to the browsers
+// navigator.credentials.create() call, the opaque session blob must be
+// round-tripped to FinishWebAuthnRegistration via the response writer
 func (s *Service) BeginWebAuthnRegistration(
 	ctx context.Context, w http.ResponseWriter, user *postgres.User, secure bool,
 ) (*protocol.CredentialCreation, error) {
@@ -108,9 +102,8 @@ func (s *Service) BeginWebAuthnRegistration(
 }
 
 // FinishWebAuthnRegistration completes the registration ceremony by
-// verifying the browser's attestation response against the saved
-// SessionData. On success it persists the new credential as a confirmed
-// WebAuthn method.
+// verifying the browsers attestation response against the saved SessionData
+// on success it persists the new credential as a confirmed WebAuthn method
 func (s *Service) FinishWebAuthnRegistration(
 	ctx context.Context, r *http.Request, w http.ResponseWriter, user *postgres.User, label string,
 ) (*postgres.UserMFAMethod, error) {
@@ -138,7 +131,7 @@ func (s *Service) FinishWebAuthnRegistration(
 		return nil, fmt.Errorf("verify attestation: %w", err)
 	}
 
-	// Clear the session cookie now that we're done with it.
+	// clear the session cookie now that we are done with it
 	s.clearWebAuthnSession(w, secureFromRequest(r))
 
 	blob, err := json.Marshal(cred)
@@ -163,11 +156,9 @@ func (s *Service) FinishWebAuthnRegistration(
 	return method, nil
 }
 
-// Authentication
-
-// BeginWebAuthnLogin starts the assertion ceremony for an already-known
-// user (i.e. they typed their password first). Returns the
-// CredentialAssertion options for navigator.credentials.get().
+// BeginWebAuthnLogin starts the assertion ceremony for an already-known user
+// example when they aredy had typed their password
+// Returns the CredentialAssertion options for navigator.credentials.get()
 func (s *Service) BeginWebAuthnLogin(
 	ctx context.Context, w http.ResponseWriter, user *postgres.User, secure bool,
 ) (*protocol.CredentialAssertion, error) {
@@ -193,9 +184,9 @@ func (s *Service) BeginWebAuthnLogin(
 	return opts, nil
 }
 
-// FinishWebAuthnLogin completes the assertion ceremony. On success it
-// returns the matching credential's method id so the caller can update
-// last_used_at and the sign counter.
+// FinishWebAuthnLogin completes the assertion ceremony, on success it
+// returns the matching credentials method id so the caller can update
+// last_used_at and the sign counter
 func (s *Service) FinishWebAuthnLogin(
 	ctx context.Context, r *http.Request, w http.ResponseWriter, user *postgres.User,
 ) (*postgres.UserMFAMethod, error) {
@@ -224,7 +215,7 @@ func (s *Service) FinishWebAuthnLogin(
 	}
 	s.clearWebAuthnSession(w, secureFromRequest(r))
 
-	// Find the matching method row to update its counter.
+	// find the matching method row to update its counter
 	for i := range methods {
 		var stored wa.Credential
 		if err := json.Unmarshal(methods[i].Credential, &stored); err != nil {
@@ -236,14 +227,11 @@ func (s *Service) FinishWebAuthnLogin(
 			return &methods[i], nil
 		}
 	}
-	// Library verified it, but we can't find the row — should never happen.
+	// library verified it, but we can't find the row should never happen
 	return nil, errors.New("mfa: webauthn credential not found after verification")
 }
 
-// Session cookie helpers
-
-// writeWebAuthnSession persists the ceremony state in a signed cookie.
-// The blob is small (~200 bytes) so a cookie is the simplest store.
+// writeWebAuthnSession persists the ceremony state in a signed cookie
 func (s *Service) writeWebAuthnSession(w http.ResponseWriter, secure bool, sd *wa.SessionData) error {
 	blob, err := json.Marshal(sd)
 	if err != nil {
@@ -253,7 +241,7 @@ func (s *Service) writeWebAuthnSession(w http.ResponseWriter, secure bool, sd *w
 		Name:     webauthnSessionCookieName,
 		Value:    s.signer.Sign(string(blob)),
 		Path:     "/",
-		MaxAge:   300, // 5 min — long enough for a touch, short enough to limit abuse
+		MaxAge:   300, // 5 min long enough for a touch, short enough to limit abuse
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
@@ -290,8 +278,8 @@ func (s *Service) clearWebAuthnSession(w http.ResponseWriter, secure bool) {
 }
 
 // secureFromRequest infers whether to set the Secure flag based on the
-// request scheme — used when we don't have the config-derived value in
-// scope. TLS on r or X-Forwarded-Proto=https both qualify.
+// request scheme used when we don't have the config-derived value in scope
+// TLS on r or X-Forwarded-Proto=https both qualify
 func secureFromRequest(r *http.Request) bool {
 	if r.TLS != nil {
 		return true

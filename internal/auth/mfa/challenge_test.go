@@ -13,7 +13,7 @@ import (
 )
 
 // testSigner returns a CookieSigner with a fixed test key. Determinism
-// in tests is more valuable than entropy here — the goal is to verify
+// in tests is more valuable than entropy here the goal is to verify
 // our cookie logic, not the underlying HMAC implementation.
 func testSigner() *crypto.CookieSigner {
 	return crypto.NewCookieSigner("test-key-test-key-test-key-test!")
@@ -59,7 +59,7 @@ func TestChallengeRoundTrip(t *testing.T) {
 		NextURL:   "/admin/users",
 		Methods:   []string{"totp", "webauthn"},
 		HasBackup: true,
-		// Expires is set by IssueChallenge — leave zero.
+		// Expires is set by IssueChallenge, leave zero
 	}
 	got := roundTrip(t, in)
 
@@ -121,7 +121,7 @@ func TestChallengeBadSignature(t *testing.T) {
 
 // TestChallengeTamperedCookie: flipping a byte breaks the signature.
 // Distinct from BadSignature because here the signer is the right one
-// — the attacker just modified the cookie value in transit.
+// - the attacker just modified the cookie value in transit.
 func TestChallengeTamperedCookie(t *testing.T) {
 	t.Parallel()
 	signer := testSigner()
@@ -151,7 +151,7 @@ func TestChallengeTamperedCookie(t *testing.T) {
 
 // TestChallengeExpired: a challenge whose Expires field is in the past
 // must be rejected. We build the cookie manually here because
-// IssueChallenge always uses now+TTL — going around it gives us the
+// IssueChallenge always uses now+TTL, going around it gives us the
 // fine-grained timestamp control the test needs.
 func TestChallengeExpired(t *testing.T) {
 	t.Parallel()
@@ -193,7 +193,7 @@ func TestClearChallenge(t *testing.T) {
 }
 
 // TestChallengeSecureFlag: when secure=true, the Secure attribute is
-// set; when false, it isn't. Matters for prod-vs-dev — sending a
+// set; when false, it isn't. Matters for prod-vs-dev, sending a
 // Secure cookie over plain HTTP would silently lose the session.
 func TestChallengeSecureFlag(t *testing.T) {
 	t.Parallel()
@@ -209,7 +209,7 @@ func TestChallengeSecureFlag(t *testing.T) {
 			if cookies[0].Secure != secure {
 				t.Errorf("Secure flag: got %v, want %v", cookies[0].Secure, secure)
 			}
-			// HttpOnly is always on — not a configuration knob.
+			// HttpOnly is always on, not a configuration knob.
 			if !cookies[0].HttpOnly {
 				t.Error("HttpOnly must always be true")
 			}

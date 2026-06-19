@@ -1,6 +1,3 @@
-// Package mfa implements multi-factor authentication: TOTP, WebAuthn,
-// and backup codes. It exposes a Service that the CAS and OIDC login
-// flows use to gate access on enrolled second factors.
 package mfa
 
 import (
@@ -13,46 +10,28 @@ import (
 	"github.com/lusopoint/lusoiam/internal/crypto"
 )
 
-// ChallengeCookieName is the cookie carrying the signed pending-MFA state.
 const ChallengeCookieName = "iam_mfa_challenge"
 
-// challengeTTL is the maximum time a user has to complete MFA after
-// password authentication. Short enough to limit attack windows; long
-// enough for users to fetch a code from their phone.
+// challengeTTL is the maximum time a user has to complete mfa after password authentication
+// short enough to limit attack windows, long enough for users to fetch a code from their phone
 const challengeTTL = 5 * time.Minute
 
-// ErrNoChallenge means the cookie was missing, malformed, signature
-// invalid, or expired. From the caller's perspective these are
-// indistinguishable — the user must re-authenticate from scratch.
+// ErrNoChallenge means the cookie was missing, malformed, signature invalid, or expired
 var ErrNoChallenge = errors.New("mfa: no pending challenge")
 
-// Challenge is the state we round-trip between password authentication
-// and MFA verification. Stored client-side in an HMAC-signed cookie so
-// the server is stateless across the gap.
+// Challenge is the state layer between password authentication and MFA verification
 type Challenge struct {
-	UserID string `json:"u"`
-
-	// CAS service URL (may be empty)
-	Service string `json:"svc"`
-
-	// post-MFA redirect (used by /oauth2/authorize)
-	NextURL string `json:"next"`
-
-	// post-MFA cross-origin redirect (used by /proxy/verify); pre-validated by caller
-	Redirect string `json:"rd"`
-
-	// enrolled method types: "totp", "webauthn"
-	Methods []string `json:"m"`
-
-	// user has backup codes
-	HasBackup bool `json:"bk"`
-
-	// unix seconds
-	Expires int64 `json:"exp"`
+	UserID    string   `json:"u"`
+	Service   string   `json:"svc"`  // CAS service URL (may be empty)
+	NextURL   string   `json:"next"` // post-MFA same-origin redirect (used by /oauth2/authorize)
+	Redirect  string   `json:"rd"`   // post-MFA cross-origin redirect (used by /proxy/verify), pre-validated by caller
+	Methods   []string `json:"m"`    // enrolled method types: "totp", "webauthn"
+	HasBackup bool     `json:"bk"`   // user has backup codes
+	Expires   int64    `json:"exp"`
 }
 
-// IssueChallenge signs a Challenge into a cookie on w. Sets a 5-minute
-// MaxAge with HttpOnly + SameSite=Lax. Secure controls the Secure flag.
+// IssueChallenge signs a Challenge into a cookie on request writer
+// sets a 5 minute MaxAge with HttpOnly + SameSite=Lax, secure controls the Secure flag
 func IssueChallenge(w http.ResponseWriter, signer *crypto.CookieSigner, secure bool, c Challenge) error {
 	c.Expires = time.Now().Add(challengeTTL).Unix()
 	payload, err := json.Marshal(c)
@@ -71,11 +50,11 @@ func IssueChallenge(w http.ResponseWriter, signer *crypto.CookieSigner, secure b
 	return nil
 }
 
-// ReadChallenge extracts the Challenge from r. Returns ErrNoChallenge
-// for any failure — never leak which step failed.
+// ReadChallenge extracts the Challenge from request
 func ReadChallenge(r *http.Request, signer *crypto.CookieSigner) (*Challenge, error) {
 	cookie, err := r.Cookie(ChallengeCookieName)
 	if err != nil {
+		// ErrNoChallenge for any failure, never leak which step failed
 		return nil, ErrNoChallenge
 	}
 	payload, err := signer.Verify(cookie.Value)
@@ -92,7 +71,7 @@ func ReadChallenge(r *http.Request, signer *crypto.CookieSigner) (*Challenge, er
 	return &c, nil
 }
 
-// ClearChallenge removes the cookie. Idempotent.
+// ClearChallenge removes the cookie
 func ClearChallenge(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     ChallengeCookieName,
