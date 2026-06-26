@@ -94,3 +94,14 @@ func (s *Store) DeleteEmailVerificationTokensForUser(ctx context.Context, userID
 	}
 	return nil
 }
+
+// DeleteExpiredEmailVerificationTokens helper for the cleanup service
+// it removes tokens that expired more than an hour ago
+func (s *Store) DeleteExpiredEmailVerificationTokens(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM email_verification_tokens WHERE expires_at < now() - interval '1 hour'`)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired email_verification_tokens: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}

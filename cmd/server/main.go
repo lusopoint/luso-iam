@@ -399,6 +399,9 @@ func run() error {
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
 
+	// background cleanup service
+	startCleanupService(ctx, store, logger)
+
 	// serve until signalled
 	errCh := make(chan error, 1)
 	go func() {
@@ -426,6 +429,76 @@ func run() error {
 	}
 	logger.Info("shutdown complete")
 	return nil
+}
+
+// cleanupInterval is how often the background will clean up expired rows
+// TODO: should we make this an env variable?
+const cleanupInterval = 30 * time.Minute
+
+// startCleanupService, goroutine that periodically deletes expired tokens
+// from tables that use tickets, sessions and other
+// revoked tokens are maintained until expired (expired_at < now())
+// we also keeps 1h expired grace window, meaning that if the
+// expired_at < now() we also give 1h (expired_at < now() - 1h interval)
+func startCleanupService(ctx context.Context, store *postgres.Store, logger *slog.Logger) {
+	go func() {
+		ticket := time.NewTicker(cleanupInterval)
+		defer ticket.Stop()
+
+		// execute one full cleanup pass
+		runSweep := func() {
+			// so the query does not get stuck and runs forever
+			sweepCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
+
+			// oidc tokens
+			if n, err := store.DeleteExpiredOIDCTokens(sweepCtx); err != nil {
+				logger.Error("cleanup: oidc token sweep failed", "err", err)
+			} else if n > 0 {
+				logger.Error("cleanup: swept expired oidc tokens", "rows", n)
+			}
+
+			// cas tickets
+			if n, err := store.DeleteExpiredCASTickets(sweepCtx); err != nil {
+				logger.Error("cleanup: cas ticket sweep failed", "err", err)
+			} else if n > 0 {
+				logger.Info("cleanup: swept expired cas tickets", "rows", n)
+			}
+
+			// password reset tokens
+			if n, err := store.DeleteExpiredPasswordResetTokens(sweepCtx); err != nil {
+				logger.Error("cleanup: password reset token sweep failed", "err", err)
+			} else if n > 0 {
+				logger.Info("cleanup: swept expired password reset tokens", "rows", n)
+			}
+
+			// email verification tokens
+			if n, err := store.DeleteExpiredEmailVerificationTokens(sweepCtx); err != nil {
+				logger.Error("cleanup: email verification token sweep failed", "err", err)
+			} else if n > 0 {
+				logger.Info("cleanup: swept expired email verification tokens", "rows", n)
+			}
+
+			// session tokens
+			if n, err := store.DeleteExpiredSessions(sweepCtx); err != nil {
+				logger.Error("cleanup: session sweep failed", "err", err)
+			} else if n > 0 {
+				logger.Info("cleanup: swept expired sessions", "rows", n)
+			}
+		}
+
+		logger.Info("clenup: started", "interval", cleanupInterval)
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("cleanup: stopped")
+				return
+			case <-ticket.C:
+				runSweep()
+			}
+		}
+	}()
 }
 
 // buildRegistry constructs the federation provider registry from config
