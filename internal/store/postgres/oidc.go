@@ -279,18 +279,22 @@ func (s *Store) RevokeAllRefreshTokensForSession(ctx context.Context, sessionID 
 	return err
 }
 
-// DeleteExpiredOIDCTokens is a maintenance helper for a periodic job
-func (s *Store) DeleteExpiredOIDCTokens(ctx context.Context) error {
+// DeleteExpiredOIDCTokens helper for the cleanup service it removes auth codes
+// access tokens, and refresh tokens that expired more than an hour ago
+func (s *Store) DeleteExpiredOIDCTokens(ctx context.Context) (int64, error) {
 	// keep 1h post-expiry for audit
 	cutoff := time.Now().Add(-time.Hour)
+	var total int64
 	for _, q := range []string{
 		`DELETE FROM oidc_auth_codes WHERE expires_at < $1`,
 		`DELETE FROM oidc_access_tokens WHERE expires_at < $1`,
 		`DELETE FROM oidc_refresh_tokens WHERE expires_at < $1`,
 	} {
-		if _, err := s.pool.Exec(ctx, q, cutoff); err != nil {
-			return err
+		tag, err := s.pool.Exec(ctx, q, cutoff)
+		if err != nil {
+			return total, err
 		}
+		total += tag.RowsAffected()
 	}
-	return nil
+	return total, nil
 }

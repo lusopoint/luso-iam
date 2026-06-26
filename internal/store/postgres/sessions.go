@@ -87,3 +87,15 @@ func (s *Store) RevokeSession(ctx context.Context, id pgtype.UUID) error {
 	}
 	return nil
 }
+
+// DeleteExpiredSessions helper for the cleanup service
+// it removes sessions whose absolute expiry passed more than an hour ago
+// deletion is keyed on expires_at only, never on revoked_at
+func (s *Store) DeleteExpiredSessions(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM sessions WHERE expires_at < now() - interval '1 hour'`)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired sessions: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}

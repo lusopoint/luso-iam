@@ -77,3 +77,14 @@ func (s *Store) DeletePasswordResetTokensForUser(ctx context.Context, userID pgt
 	}
 	return nil
 }
+
+// DeleteExpiredPasswordResetTokens helper for the cleanup service
+// it removes tokens that expired more than an hour ago
+func (s *Store) DeleteExpiredPasswordResetTokens(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM password_reset_tokens WHERE expires_at < now() - interval '1 hour'`)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired password_reset_tokens: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
