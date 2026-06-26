@@ -473,6 +473,8 @@ func startCleanupService(ctx context.Context, store *postgres.Store, logger *slo
 			}
 
 			// email verification tokens
+			// note that once the token is consumed we delete the token automatically
+			// but here this routine takes care of cases where the token is abandon and never used
 			if n, err := store.DeleteExpiredEmailVerificationTokens(sweepCtx); err != nil {
 				logger.Error("cleanup: email verification token sweep failed", "err", err)
 			} else if n > 0 {
