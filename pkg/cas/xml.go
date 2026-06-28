@@ -30,15 +30,15 @@ const XMLNamespace = "http://www.yale.edu/tp/cas"
 //	  </cas:authenticationSuccess>
 //	</cas:serviceResponse>
 type SuccessResponse struct {
-	XMLName    xml.Name
-	Namespace  string                  `xml:"xmlns:cas,attr"`
-	Success    SuccessBody             `xml:"cas:authenticationSuccess"`
+	XMLName   xml.Name
+	Namespace string      `xml:"xmlns:cas,attr"`
+	Success   SuccessBody `xml:"cas:authenticationSuccess"`
 }
 
 // SuccessBody is the inner <cas:authenticationSuccess>.
 type SuccessBody struct {
-	User       string                  `xml:"cas:user"`
-	Attributes *AttributesBody         `xml:"cas:attributes,omitempty"`
+	User       string          `xml:"cas:user"`
+	Attributes *AttributesBody `xml:"cas:attributes,omitempty"`
 }
 
 // AttributesBody is the optional <cas:attributes> block emitted only
@@ -64,8 +64,8 @@ type Attribute struct {
 //	</cas:serviceResponse>
 type FailureResponse struct {
 	XMLName   xml.Name
-	Namespace string         `xml:"xmlns:cas,attr"`
-	Failure   FailureBody    `xml:"cas:authenticationFailure"`
+	Namespace string      `xml:"xmlns:cas,attr"`
+	Failure   FailureBody `xml:"cas:authenticationFailure"`
 }
 
 // FailureBody is the inner <cas:authenticationFailure>.
