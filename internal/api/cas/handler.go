@@ -14,6 +14,7 @@ import (
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 	"github.com/lusopoint/lusoiam/internal/crypto"
 	"github.com/lusopoint/lusoiam/internal/federation"
+	"github.com/lusopoint/lusoiam/internal/metrics"
 )
 
 // Handler holds the dependencies for all CAS HTTP endpoints
@@ -26,6 +27,8 @@ type Handler struct {
 	signer       *crypto.CookieSigner // signs the pending-MFA cookie
 	cookieSecure bool                 // mirrors session cookie Secure flag
 	audit        *audit.Service       // optional: nil disables audit logging
+	// metrics records login outcomes (success, failure and locked)
+	metrics *metrics.Metrics
 	// proxyOrigins is the set of accepted cross-origin redirect targets
 	// for the `rd=` parameter (used by the reverse-proxy companion)
 	proxyOrigins map[string]struct{}
@@ -51,6 +54,8 @@ type Config struct {
 	Signer       *crypto.CookieSigner // required when MFA is set
 	CookieSecure bool
 	Audit        *audit.Service // optional: events are silently dropped when nil
+	// Metrics records login outcomes for Prometheus
+	Metrics *metrics.Metrics
 	// ProxyCallbackOrigins enumerates the cross-origin URLs that may
 	// appear in the `rd=` query parameter on /cas/login. The proxy
 	// companion (/proxy/verify) uses the same allowlist; both lists
@@ -84,6 +89,7 @@ func New(cfg Config) *Handler {
 		signer:         cfg.Signer,
 		cookieSecure:   cfg.CookieSecure,
 		audit:          cfg.Audit,
+		metrics:        cfg.Metrics,
 		proxyOrigins:   origins,
 		providerLabels: cfg.ProviderLabels,
 		signupEnabled:  cfg.SignupEnabled,

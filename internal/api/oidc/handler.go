@@ -7,6 +7,7 @@ import (
 
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 	"github.com/lusopoint/lusoiam/internal/crypto"
+	"github.com/lusopoint/lusoiam/internal/metrics"
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 	pkgoidc "github.com/lusopoint/lusoiam/pkg/oidc"
 )
@@ -17,12 +18,14 @@ type Handler struct {
 	sessions *session.Service
 	baseURL  string
 	disco    pkgoidc.DiscoveryDocument // built once at startup
+	metrics  *metrics.Metrics
 }
 type Config struct {
 	Service  *oidcsvc.Service
 	Keys     *crypto.KeyManager
 	Sessions *session.Service
 	BaseURL  string
+	Metrics  *metrics.Metrics
 }
 
 func New(cfg Config) *Handler {
@@ -31,6 +34,7 @@ func New(cfg Config) *Handler {
 		keys:     cfg.Keys,
 		sessions: cfg.Sessions,
 		baseURL:  cfg.BaseURL,
+		metrics:  cfg.Metrics,
 	}
 	h.disco = h.buildDiscovery()
 	return h
