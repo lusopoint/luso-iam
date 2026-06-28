@@ -3,7 +3,7 @@
         migrate-up migrate-down migrate-new \
         web-install web-build web-dev web-clean \
         keygen rotate-key seed-client grant-admin seed-user \
-        prod-build prod-run prod-push
+        prod-build prod-run prod-push vuln vuln-web
 
 # TODO: should we just trust the one on the .env?
 DATABASE_URL ?= postgres://iam:iam@localhost:5432/iam?sslmode=disable
@@ -137,3 +137,9 @@ prod-run: ## Boot the production compose stack (postgres + iam + caddy)
 prod-push: ## Push the image (requires IMAGE_TAG to point at a registry)
 	docker push $(IMAGE_TAG)
 
+vuln: ## scan Go dependencies for known vulnerabilities (govulncheck)
+	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@latest
+	govulncheck ./...
+
+vuln-web: ## scan the SPA's production dependencies (npm audit, high+)
+	@cd web && npm audit --omit=dev --audit-level=high

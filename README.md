@@ -162,6 +162,12 @@ This README covers getting the server up. For the deeper setup steps, connecting
 
 ---
 
+## Security
+
+Found a security vulnerability? Please **do not** open a public issue. See
+[SECURITY.md](SECURITY.md) for how to report it privately through GitHub's
+private vulnerability reporting.
+
 ## License
 
 Apache-2.0 License, see [LICENSE](LICENSE).
