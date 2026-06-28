@@ -5,8 +5,8 @@ import "fmt"
 // Registry holds the set of configured upstream providers indexed by slug.
 // Built at startup from config; immutable after that.
 type Registry struct {
-	ordered   []Provider            // insertion order for UI rendering
-	byName    map[string]Provider
+	ordered []Provider // insertion order for UI rendering
+	byName  map[string]Provider
 }
 
 // NewRegistry returns an empty registry.
