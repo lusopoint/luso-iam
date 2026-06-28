@@ -164,4 +164,4 @@ This README covers getting the server up. For the deeper setup steps, connecting
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Apache-2.0 License, see [LICENSE](LICENSE).
