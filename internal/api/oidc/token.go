@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/lusopoint/lusoiam/internal/metrics"
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 )
 
@@ -42,7 +43,7 @@ func (h *Handler) tokenAuthCode(w http.ResponseWriter, r *http.Request, clientID
 		tokenError(w, err)
 		return
 	}
-	writeTokenResponse(w, resp)
+	h.writeTokenResponse(w, resp)
 }
 
 func (h *Handler) tokenRefresh(w http.ResponseWriter, r *http.Request, clientID, clientSecret string) {
@@ -61,7 +62,7 @@ func (h *Handler) tokenRefresh(w http.ResponseWriter, r *http.Request, clientID,
 		tokenError(w, err)
 		return
 	}
-	writeTokenResponse(w, resp)
+	h.writeTokenResponse(w, resp)
 }
 
 func (h *Handler) tokenClientCredentials(w http.ResponseWriter, r *http.Request, clientID, clientSecret string) {
@@ -71,10 +72,10 @@ func (h *Handler) tokenClientCredentials(w http.ResponseWriter, r *http.Request,
 		tokenError(w, err)
 		return
 	}
-	writeTokenResponse(w, resp)
+	h.writeTokenResponse(w, resp)
 }
 
-func writeTokenResponse(w http.ResponseWriter, resp *oidcsvc.TokenResponse) {
+func (h *Handler) writeTokenResponse(w http.ResponseWriter, resp *oidcsvc.TokenResponse) {
 	body := map[string]any{
 		"access_token": resp.AccessToken,
 		"token_type":   resp.TokenType,
@@ -86,6 +87,20 @@ func writeTokenResponse(w http.ResponseWriter, resp *oidcsvc.TokenResponse) {
 	}
 	if resp.RefreshToken != "" {
 		body["refresh_token"] = resp.RefreshToken
+	}
+	// count issued tokens by type all types
+	// (auth_code, refresh, client_credentials) pass through here
+	// we count each token that's actually present in the response
+	if h.metrics != nil {
+		if resp.AccessToken != "" {
+			h.metrics.RecordTokenIssued(metrics.TokenAccess)
+		}
+		if resp.IDToken != "" {
+			h.metrics.RecordTokenIssued(metrics.TokenID)
+		}
+		if resp.RefreshToken != "" {
+			h.metrics.RecordTokenIssued(metrics.TokenRefresh)
+		}
 	}
 	writeJSON(w, http.StatusOK, body)
 }

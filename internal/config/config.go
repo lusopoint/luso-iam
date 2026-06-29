@@ -47,6 +47,9 @@ type Config struct {
 	// closed by default, set SIGNUP_ENABLED=true to open
 	Signup SignupConfig `yaml:"signup"`
 
+	// Metrics controls the /metrics endpoint
+	Metrics MetricsConfig `yaml:"metrics"`
+
 	// Proxy holds settings for the reverse proxy companion endpoint (`/proxy/verify`)
 	// the endpoint is always served, the values below control the cross-origin
 	// redirect back behaviour, when AllowedCallbackOrigins is empty the endpoint
@@ -211,6 +214,11 @@ type SignupConfig struct {
 	TokenTTLHours int `yaml:"token_ttl_hours"`
 }
 
+// MetricsConfig controls the /metrics endpoint
+type MetricsConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 // ProxyConfig configures the /proxy/verify reverse-proxy companion
 // endpoint used by Caddy `forward_auth` or Traefik `ForwardAuth`
 type ProxyConfig struct {
@@ -253,6 +261,7 @@ func defaults() Config {
 			Level:  "info",
 			Format: "text",
 		},
+		Metrics: MetricsConfig{Enabled: true},
 	}
 }
 
@@ -325,6 +334,9 @@ func applyEnv(cfg *Config) {
 	setBool(&cfg.Signup.Enabled, "SIGNUP_ENABLED")
 	setInt(&cfg.Signup.MinPasswordLength, "SIGNUP_MIN_PASSWORD_LENGTH")
 	setInt(&cfg.Signup.TokenTTLHours, "SIGNUP_TOKEN_TTL_HOURS")
+
+	// metrics
+	setBool(&cfg.Metrics.Enabled, "METRICS_ENABLED")
 
 	// federation provider credentials
 	setString(&cfg.Federation.Google.ClientID, "GOOGLE_CLIENT_ID")

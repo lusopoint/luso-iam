@@ -10,6 +10,7 @@ import (
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
 	"github.com/lusopoint/lusoiam/internal/auth/password"
 	"github.com/lusopoint/lusoiam/internal/auth/session"
+	"github.com/lusopoint/lusoiam/internal/metrics"
 	"github.com/lusopoint/lusoiam/internal/middleware"
 )
 
@@ -127,6 +128,16 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 				Metadata: map[string]any{"email": email, "reason": reason},
 			}))
 		}
+		// record the outcome for Prometheus, a locked account is counted
+		// distinctly from an ordinary credential failure so a lockout
+		// spike (attack or misconfiguration) is visible separately
+		if h.metrics != nil {
+			if errors.Is(err, password.ErrAccountLocked) {
+				h.metrics.RecordLogin(metrics.LoginLocked)
+			} else {
+				h.metrics.RecordLogin(metrics.LoginFailure)
+			}
+		}
 		renderLogin(w, http.StatusUnauthorized, loginPageData{
 			CSRFToken:     middleware.CSRFTokenFromContext(r.Context()),
 			Email:         email,
@@ -215,6 +226,14 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 			Actor:    &user.ID,
 			Metadata: map[string]any{"method": "password", "mfa": false},
 		}))
+	}
+
+	// password authentication succeeded, counted here even though the
+	// request may still route to an MFA challenge next: this counter
+	// tracks the credential check, and MFA outcomes are tracked
+	// separately by the MFA handlers own counter
+	if h.metrics != nil {
+		h.metrics.RecordLogin(metrics.LoginSuccess)
 	}
 
 	// force mfa, if the server requires MFA globally but this user

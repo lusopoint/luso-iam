@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	apiadmin "github.com/lusopoint/lusoiam/internal/api/admin"
 	apicas "github.com/lusopoint/lusoiam/internal/api/cas"
 	apifed "github.com/lusopoint/lusoiam/internal/api/federation"
@@ -40,6 +42,7 @@ import (
 	genericoidc "github.com/lusopoint/lusoiam/internal/federation/generic_oidc"
 	"github.com/lusopoint/lusoiam/internal/federation/github"
 	"github.com/lusopoint/lusoiam/internal/federation/google"
+	"github.com/lusopoint/lusoiam/internal/metrics"
 	"github.com/lusopoint/lusoiam/internal/middleware"
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
@@ -106,6 +109,7 @@ func run() error {
 
 	// core services
 	store := postgres.NewStore(pool)
+	met := metrics.New()
 	signer := crypto.NewCookieSigner(cfg.SessionSecret)
 	passwordSvc := password.New(store)
 	sessionSvc := session.New(session.Config{
@@ -213,6 +217,14 @@ func run() error {
 	mux := http.NewServeMux()
 	apihealth.Register(mux, pool)
 
+	// metrics, the instance is always constructed
+	// metrics is exposed by default and can be disabled
+	met.BindPool(poolStatAdapter{pool})
+	if cfg.Metrics.Enabled {
+		mux.Handle("GET /metrics", met.Handler())
+		logger.Info("metrics: enabled at /metrics")
+	}
+
 	// CAS 1.0 / 2.0 / 3.0
 	providerLabels := map[string]string{}
 	for _, p := range cfg.Federation.OIDC {
@@ -232,6 +244,7 @@ func run() error {
 		ProxyCallbackOrigins: cfg.Proxy.AllowedCallbackOrigins,
 		ProviderLabels:       providerLabels,
 		SignupEnabled:        cfg.Signup.Enabled,
+		Metrics:              met,
 	}).Register(mux)
 
 	// reverse-proxy
@@ -260,6 +273,7 @@ func run() error {
 		Keys:     keys,
 		Sessions: sessionSvc,
 		BaseURL:  cfg.BaseURL,
+		Metrics:  met,
 	}).Register(mux)
 
 	// MFA challenge + enrollment UI
@@ -271,6 +285,7 @@ func run() error {
 		Signer:   signer,
 		Secure:   cfg.CookiesSecure(),
 		Audit:    auditSvc,
+		Metrics:  met,
 	}).Register(mux)
 
 	//password reset
@@ -387,6 +402,7 @@ func run() error {
 		middleware.SecurityHeaders(cfg.CookiesSecure()),
 		perRouteLimit,
 		csrfMW,
+		met.HTTPMiddleware,
 	)
 
 	srv := &http.Server{
@@ -429,6 +445,18 @@ func run() error {
 	}
 	logger.Info("shutdown complete")
 	return nil
+}
+
+type poolStatAdapter struct{ pool *pgxpool.Pool }
+
+func (a poolStatAdapter) Stat() metrics.PoolStat {
+	s := a.pool.Stat()
+	return metrics.PoolStat{
+		Total:    s.TotalConns(),
+		Acquired: s.AcquiredConns(),
+		Idle:     s.IdleConns(),
+		Max:      s.MaxConns(),
+	}
 }
 
 // cleanupInterval is how often the background will clean up expired rows

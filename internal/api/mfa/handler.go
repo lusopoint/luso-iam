@@ -16,6 +16,7 @@ import (
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
 	"github.com/lusopoint/lusoiam/internal/auth/session"
 	"github.com/lusopoint/lusoiam/internal/crypto"
+	"github.com/lusopoint/lusoiam/internal/metrics"
 	"github.com/lusopoint/lusoiam/internal/middleware"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
@@ -33,6 +34,7 @@ type Handler struct {
 	signer   *crypto.CookieSigner
 	secure   bool
 	audit    *audit.Service // optional, nil disables audit logging
+	metrics  *metrics.Metrics
 }
 type Config struct {
 	MFA      *authmfa.Service
@@ -42,6 +44,7 @@ type Config struct {
 	Signer   *crypto.CookieSigner
 	Secure   bool
 	Audit    *audit.Service
+	Metrics  *metrics.Metrics
 }
 
 func New(c Config) *Handler {
@@ -53,6 +56,7 @@ func New(c Config) *Handler {
 		signer:   c.Signer,
 		secure:   c.Secure,
 		audit:    c.Audit,
+		metrics:  c.Metrics,
 	}
 }
 
@@ -117,6 +121,9 @@ func (h *Handler) challengeTOTP(w http.ResponseWriter, r *http.Request) {
 				Metadata: map[string]any{"method": "totp"},
 			}))
 		}
+		if h.metrics != nil {
+			h.metrics.RecordMFAChallenge(metrics.MFAFailure)
+		}
 		h.redirectToChallenge(w, r, "Invalid code. Try again.")
 		return
 	}
@@ -162,6 +169,9 @@ func (h *Handler) challengeBackup(w http.ResponseWriter, r *http.Request) {
 				Actor:    &userID,
 				Metadata: map[string]any{"method": "backup_code"},
 			}))
+		}
+		if h.metrics != nil {
+			h.metrics.RecordMFAChallenge(metrics.MFAFailure)
 		}
 		http.Redirect(w, r, "/mfa/backup?error="+esc("Invalid code."), http.StatusFound)
 		return
@@ -223,6 +233,9 @@ func (h *Handler) challengeWebAuthnFinish(w http.ResponseWriter, r *http.Request
 				Actor:    &userID,
 				Metadata: map[string]any{"method": "webauthn"},
 			}))
+		}
+		if h.metrics != nil {
+			h.metrics.RecordMFAChallenge(metrics.MFAFailure)
 		}
 		http.Error(w, "verification failed", http.StatusUnauthorized)
 		return
@@ -495,6 +508,12 @@ func (h *Handler) finishChallenge(
 			Actor:    &userID,
 			Metadata: map[string]any{"method": "password+mfa", "mfa": true, "amr": amr},
 		}))
+	}
+	// record the successful second factor, finishChallenge is the shared
+	// success path for all challenge types (TOTP, backup, WebAuthn)
+	// so a single call here covers them all
+	if h.metrics != nil {
+		h.metrics.RecordMFAChallenge(metrics.MFASuccess)
 	}
 
 	// resolve the destination
