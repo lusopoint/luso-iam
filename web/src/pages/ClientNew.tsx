@@ -12,8 +12,9 @@ import type { CreateClientRequest, OIDCClient } from "../lib/types";
  * but the server is the source of truth.
  *
  * Public clients (SPAs, mobile apps) get no secret; PKCE is forced on
- * server-side regardless of the checkbox. Confidential clients receive
- * a one-time plaintext secret in the response.
+ * server-side for them regardless of the checkbox. Confidential clients
+ * receive a one-time plaintext secret in the response and may opt out of
+ * PKCE via the "Require PKCE" toggle.
  */
 
 export default function ClientNew() {
@@ -26,6 +27,7 @@ export default function ClientNew() {
     allowed_scopes: ["openid", "profile", "email"],
     allowed_grant_types: ["authorization_code", "refresh_token"],
     is_public: false,
+    require_pkce: true,
     require_consent: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +165,23 @@ export default function ClientNew() {
             label="Public client (no secret)"
             hint="SPAs and mobile apps. PKCE is mandatory."
             checked={form.is_public}
-            onChange={(v) => updateField("is_public", v)}
+            onChange={(v) =>
+              // Public clients always require PKCE (the server enforces this
+              // too). Keep the form payload consistent by forcing the flag
+              // on when public is selected.
+              setForm((f) => ({ ...f, is_public: v, require_pkce: v ? true : f.require_pkce }))
+            }
+          />
+          <Checkbox
+            label="Require PKCE (S256)"
+            hint={
+              form.is_public
+                ? "Always required for public clients."
+                : "Recommended. Disable only for confidential clients that can't send a code_challenge (e.g. some server-to-server flows)."
+            }
+            checked={form.is_public ? true : Boolean(form.require_pkce)}
+            disabled={form.is_public}
+            onChange={(v) => updateField("require_pkce", v)}
           />
           <Checkbox
             label="Require user consent"
@@ -184,15 +202,16 @@ export default function ClientNew() {
   );
 }
 
-function Checkbox({ label, hint, checked, onChange }: {
-  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;
+function Checkbox({ label, hint, checked, onChange, disabled }: {
+  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
-    <label className="flex items-start gap-2 text-sm">
+    <label className={`flex items-start gap-2 text-sm ${disabled ? "opacity-60" : ""}`}>
       <input
         type="checkbox"
         className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
       <span>
