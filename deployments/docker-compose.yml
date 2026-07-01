@@ -41,23 +41,30 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@mail.com}
       ADMIN_NAME: ${ADMIN_NAME:-admin}
 
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+
       # Production posture.
       ENV: production
       LOG_LEVEL: info
       LOG_FORMAT: json
       # OK in a single-instance docker-compose deploy; set false + run migrations manually for multi-instance / blue-green
       AUTO_MIGRATE: "true"
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
 
       # MFA labels
       MFA_ISSUER: ${MFA_ISSUER:-IAM}
       MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-IAM}
 
       # Optional federation, uncomment and set in .env to enable
-      # GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      # GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      # GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      # OIDC_PROVIDERS: ${OIDC_PROVIDERS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      OIDC_PROVIDERS: ${OIDC_PROVIDERS:-}
       # (per-provider OIDC_<SLUG>_* vars also flow through, add them
     volumes:
       - ./signing/signing.pem:/etc/iam/signing.pem:ro
