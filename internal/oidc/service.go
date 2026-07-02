@@ -16,15 +16,16 @@ import (
 )
 
 var (
-	ErrInvalidClient        = errors.New("oidc: invalid client")
-	ErrUnauthorizedClient   = errors.New("oidc: client not authorized for this grant")
-	ErrInvalidRedirectURI   = errors.New("oidc: redirect_uri not registered")
-	ErrInvalidScope         = errors.New("oidc: requested scope not allowed")
-	ErrInvalidGrant         = errors.New("oidc: invalid or expired grant")
-	ErrPKCERequired         = errors.New("oidc: pkce is required for this client")
-	ErrPKCEFailed           = errors.New("oidc: code_verifier does not match code_challenge")
-	ErrUnsupportedGrantType = errors.New("oidc: unsupported grant_type")
-	ErrInvalidToken         = errors.New("oidc: invalid token")
+	ErrInvalidClient           = errors.New("oidc: invalid client")
+	ErrUnauthorizedClient      = errors.New("oidc: client not authorized for this grant")
+	ErrInvalidRedirectURI      = errors.New("oidc: redirect_uri not registered")
+	ErrInvalidScope            = errors.New("oidc: requested scope not allowed")
+	ErrInvalidGrant            = errors.New("oidc: invalid or expired grant")
+	ErrPKCERequired            = errors.New("oidc: pkce is required for this client")
+	ErrPKCEFailed              = errors.New("oidc: code_verifier does not match code_challenge")
+	ErrUnsupportedGrantType    = errors.New("oidc: unsupported grant_type")
+	ErrUnsupportedResponseType = errors.New("oidc: unsupported response_type")
+	ErrInvalidToken            = errors.New("oidc: invalid token")
 )
 
 // AuthRequest carries the parsed, raw authorization request parameters

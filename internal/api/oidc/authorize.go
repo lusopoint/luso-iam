@@ -48,8 +48,15 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// prompt=login forces re-authentication even with a valid session
+	// renew=true makes /cas/login skip its existing-session short-circuit
+	// and require a fresh credential entry, creating a new session with a
+	// later auth_time (per OIDC Core prompt=login semantics)
 	if req.Prompt == "login" {
-		loginURL := "/cas/login?next=" + url.QueryEscape(r.URL.RequestURI())
+		returnTo := *r.URL
+		rq := returnTo.Query()
+		rq.Del("prompt")
+		returnTo.RawQuery = rq.Encode()
+		loginURL := "/cas/login?renew=true&next=" + url.QueryEscape(returnTo.RequestURI())
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
@@ -141,9 +148,18 @@ func (h *Handler) issueCodeAndRedirect(
 			"server_error", "Could not issue authorization code.")
 		return
 	}
-	dest := req.RedirectURI + "?code=" + url.QueryEscape(code)
+	params := map[string]string{"code": code}
 	if req.State != "" {
-		dest += "&state=" + url.QueryEscape(req.State)
+		params["state"] = req.State
+	}
+	dest, err := appendQuery(req.RedirectURI, params)
+	if err != nil {
+		// redirect_uri was validated as registered upstream
+		// a parse failure here is unexpected, fail closed rather than emit a
+		// malformed redirect
+		redirectError(w, r, req.RedirectURI, req.State,
+			"server_error", "Could not build redirect.")
+		return
 	}
 	http.Redirect(w, r, dest, http.StatusFound)
 }
@@ -158,6 +174,9 @@ func (h *Handler) authorizeError(w http.ResponseWriter, r *http.Request, req oid
 	case errors.Is(err, oidcsvc.ErrInvalidClient):
 		code = "unauthorized_client"
 		desc = "Unknown or disabled client."
+	case errors.Is(err, oidcsvc.ErrUnsupportedResponseType):
+		code = "unsupported_response_type"
+		desc = "Only response_type=code is supported."
 	case errors.Is(err, oidcsvc.ErrInvalidRedirectURI):
 		// cannot redirect, show a page
 		http.Error(w, "Invalid redirect_uri: not registered for this client.", http.StatusBadRequest)
@@ -178,10 +197,33 @@ func redirectError(w http.ResponseWriter, r *http.Request, redirectURI, state, c
 		oauthError(w, http.StatusBadRequest, code, desc)
 		return
 	}
-	dest := redirectURI + "?error=" + url.QueryEscape(code) +
-		"&error_description=" + url.QueryEscape(desc)
+	params := map[string]string{
+		"error":             code,
+		"error_description": desc,
+	}
 	if state != "" {
-		dest += "&state=" + url.QueryEscape(state)
+		params["state"] = state
+	}
+	dest, err := appendQuery(redirectURI, params)
+	if err != nil {
+		// redirectURI was validated as registered before we got here
+		// so this should not happen, fail closed with a plain error
+		// instead of a malformed redirect
+		oauthError(w, http.StatusBadRequest, "server_error", "Could not build redirect.")
+		return
 	}
 	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+func appendQuery(raw string, params map[string]string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	for k, v := range params {
+		q.Set(k, v)
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
