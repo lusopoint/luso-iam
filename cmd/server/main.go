@@ -370,6 +370,7 @@ func run() error {
 		Secure: cfg.CookiesSecure(),
 		ExemptPaths: []string{
 			"/oauth2/token",
+			"/oauth2/userinfo",
 			"/oauth2/introspect",
 			"/oauth2/revoke",
 			"/federation/", // covers /federation/<slug>/callback (provider redirects)
@@ -442,8 +443,8 @@ const cleanupInterval = 30 * time.Minute
 // expired_at < now() we also give 1h (expired_at < now() - 1h interval)
 func startCleanupService(ctx context.Context, store *postgres.Store, logger *slog.Logger) {
 	go func() {
-		ticket := time.NewTicker(cleanupInterval)
-		defer ticket.Stop()
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
 
 		// execute one full cleanup pass
 		runSweep := func() {
@@ -451,7 +452,6 @@ func startCleanupService(ctx context.Context, store *postgres.Store, logger *slo
 			sweepCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			defer cancel()
 
-			// oidc tokens
 			if n, err := store.DeleteExpiredOIDCTokens(sweepCtx); err != nil {
 				logger.Error("cleanup: oidc token sweep failed", "err", err)
 			} else if n > 0 {
@@ -496,7 +496,7 @@ func startCleanupService(ctx context.Context, store *postgres.Store, logger *slo
 			case <-ctx.Done():
 				logger.Info("cleanup: stopped")
 				return
-			case <-ticket.C:
+			case <-ticker.C:
 				runSweep()
 			}
 		}
