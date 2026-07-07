@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-
 import { ConfirmProvider } from "./components/Confirm";
 import Layout from "./components/Layout";
 import { PromptProvider } from "./components/Prompt";
@@ -9,6 +8,7 @@ import { ToastProvider } from "./components/Toast";
 import { useMe } from "./lib/auth";
 import Audit from "./pages/Audit";
 import ClientNew from "./pages/ClientNew";
+import ClientDetail from "./pages/ClientDetail";
 import Clients from "./pages/Clients";
 import Dashboard from "./pages/Dashboard";
 import Federation from "./pages/Federation";
@@ -55,16 +55,17 @@ export default function App() {
         <PromptProvider>
           <Routes>
             <Route element={<Layout me={me.user} />}>
-              <Route index            element={<Dashboard />} />
-              <Route path="users"     element={<Users />} />
+              <Route index element={<Dashboard />} />
+              <Route path="users" element={<Users />} />
               <Route path="users/:id" element={<UserDetail />} />
-              <Route path="clients"   element={<Clients />} />
+              <Route path="clients" element={<Clients />} />
               <Route path="clients/new" element={<ClientNew />} />
+              <Route path="clients/:id" element={<ClientDetail />} />
               <Route path="cas-services" element={<CASServices />} />
               <Route path="federation" element={<Federation />} />
-              <Route path="audit"     element={<Audit />} />
-              <Route path="keys"      element={<Keys />} />
-              <Route path="*"         element={<Navigate to="/" replace />} />
+              <Route path="audit" element={<Audit />} />
+              <Route path="keys" element={<Keys />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
           {/* Side-effect component: registers the SW, surfaces "ready

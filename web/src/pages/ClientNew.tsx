@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import PageHeader from "../components/PageHeader";
+import { ScopesEditor } from "../components/ScopesEditor";
 import { SecretBanner } from "./Clients";
 import { ApiError, api } from "../lib/api";
 import type { CreateClientRequest, OIDCClient } from "../lib/types";
@@ -160,6 +161,15 @@ export default function ClientNew() {
           <p className="hint">Absolute http or https URLs. At least one required.</p>
         </div>
 
+        <div>
+          <label className="label">Allowed scopes</label>
+          <ScopesEditor
+            value={form.allowed_scopes ?? []}
+            onChange={(next) => updateField("allowed_scopes", next)}
+          />
+          <p className="hint">Scopes this client may request. Include <span className="font-mono">offline_access</span> to allow refresh tokens.</p>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Checkbox
             label="Public client (no secret)"
@@ -179,7 +189,7 @@ export default function ClientNew() {
                 ? "Always required for public clients."
                 : "Recommended. Disable only for confidential clients that can't send a code_challenge (e.g. some server-to-server flows)."
             }
-            checked={form.is_public ? true : Boolean(form.require_pkce)}
+            checked={form.is_public ? true : (form.require_pkce ?? false)}
             disabled={form.is_public}
             onChange={(v) => updateField("require_pkce", v)}
           />

@@ -133,6 +133,9 @@ export default function Clients() {
                   <span>{formatDateTime(c.created_at)}</span>
                 </div>
                 <div className="mt-3 flex justify-end gap-3 text-sm">
+                  <Link to={`/clients/${c.id}`} className="text-brand-600 hover:underline dark:text-brand-100">
+                    Edit
+                  </Link>
                   {!c.is_public && (
                     <button onClick={() => rotate(c.id)} className="text-brand-600 hover:underline dark:text-brand-100">
                       Rotate secret
@@ -190,8 +193,9 @@ export default function Clients() {
                       </td>
                       <td className="table-td">{formatDateTime(c.created_at)}</td>
                       <td className="table-td text-right pr-3">
+                        <Link to={`/clients/${c.id}`} className="text-xs text-brand-600 hover:underline dark:text-brand-100">Edit</Link>
                         {!c.is_public && (
-                          <button onClick={() => rotate(c.id)} className="text-xs text-brand-600 hover:underline dark:text-brand-100">Rotate</button>
+                          <button onClick={() => rotate(c.id)} className="ml-3 text-xs text-brand-600 hover:underline dark:text-brand-100">Rotate</button>
                         )}
                         <button onClick={() => remove(c.id)} className="ml-3 text-xs text-red-600 hover:underline">Delete</button>
                       </td>
