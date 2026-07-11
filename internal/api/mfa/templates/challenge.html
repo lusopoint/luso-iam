@@ -236,6 +236,9 @@
     {{ if .HasWebAuthn }}
     <script>
       (function () {
+        // CSRF token for the webauthn fetches; the middleware accepts it
+        // via the X-CSRF-Token header.
+        const CSRF = "{{ .CSRFToken }}";
         const btn = document.getElementById("wa-btn");
         const status = document.getElementById("wa-status");
         if (!btn || !window.PublicKeyCredential) {
@@ -252,6 +255,7 @@
             // 1. Ask server for assertion options.
             const optsResp = await fetch("/mfa/webauthn/begin", {
               method: "POST",
+              headers: { "X-CSRF-Token": CSRF },
             });
             if (!optsResp.ok) throw new Error("begin failed");
             const opts = await optsResp.json();
@@ -290,7 +294,10 @@
 
             const finishResp = await fetch("/mfa/webauthn/finish", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": CSRF,
+              },
               body: JSON.stringify(body),
             });
             if (!finishResp.ok) {
