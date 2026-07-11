@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lusopoint/lusoiam/internal/middleware"
 	oidcsvc "github.com/lusopoint/lusoiam/internal/oidc"
@@ -51,10 +53,10 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 	// renew=true makes /cas/login skip its existing-session short-circuit
 	// and require a fresh credential entry, creating a new session with a
 	// later auth_time (per OIDC Core prompt=login semantics)
-	if req.Prompt == "login" {
+	if req.Prompt == "login" && !reauthSatisfied(r, sess) {
 		returnTo := *r.URL
 		rq := returnTo.Query()
-		rq.Del("prompt")
+		rq.Set("rauth", strconv.FormatInt(time.Now().Unix(), 10))
 		returnTo.RawQuery = rq.Encode()
 		loginURL := "/cas/login?renew=true&next=" + url.QueryEscape(returnTo.RequestURI())
 		http.Redirect(w, r, loginURL, http.StatusFound)
@@ -83,6 +85,20 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.issueCodeAndRedirect(w, r, req, sess)
+}
+
+// reauthSatisfied reports whether the session was created by a
+// re-authentication that this authorize request already demanded
+func reauthSatisfied(r *http.Request, sess *postgres.Session) bool {
+	raw := r.URL.Query().Get("rauth")
+	if raw == "" {
+		return false
+	}
+	demandedAt, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return false
+	}
+	return sess.CreatedAt.Unix() >= demandedAt
 }
 
 // authorizeConsent handles POST /oauth2/authorize (consent form submission)
@@ -154,9 +170,9 @@ func (h *Handler) issueCodeAndRedirect(
 	}
 	dest, err := appendQuery(req.RedirectURI, params)
 	if err != nil {
-		// redirect_uri was validated as registered upstream
-		// a parse failure here is unexpected, fail closed rather than emit a
-		// malformed redirect
+		// redirect_uri was validated as registered upstream; a parse
+		// failure here is unexpected. Fail closed rather than emit a
+		// malformed redirect.
 		redirectError(w, r, req.RedirectURI, req.State,
 			"server_error", "Could not build redirect.")
 		return
@@ -206,9 +222,9 @@ func redirectError(w http.ResponseWriter, r *http.Request, redirectURI, state, c
 	}
 	dest, err := appendQuery(redirectURI, params)
 	if err != nil {
-		// redirectURI was validated as registered before we got here
-		// so this should not happen, fail closed with a plain error
-		// instead of a malformed redirect
+		// redirectURI was validated as registered before we got here, so
+		// this should not happen; fail closed with a plain error rather
+		// than emitting a malformed redirect.
 		oauthError(w, http.StatusBadRequest, "server_error", "Could not build redirect.")
 		return
 	}
