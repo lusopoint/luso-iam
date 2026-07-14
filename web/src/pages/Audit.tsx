@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  CodeBlock,
+  EmptyState,
+  Input,
+  Loading,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@lusopoint/luso-ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import PageHeader from "../components/PageHeader";
-import { EmptyState, ErrorState, Loading } from "../components/States";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { AuditEvent } from "../lib/types";
 import { formatDateTime, shortID } from "../lib/util";
-
-/*
- * Audit: paginated, filterable view of the audit_log. The filter inputs
- * commit on submit, not on every keystroke — audit_log reads are cheap
- * but we don't want to re-issue queries while someone is mid-typing an
- * actor UUID.
- *
- * The result table favours scannability: event type prominent, timestamp
- * to the right, expandable metadata row beneath each event.
- */
 
 const PAGE_SIZE = 50;
 
@@ -26,7 +32,14 @@ interface Filters {
 
 const emptyFilters: Filters = { event_type: "", actor_id: "", target_id: "" };
 
-export default function Audit() {
+export const statusForEvent = (eventType: string): string => {
+  if (eventType.endsWith("_failure")) return "critical";
+  if (eventType.endsWith("_success")) return "operational";
+  if (eventType.startsWith("admin_") || eventType.includes("_deleted")) return "medium";
+  return "pending";
+}
+
+const Audit = () => {
   // `active` is what the query is currently using; `draft` is what the
   // form holds before the operator submits. Keeping them separate avoids
   // a fetch on every keystroke.
@@ -72,12 +85,11 @@ export default function Audit() {
     return () => ctrl.abort();
   }, [active, offset]);
 
-  function applyFilters(e: React.FormEvent) {
-    e.preventDefault();
+  const applyFilters = () => {
     setOffset(0);
     setActive(draft);
   }
-  function clearFilters() {
+  const clearFilters = () => {
     setDraft(emptyFilters);
     setActive(emptyFilters);
     setOffset(0);
@@ -89,45 +101,61 @@ export default function Audit() {
     return { start, end };
   }, [offset, total]);
 
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyFilters();
+    }
+  };
+
   return (
     <>
-      <PageHeader
-        title="Audit log"
-        subtitle="Append-only history of security-relevant events."
-      />
+      <PageHeader title="Audit log" subtitle="Append-only history of security-relevant events." />
 
-      <form
-        onSubmit={applyFilters}
-        className="card mb-4 flex flex-wrap items-end gap-3 p-3"
-      >
-        <Field
-          label="Event type"
-          placeholder="login_success"
-          value={draft.event_type}
-          onChange={(v) => setDraft({ ...draft, event_type: v })}
-        />
-        <Field
-          label="Actor ID"
-          placeholder="uuid"
-          value={draft.actor_id}
-          onChange={(v) => setDraft({ ...draft, actor_id: v })}
-        />
-        <Field
-          label="Target ID"
-          placeholder="uuid"
-          value={draft.target_id}
-          onChange={(v) => setDraft({ ...draft, target_id: v })}
-        />
-        <div className="flex gap-2">
-          <button type="submit" className="btn-primary">Apply</button>
-          <button type="button" className="btn-secondary" onClick={clearFilters}>
-            Clear
-          </button>
+      <Card noHover variant="low" className="mb-6 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[10rem] flex-1">
+            <Input
+              label="Event type"
+              placeholder="login_success"
+              value={draft.event_type}
+              onChange={(e) => setDraft({ ...draft, event_type: e.target.value })}
+              onKeyDown={onEnter}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1">
+            <Input
+              label="Actor ID"
+              placeholder="uuid"
+              value={draft.actor_id}
+              onChange={(e) => setDraft({ ...draft, actor_id: e.target.value })}
+              onKeyDown={onEnter}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1">
+            <Input
+              label="Target ID"
+              placeholder="uuid"
+              value={draft.target_id}
+              onChange={(e) => setDraft({ ...draft, target_id: e.target.value })}
+              onKeyDown={onEnter}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={applyFilters} className="h-12">Apply</Button>
+            <Button variant="ghost" onClick={clearFilters} className="h-12">Clear</Button>
+          </div>
         </div>
-      </form>
+      </Card>
 
       {loading ? (
-        <Loading />
+        <Loading label="Loading events…" />
       ) : error ? (
         <ErrorState error={error} />
       ) : events.length === 0 ? (
@@ -137,18 +165,18 @@ export default function Audit() {
         />
       ) : (
         <>
-          <div className="card overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-900/40">
-                <tr>
-                  <th className="table-th">Event</th>
-                  <th className="table-th">Actor</th>
-                  <th className="table-th">Target</th>
-                  <th className="table-th">IP</th>
-                  <th className="table-th">When</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Card noHover className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>IP</TableHead>
+                  <TableHead>When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {events.map((e) => {
                   const isOpen = expanded === e.id;
                   return (
@@ -160,32 +188,38 @@ export default function Audit() {
                     />
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
 
-          {/* Pagination footer. We avoid jumping pages — Prev/Next is plenty
+          {/* Pagination footer. We avoid jumping pages, Prev/Next is plenty
               for an audit log, and "page N of M" would race against new
               events being inserted at the head. */}
-          <div className="mt-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-            <span>
+          <div className="mt-6 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
               Showing {pageMeta.start}–{pageMeta.end} of {total}
             </span>
             <div className="flex gap-2">
-              <button
-                className="btn-secondary"
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
               >
-                ← Prev
-              </button>
-              <button
-                className="btn-secondary"
+                <ChevronLeft size={14} />
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
                 disabled={offset + PAGE_SIZE >= total}
                 onClick={() => setOffset(offset + PAGE_SIZE)}
               >
-                Next →
-              </button>
+                Next
+                <ChevronRight size={14} />
+              </Button>
             </div>
           </div>
         </>
@@ -194,33 +228,7 @@ export default function Audit() {
   );
 }
 
-function Field({
-  label,
-  placeholder,
-  value,
-  onChange,
-}: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex-1 min-w-[10rem]">
-      <span className="label">{label}</span>
-      <input
-        className="input"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete="off"
-        spellCheck={false}
-      />
-    </label>
-  );
-}
-
-function Row({
+const Row = ({
   event,
   open,
   onToggle,
@@ -228,55 +236,49 @@ function Row({
   event: AuditEvent;
   open: boolean;
   onToggle: () => void;
-}) {
-  // The metadata blob is event-type-specific. Pretty-print it on expand so
-  // the operator can read it without learning each type's shape.
+}) => {
   return (
     <>
-      <tr
-        className="table-row cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
-        onClick={onToggle}
-      >
-        <td className="table-td">
-          <span className="font-mono text-xs">{event.event_type}</span>
-        </td>
-        <td className="table-td">
+      <TableRow className="cursor-pointer" onClick={onToggle}>
+        <TableCell>
+          <Badge status={statusForEvent(event.event_type)} label={event.event_type} />
+        </TableCell>
+        <TableCell>
           {event.actor_id ? (
             <span className="font-mono text-xs">{shortID(event.actor_id)}</span>
           ) : (
-            <span className="text-slate-400">—</span>
+            <Dash />
           )}
-        </td>
-        <td className="table-td">
+        </TableCell>
+        <TableCell>
           {event.target_id ? (
             <span className="font-mono text-xs">{shortID(event.target_id)}</span>
           ) : (
-            <span className="text-slate-400">—</span>
+            <Dash />
           )}
-        </td>
-        <td className="table-td">
-          {event.ip_address || <span className="text-slate-400">—</span>}
-        </td>
-        <td className="table-td whitespace-nowrap">
-          {formatDateTime(event.created_at)}
-        </td>
-      </tr>
+        </TableCell>
+        <TableCell>{event.ip_address || <Dash />}</TableCell>
+        <TableCell className="whitespace-nowrap">{formatDateTime(event.created_at)}</TableCell>
+      </TableRow>
       {open && (
-        <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-          <td colSpan={5} className="px-4 py-3">
+        <TableRow className="bg-surface-container-low">
+          <TableCell colSpan={5}>
             <Detail event={event} />
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
 }
 
-function Detail({ event }: { event: AuditEvent }) {
+const Dash = () => <span className="text-on-surface-variant/40">-</span>;
+
+const Detail = ({ event }: { event: AuditEvent }) => {
   const hasMeta = Object.keys(event.metadata || {}).length > 0;
+
   return (
-    <div className="space-y-2 text-sm">
-      <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+    <div className="space-y-4 py-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
         <DetailLine label="Event ID" value={<code className="font-mono text-xs">{event.id}</code>} />
         <DetailLine label="Created" value={formatDateTime(event.created_at)} />
         {event.actor_id && (
@@ -289,21 +291,21 @@ function Detail({ event }: { event: AuditEvent }) {
           <DetailLine label="User-Agent" value={event.user_agent} className="sm:col-span-2" />
         )}
       </div>
+
+      {/* The metadata blob is event-type-specific. Pretty-print it on expand so
+          the operator can read it without learning each type's shape. */}
       {hasMeta && (
-        <details open className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-slate-600 dark:text-slate-300">
-            Metadata
-          </summary>
-          <pre className="mt-1 max-h-64 overflow-auto rounded bg-slate-100 p-2 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-            {JSON.stringify(event.metadata, null, 2)}
-          </pre>
-        </details>
+        <CodeBlock
+          title="Metadata"
+          value={JSON.stringify(event.metadata, null, 2)}
+          maxHeight={256}
+        />
       )}
     </div>
   );
 }
 
-function DetailLine({
+const DetailLine = ({
   label,
   value,
   className,
@@ -311,11 +313,14 @@ function DetailLine({
   label: string;
   value: React.ReactNode;
   className?: string;
-}) {
-  return (
-    <div className={className}>
-      <span className="text-xs text-slate-500 dark:text-slate-400">{label}: </span>
-      <span className="text-slate-800 dark:text-slate-200">{value}</span>
-    </div>
-  );
-}
+}) =>
+(
+  <div className={className}>
+    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+      {label}
+    </span>
+    <div className="mt-0.5 text-sm text-on-surface">{value}</div>
+  </div>
+);
+
+export default Audit

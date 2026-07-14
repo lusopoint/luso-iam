@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Loading,
+  PageHeader,
+  StatsCard,
+} from "@lusopoint/luso-ui";
+import { ArrowRight, Boxes, ShieldCheck, Users as UsersIcon } from "lucide-react";
 
-import PageHeader from "../components/PageHeader";
-import { ErrorState, Loading } from "../components/States";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { AuditEvent } from "../lib/types";
 import { relativeTime } from "../lib/util";
-
-/*
- * Dashboard: a one-page overview. Three counter cards (users, clients,
- * services) and the 10 most recent audit events. The point is to give
- * an admin landing on /admin a "everything is fine, here's what just
- * happened" snapshot without making them dig.
- */
 
 interface Counters {
   users?: number;
@@ -20,7 +24,7 @@ interface Counters {
   services?: number;
 }
 
-export default function Dashboard() {
+const Dashboard = () => {
   const [counters, setCounters] = useState<Counters>({});
   const [recent, setRecent] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<ApiError | null>(null);
@@ -47,13 +51,17 @@ export default function Dashboard() {
       })
       .catch((err) => {
         if (ctrl.signal.aborted) return;
-        setError(err instanceof ApiError ? err : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }));
+        setError(
+          err instanceof ApiError
+            ? err
+            : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }),
+        );
         setLoading(false);
       });
     return () => ctrl.abort();
   }, []);
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading label="Loading overview…" />;
   if (error) return <ErrorState error={error} />;
 
   return (
@@ -63,48 +71,88 @@ export default function Dashboard() {
         subtitle="At-a-glance view of the IAM environment."
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Users"        value={counters.users ?? 0}    to="/users" />
-        <StatCard label="OIDC clients" value={counters.clients ?? 0}  to="/clients" />
-        <StatCard label="CAS services" value={counters.services ?? 0} to="/cas-services" />
+      {/* StatsCard isn't a link, so each one is wrapped. The wrapper carries
+          the focus ring the card handles its own hover treatment */}
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <CounterLink to="/users">
+          <StatsCard
+            title="Users"
+            value={counters.users ?? 0}
+            icon={<UsersIcon size={18} />}
+          />
+        </CounterLink>
+        <CounterLink to="/clients">
+          <StatsCard
+            title="OIDC clients"
+            value={counters.clients ?? 0}
+            icon={<Boxes size={18} />}
+          />
+        </CounterLink>
+        <CounterLink to="/cas-services">
+          <StatsCard
+            title="CAS services"
+            value={counters.services ?? 0}
+            icon={<ShieldCheck size={18} />}
+          />
+        </CounterLink>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Recent events
-          </h2>
-          <Link to="/audit" className="text-xs text-brand-600 hover:underline dark:text-brand-100">
-            View all →
+      <Card noHover>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Recent events</CardTitle>
+          <Link
+            to="/audit"
+            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-primary transition-opacity hover:opacity-70"
+          >
+            View all
+            <ArrowRight size={14} />
           </Link>
-        </div>
-        {recent.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            No events recorded yet.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {recent.map((e) => (
-              <li key={e.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                <span className="font-mono text-slate-700 dark:text-slate-200">{e.event_type}</span>
-                <span className="text-slate-500 dark:text-slate-400">{relativeTime(e.created_at)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        </CardHeader>
+
+        <CardContent>
+          {recent.length === 0 ? (
+            <EmptyState
+              title="No events yet"
+              description="Security-relevant activity sign-ins, token issuance, admin changes will appear here as it happens."
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {recent.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center justify-between gap-3 py-3 text-sm"
+                >
+                  <Badge status={statusFor(e.event_type)} label={e.event_type} />
+                  <span className="shrink-0 text-xs font-medium text-on-surface-variant">
+                    {relativeTime(e.created_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
 
-function StatCard({ label, value, to }: { label: string; value: number; to: string }) {
-  return (
-    <Link
-      to={to}
-      className="card flex flex-col gap-1 p-4 transition hover:border-brand-500 dark:hover:border-brand-500"
-    >
-      <span className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{value}</span>
-    </Link>
-  );
+// map an audit event type onto a Badge status so failures read red at a glance
+// Badge accepts an arbitrary string and falls back to a neutral
+// treatment, so unknown event types are safe
+const statusFor = (eventType: string): string => {
+  if (eventType.endsWith("_failure")) return "critical";
+  if (eventType.endsWith("_success")) return "operational";
+  if (eventType.startsWith("admin_") || eventType.includes("_deleted")) return "medium";
+  return "pending";
 }
+
+const CounterLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
+  <Link
+    to={to}
+    className="rounded-2xl outline-none focus-visible:ring-1 focus-visible:ring-primary"
+  >
+    {children}
+  </Link>
+);
+
+export default Dashboard

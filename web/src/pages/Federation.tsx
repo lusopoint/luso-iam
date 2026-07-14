@@ -1,28 +1,22 @@
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CodeBlock,
+  EmptyState,
+  Loading,
+  PageHeader,
+} from "@lusopoint/luso-ui";
 
-import CopyButton from "../components/CopyButton";
-import PageHeader from "../components/PageHeader";
-import { EmptyState, ErrorState, Loading } from "../components/States";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { FederationProvider } from "../lib/types";
 
-/*
- * Federation: read-only status of configured upstream providers.
- *
- * Why read-only: provider credentials (client ID + secret) live in env
- * vars and never touch the database. Letting admins edit them from the
- * UI would mean storing OAuth secrets at rest, with all the
- * backup/restore/leak surface that implies — for very little gain,
- * since you have to register a callback URL in the provider's console
- * anyway. The page answers a single operator question: "which providers
- * can a user actually sign in with right now?"
- *
- * The redirect URI for each provider IS exposed because it's the field
- * operators most often need to copy into the provider's console
- * (Google Cloud, GitHub Developer Settings, etc.) when wiring things up.
- */
-
-export default function Federation() {
+const Federation = () => {
   const [providers, setProviders] = useState<FederationProvider[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -46,13 +40,13 @@ export default function Federation() {
     <>
       <PageHeader
         title="Federation"
-        subtitle="Upstream identity providers configured for sign-in. Read-only — manage credentials via environment variables."
+        subtitle="Upstream identity providers configured for sign-in. Read-only, manage credentials via environment variables."
       />
 
       {error ? (
         <ErrorState error={error} />
       ) : providers === null ? (
-        <Loading />
+        <Loading label="Loading providers…" />
       ) : providers.length === 0 ? (
         <EmptyState
           title="No providers configured"
@@ -60,53 +54,48 @@ export default function Federation() {
         />
       ) : (
         <>
-          <ul className="space-y-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {providers.map((p) => (
-              <li key={p.name} className="card p-4">
-                <div className="flex items-start justify-between gap-3">
+              <Card key={p.name} noHover>
+                <CardHeader className="flex-row items-start justify-between space-y-0">
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                      {p.display_name}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      slug: <code className="font-mono">{p.name}</code>
+                    <CardTitle>{p.display_name}</CardTitle>
+                    <p className="mt-1 font-mono text-xs text-on-surface-variant">
+                      {p.name}
                     </p>
                   </div>
-                  <span className="badge-green shrink-0">enabled</span>
-                </div>
-                <div className="mt-3">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Redirect URI (paste this into the provider's OAuth client console)
+                  <Badge status="operational" label="enabled" />
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-1.5 ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                    Redirect URI
                   </p>
-                  <div className="mt-1 flex items-start gap-2 rounded bg-slate-50 p-2 dark:bg-slate-800">
-                    <code className="min-w-0 flex-1 break-all font-mono text-xs text-slate-800 dark:text-slate-200">
-                      {p.redirect_uri}
-                    </code>
-                    <CopyButton value={p.redirect_uri} label="" className="shrink-0" />
-                  </div>
-                </div>
-              </li>
+                  <CodeBlock value={p.redirect_uri} inline />
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    Paste this into the provider's OAuth client console.
+                  </p>
+                </CardContent>
+              </Card>
             ))}
-          </ul>
+          </div>
 
-          <div className="mt-6 card border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              About this page
-            </h3>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Provider configuration lives in environment variables, not the database. The page
+          <Alert variant="info" title="About this page" className="mt-8">
+            <p>
+              Provider configuration lives in environment variables, not the database. The list
               above reflects what the server detected at boot. Credentials (client ID and secret)
-              are intentionally not shown — they don't need to be visible here to verify the
+              are intentionally not shown, they don't need to be visible here to verify the
               integration works.
             </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              To add or change a provider: set the matching env vars (e.g. <code className="font-mono">GOOGLE_CLIENT_ID</code>,
+            <p className="mt-2">
+              To add or change a provider: set the matching env vars (e.g.{" "}
+              <code className="font-mono">GOOGLE_CLIENT_ID</code>,{" "}
               <code className="font-mono">GOOGLE_CLIENT_SECRET</code>), register the redirect URI
               shown above in the provider's console, and restart the server.
             </p>
-          </div>
+          </Alert>
         </>
       )}
     </>
   );
 }
+export default Federation

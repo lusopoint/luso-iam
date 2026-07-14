@@ -1,10 +1,3 @@
-/*
- * Wire types for the /admin/v1/* API. These mirror the DTO structs in
- * the Go admin handler package (internal/api/admin/*.go). Any field
- * shape change there must be reflected here — there is no code-gen
- * yet (openapi-typescript is planned for a later phase).
- */
-
 export interface AdminUser {
   id: string;
   email?: string;
@@ -18,10 +11,8 @@ export interface AdminUser {
   updated_at: string;
 }
 
-/**
- * One enrolled MFA method on a user account. We never receive the
- * TOTP secret or WebAuthn credential bytes — admin only sees metadata.
- */
+// one enrolled MFA method on a user account. We never receive the
+// TOTP secret or WebAuthn credential bytes, admin only sees metadata
 export interface MFAMethod {
   id: string;
   method: "totp" | "webauthn" | string; // forward-compat with future types
@@ -36,9 +27,7 @@ export interface ListUserMFAResponse {
   backup_codes_unused: number;
 }
 
-// ─── Federation ───────────────────────────────────────────────────────────
-
-/** A configured upstream provider as surfaced by the admin status page. */
+// a configured upstream provider as surfaced by the admin status page
 export interface FederationProvider {
   name: string;          // slug: "google", "github", ...
   display_name: string;  // "Google", "GitHub", ...
@@ -49,14 +38,14 @@ export interface ListProvidersResponse {
   providers: FederationProvider[];
 }
 
-/** One link between a user and an upstream provider account. */
+// one link between a user and an upstream provider account
 export interface UserFederationIdentity {
   id: string;
   provider: string;
   display_name: string;
   sub: string;
   email?: string;
-  /** The user's name as known by the provider — distinct from their IAM display_name. */
+  // the user's name as known by the provider, distinct from their IAM display_name
   provider_name?: string;
   picture_url?: string;
   created_at: string;
@@ -74,11 +63,10 @@ export interface ListUsersResponse {
   offset: number;
 }
 
-/**
- * Request body for POST /admin/v1/users. Email is required; everything
- * else is optional. If password is omitted the server generates one and
- * returns it in `generated_password` (shown once, like a client secret).
- */
+
+// request body for POST /admin/v1/users. Email is required; everything
+// else is optional. If password is omitted the server generates one and
+// returns it in `generated_password` (shown once, like a client secret)
 export interface CreateUserRequest {
   email: string;
   username?: string;
@@ -90,7 +78,7 @@ export interface CreateUserRequest {
 
 export interface CreateUserResponse {
   user: AdminUser;
-  /** Plaintext password — present only when the server generated it. */
+  // plaintext password, present only when the server generated it
   generated_password?: string;
 }
 
@@ -128,7 +116,7 @@ export interface CreateClientRequest {
 
 export interface CreateClientResponse {
   client: OIDCClient;
-  /** Plaintext secret — shown once, on creation. Empty for public clients. */
+  // plaintext secret, shown once, on creation. Empty for public clients
   secret?: string;
 }
 
@@ -184,17 +172,16 @@ export interface ListAuditResponse {
 export interface SigningKey {
   kid: string;
   alg: string;
-  // primary=true marks the key currently used for signing new tokens.
-  // Other entries are "retiring" — kept in JWKS so already-issued
+  // primary=true marks the key currently used for signing new tokens
+  // Other entries are "retiring", kept in JWKS so already-issued
   // tokens still verify until they expire, then removed by operator
-  // after the next rotation grace period.
+  // after the next rotation grace period
   primary: boolean;
   // source is the filename the key was loaded from (multi-key directory
-  // mode). Empty for single-file mode and ephemeral keys.
+  // mode). Empty for single-file mode and ephemeral keys
   source?: string;
 }
 
-/** RFC 7807 problem envelope returned by every admin API on error. */
 export interface ApiProblem {
   type: string;
   title: string;

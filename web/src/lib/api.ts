@@ -1,22 +1,8 @@
 import type { ApiProblem } from "./types";
 
-/*
- * Hand-rolled API client. We keep it tiny on purpose — no react-query, no
- * fetch generator, no Axios. The admin SPA's needs are simple: a few CRUD
- * lists plus a handful of mutations. A 60-line wrapper buys us:
- *
- *  - Consistent error handling (Problem JSON → ApiError thrown).
- *  - Cookie credentials included on every request (admin sessions are
- *    same-origin, so `credentials: "include"` is all that's needed).
- *  - A single place to tweak headers, base URL, or future tracing.
- *
- * If the surface grows beyond a couple dozen calls, switch to openapi-fetch
- * with a generated client. Until then, ad-hoc is faster to evolve.
- */
-
 const ADMIN_BASE = "/admin/v1";
 
-/** Thrown for any non-2xx HTTP response. Carries the parsed Problem envelope. */
+// thrown for any non-2xx HTTP response. Carries the parsed Problem envelope
 export class ApiError extends Error {
   status: number;
   code: string | undefined;
@@ -35,11 +21,11 @@ interface RequestOpts {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   query?: Record<string, string | number | undefined>;
   body?: unknown;
-  /** AbortSignal for cancellation from React effect cleanup. */
+  // AbortSignal for cancellation from React effect cleanup
   signal?: AbortSignal;
 }
 
-async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+const request = async <T>(path: string, opts: RequestOpts = {}): Promise<T> => {
   const method = opts.method ?? "GET";
   const url = buildURL(path, opts.query);
 
@@ -57,7 +43,7 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   // server-side so the header would be wasted bytes there.
   //
   // The cookie is intentionally NOT HttpOnly so document.cookie can read
-  // it — this is the standard double-submit pattern. Same-origin XSS
+  // it, this is the standard double-submit pattern. Same-origin XSS
   // could read it too, but same-origin XSS already has full session
   // access via the session cookie; CSRF protects against cross-origin
   // attacks, not on-page code execution.
@@ -76,7 +62,7 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     signal: opts.signal,
   });
 
-  // 204 No Content — common for DELETE / lock / unlock.
+  // 204 No Content common for DELETE / lock / unlock.
   if (res.status === 204) {
     return undefined as T;
   }
@@ -120,7 +106,7 @@ function isProblem(v: unknown): v is ApiProblem {
 
 /**
  * Reads the iam_csrf cookie from document.cookie. Returns "" when the
- * cookie isn't set yet — typically only on the very first page load
+ * cookie isn't set yet, typically only on the very first page load
  * before any GET has bounced through the CSRF middleware.
  *
  * Hand-parses document.cookie because the standard says cookie values
@@ -138,11 +124,6 @@ function readCSRFCookie(): string {
   }
   return "";
 }
-
-/* ─── Resource-level helpers ─────────────────────────────────────────────
- * The handlers below wrap `request()` so that pages don't need to know the
- * URL shape. Keeps the SPA refactor-friendly when paths change.
- */
 
 import type {
   AdminUser,
@@ -174,7 +155,7 @@ export const api = {
     request<AdminUser>(`/users/${id}`, { signal }),
   updateUser: (id: string, body: Partial<Pick<AdminUser, "email" | "username" | "display_name" | "status" | "is_admin">>) =>
     request<AdminUser>(`/users/${id}`, { method: "PATCH", body }),
-  lockUser:   (id: string) => request<AdminUser>(`/users/${id}/lock`,   { method: "POST" }),
+  lockUser: (id: string) => request<AdminUser>(`/users/${id}/lock`, { method: "POST" }),
   unlockUser: (id: string) => request<AdminUser>(`/users/${id}/unlock`, { method: "POST" }),
   deleteUser: (id: string) => request<void>(`/users/${id}`, { method: "DELETE" }),
   resetUserPassword: (id: string, newPassword: string) =>
