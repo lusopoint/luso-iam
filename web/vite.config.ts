@@ -3,8 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Vite config for the IAM admin SPA.
-//
 // `base: "/admin/"` so all asset URLs in the production index.html are
 // prefixed with /admin/assets/..., matching where the Go embed handler
 // serves them. The dev server runs at /admin/* too, proxying API calls
@@ -40,11 +38,11 @@ export default defineConfig({
         scope: "/admin/",
         display: "standalone",
         orientation: "any",
-        background_color: "#0f172a",
-        theme_color: "#4459d0",
+        background_color: "#0b0f19",
+        theme_color: "#0284c7",
         icons: [
-          { src: "icon-192.png",          sizes: "192x192", type: "image/png" },
-          { src: "icon-512.png",          sizes: "512x512", type: "image/png" },
+          { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
           { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
         ],
         categories: ["productivity", "developer", "utilities"]
@@ -80,13 +78,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/admin/v1":     "http://localhost:8080",
-      "/cas":          "http://localhost:8080",
-      "/oauth2":       "http://localhost:8080",
-      "/oauth":        "http://localhost:8080",
-      "/mfa":          "http://localhost:8080",
-      "/.well-known":  "http://localhost:8080",
-      "/healthz":      "http://localhost:8080"
+      "/admin/v1": "http://localhost:8080",
+      "/cas": "http://localhost:8080",
+      "/oauth2": "http://localhost:8080",
+      "/oauth": "http://localhost:8080",
+      "/mfa": "http://localhost:8080",
+      "/.well-known": "http://localhost:8080",
+      "/healthz": "http://localhost:8080"
     }
   }
 });

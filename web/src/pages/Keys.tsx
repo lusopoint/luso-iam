@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  Badge,
+  Card,
+  Loading,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@lusopoint/luso-ui";
+import { ExternalLink } from "lucide-react";
 
-import PageHeader from "../components/PageHeader";
-import { ErrorState, Loading } from "../components/States";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { SigningKey } from "../lib/types";
 
-/*
- * Keys: view-only signing-key status. Rotation is intentionally a P7
- * deliverable — the storage layer supports it but exposing the action
- * here is risky without first wiring multi-key validation in the OIDC
- * service. For now, surface the active key and document the bootstrap
- * pattern: a single RSA key loaded from SIGNING_KEY_PATH (or ephemeral).
- *
- * The /.well-known/jwks.json endpoint is the canonical place for the
- * full JWK set; we link to it so admins don't have to remember the URL.
- */
-export default function Keys() {
+const Keys = () => {
   const [keys, setKeys] = useState<SigningKey[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -45,82 +48,56 @@ export default function Keys() {
       {error ? (
         <ErrorState error={error} />
       ) : keys === null ? (
-        <Loading />
+        <Loading label="Loading keys..." />
       ) : (
         <>
-          <div className="card overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-900/40">
-                <tr>
-                  <th className="table-th">Key ID</th>
-                  <th className="table-th">Algorithm</th>
-                  <th className="table-th">Role</th>
-                  <th className="table-th">Source</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Card noHover className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Key ID</TableHead>
+                  <TableHead>Algorithm</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Source</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {keys.map((k) => (
-                  <tr key={k.kid} className="table-row">
-                    <td className="table-td">
+                  <TableRow key={k.kid}>
+                    <TableCell>
                       <code className="font-mono text-xs">{k.kid}</code>
-                    </td>
-                    <td className="table-td">
-                      <span className="badge-slate">{k.alg}</span>
-                    </td>
-                    <td className="table-td">
+                    </TableCell>
+                    <TableCell>
+                      <Badge status="pending" label={k.alg} />
+                    </TableCell>
+                    <TableCell>
                       {k.primary ? (
-                        <span className="badge-green">primary</span>
+                        <Badge status="operational" label="primary" />
                       ) : (
-                        <span className="badge-slate">retiring</span>
+                        <Badge status="decommissioned" label="retiring" />
                       )}
-                    </td>
-                    <td className="table-td">
-                      <code className="font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {k.source || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <code className="font-mono text-xs text-on-surface-variant">
+                        {k.source || "-"}
                       </code>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <InfoCard
-              title="Public JWKS"
-              body={
-                <>
-                  The full JWK set is published at{" "}
-                  <a
-                    href="/.well-known/jwks.json"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-brand-600 hover:underline dark:text-brand-100"
-                  >
-                    /.well-known/jwks.json
-                  </a>
-                  . OIDC clients fetch this endpoint to validate id_token
-                  signatures.
-                </>
-              }
-            />
-            <InfoCard
-              title="Discovery"
-              body={
-                <>
-                  The OpenID provider metadata is at{" "}
-                  <a
-                    href="/.well-known/openid-configuration"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-brand-600 hover:underline dark:text-brand-100"
-                  >
-                    /.well-known/openid-configuration
-                  </a>
-                  .
-                </>
-              }
-            />
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Alert variant="info" title="Public JWKS">
+              The full JWK set is published at
+              <WellKnownLink href="/.well-known/jwks.json" />. OIDC clients fetch this
+              endpoint to validate id_token signatures.
+            </Alert>
+            <Alert variant="info" title="Discovery">
+              The OpenID provider metadata is at
+              <WellKnownLink href="/.well-known/openid-configuration" />.
+            </Alert>
           </div>
         </>
       )}
@@ -128,11 +105,16 @@ export default function Keys() {
   );
 }
 
-function InfoCard({ title, body }: { title: string; body: React.ReactNode }) {
-  return (
-    <div className="card p-4">
-      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{body}</p>
-    </div>
-  );
-}
+const WellKnownLink = ({ href }: { href: string }) =>
+(
+  <a
+    href={href}
+    target="_blank"
+    rel="noreferrer"
+    className="inline-flex items-center gap-1 font-mono underline underline-offset-2 hover:opacity-70"
+  >
+    {href}
+    <ExternalLink size={11} />
+  </a>
+);
+export default Keys

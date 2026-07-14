@@ -1,34 +1,44 @@
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Input,
+  Loading,
+  PageHeader,
+  TagInput,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  useConfirm,
+  useToast,
+} from "@lusopoint/luso-ui";
+import { Plus } from "lucide-react";
 
-import { useConfirm } from "../components/Confirm";
-import PageHeader from "../components/PageHeader";
-import { EmptyState, ErrorState, Loading } from "../components/States";
-import { useToast } from "../components/Toast";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { CASService, CreateCASServiceRequest } from "../lib/types";
 import { formatDateTime } from "../lib/util";
 
-/*
- * CAS service registry. CAS-protocol applications need to be registered
- * here before /cas/login will issue tickets for them — see the prefix
- * match in FindCASServiceForURL.
- *
- * Add and delete are inline; updates flip the enabled flag only — full
- * editing is rare and intentionally not exposed in the SPA (use PATCH
- * via API for niche cases like changing released_attributes).
- */
-
-export default function CASServices() {
+const CASServices = () => {
   const toast = useToast();
   const confirm = useConfirm();
   const [services, setServices] = useState<CASService[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<ApiError | null>(null);
-  const [adding, setAdding]     = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => { refresh(); }, []);
 
-  function refresh() {
+  const refresh = () => {
     setLoading(true);
     api.listCASServices()
       .then((r) => { setServices(r.services); setError(null); setLoading(false); })
@@ -38,7 +48,7 @@ export default function CASServices() {
       });
   }
 
-  async function toggle(s: CASService) {
+  const toggle = async (s: CASService) => {
     try {
       const updated = await api.updateCASService(s.id, { enabled: !s.enabled });
       setServices((list) => list.map((x) => x.id === s.id ? updated : x));
@@ -48,7 +58,7 @@ export default function CASServices() {
     }
   }
 
-  async function remove(s: CASService) {
+  const remove = async (s: CASService) => {
     const ok = await confirm({
       title: `Delete "${s.name}"?`,
       message: "Active CAS tickets will continue to validate until they expire (typically 60s).",
@@ -65,125 +75,158 @@ export default function CASServices() {
     }
   }
 
+  const registerButton = (
+    <Button onClick={() => setAdding(true)} className="gap-2">
+      <Plus size={16} />
+      Register service
+    </Button>
+  );
+
   return (
     <>
       <PageHeader
         title="CAS services"
         subtitle="Applications allowed to use the CAS authentication protocol."
-        actions={!adding && (
-          <button onClick={() => setAdding(true)} className="btn-primary">Register service</button>
-        )}
+        actions={!adding && registerButton}
       />
 
-      {adding && <AddForm onCancel={() => setAdding(false)} onCreated={() => { setAdding(false); refresh(); }} />}
+      {adding && (
+        <AddForm
+          onCancel={() => setAdding(false)}
+          onCreated={() => { setAdding(false); refresh(); }}
+        />
+      )}
 
-      {loading && <Loading />}
+      {loading && <Loading label="Loading services…" />}
       {error && <ErrorState error={error} />}
       {!loading && !error && services.length === 0 && !adding && (
         <EmptyState
           title="No CAS services registered."
           description="Register your first service to enable CAS-protocol logins."
-          action={<button onClick={() => setAdding(true)} className="btn-primary">Register service</button>}
+          action={registerButton}
         />
       )}
 
       {!loading && !error && services.length > 0 && (
         <>
           {/* Mobile: cards with the most important fields surfaced inline. */}
-          <ul className="space-y-2 md:hidden">
+          <ul className="space-y-3 md:hidden">
             {services.map((s) => (
-              <li key={s.id} className="card p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {s.name}
-                    </p>
-                    {s.description && (
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {s.description}
-                      </p>
-                    )}
+              <li key={s.id}>
+                <Card noHover className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-on-surface">{s.name}</p>
+                      {s.description && (
+                        <p className="truncate text-xs text-on-surface-variant">
+                          {s.description}
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      status={s.enabled ? "operational" : "critical"}
+                      label={s.enabled ? "enabled" : "disabled"}
+                    />
                   </div>
-                  {s.enabled ? <span className="badge-green shrink-0">enabled</span> : <span className="badge-red shrink-0">disabled</span>}
-                </div>
-                <code className="mt-2 block break-all rounded bg-slate-50 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  {s.service_url_pattern}
-                </code>
-                {s.released_attributes.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {s.released_attributes.map((a) => (
-                      <span key={a} className="badge-slate">{a}</span>
-                    ))}
+
+                  <code className="mt-3 block break-all rounded-lg bg-surface-container-lowest px-3 py-2 font-mono text-xs text-on-surface">
+                    {s.service_url_pattern}
+                  </code>
+
+                  {s.released_attributes.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {s.released_attributes.map((a) => (
+                        <Badge key={a} status="pending" label={a} />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="text-xs text-on-surface-variant">
+                      {formatDateTime(s.created_at)}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => toggle(s)}>
+                        {s.enabled ? "Disable" : "Enable"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(s)}
+                        className="text-error hover:bg-error/10"
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
-                )}
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatDateTime(s.created_at)}
-                  </span>
-                  <div className="flex gap-3">
-                    <button onClick={() => toggle(s)} className="text-brand-600 hover:underline dark:text-brand-100">
-                      {s.enabled ? "Disable" : "Enable"}
-                    </button>
-                    <button onClick={() => remove(s)} className="text-red-600 hover:underline">
-                      Delete
-                    </button>
-                  </div>
-                </div>
+                </Card>
               </li>
             ))}
           </ul>
 
           {/* Desktop: table. */}
-          <div className="hidden md:block">
-            <div className="card overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-slate-950/40">
-                  <tr>
-                    <th className="table-th">Name</th>
-                    <th className="table-th">URL pattern</th>
-                    <th className="table-th">Released attributes</th>
-                    <th className="table-th">Status</th>
-                    <th className="table-th">Created</th>
-                    <th className="table-th text-right pr-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((s) => (
-                    <tr key={s.id} className="table-row">
-                      <td className="table-td">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">{s.name}</div>
-                        {s.description && (
-                          <div className="text-xs text-slate-500 dark:text-slate-400">{s.description}</div>
-                        )}
-                      </td>
-                      <td className="table-td">
-                        <code className="text-xs">{s.service_url_pattern}</code>
-                      </td>
-                      <td className="table-td text-xs">
-                        {s.released_attributes.length === 0 ? (
-                          <span className="text-slate-400">username only</span>
-                        ) : s.released_attributes.map((a) => (
-                          <span key={a} className="badge-slate mr-1 mb-1">{a}</span>
-                        ))}
-                      </td>
-                      <td className="table-td">
-                        {s.enabled ? <span className="badge-green">enabled</span> : <span className="badge-red">disabled</span>}
-                      </td>
-                      <td className="table-td">{formatDateTime(s.created_at)}</td>
-                      <td className="table-td text-right pr-3">
-                        <button onClick={() => toggle(s)} className="text-xs text-brand-600 hover:underline dark:text-brand-100">
+          <Card noHover className="hidden overflow-hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>URL pattern</TableHead>
+                  <TableHead>Released attributes</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {services.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <div className="font-bold text-on-surface">{s.name}</div>
+                      {s.description && (
+                        <div className="text-xs text-on-surface-variant">{s.description}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <code className="font-mono text-xs">{s.service_url_pattern}</code>
+                    </TableCell>
+                    <TableCell>
+                      {s.released_attributes.length === 0 ? (
+                        <span className="text-xs text-on-surface-variant/60">username only</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {s.released_attributes.map((a) => (
+                            <Badge key={a} status="pending" label={a} />
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        status={s.enabled ? "operational" : "critical"}
+                        label={s.enabled ? "enabled" : "disabled"}
+                      />
+                    </TableCell>
+                    <TableCell>{formatDateTime(s.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => toggle(s)}>
                           {s.enabled ? "Disable" : "Enable"}
-                        </button>
-                        <button onClick={() => remove(s)} className="ml-3 text-xs text-red-600 hover:underline">
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => remove(s)}
+                          className="text-error hover:bg-error/10"
+                        >
                           Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </>
       )}
     </>
@@ -197,22 +240,14 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
     description: "",
     released_attributes: [],
   });
-  const [attrsRaw, setAttrsRaw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     setError(null);
     setBusy(true);
     try {
-      await api.createCASService({
-        ...form,
-        released_attributes: attrsRaw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      });
+      await api.createCASService(form);
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -221,66 +256,65 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
     }
   }
 
+  const valid = form.name.trim() !== "" && form.service_url_pattern.trim() !== "";
+
   return (
-    <form onSubmit={submit} className="card mb-4 max-w-2xl p-4 space-y-3">
-      {error && (
-        <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="cas-name">Name</label>
-          <input
-            id="cas-name"
-            className="input"
+    <Card noHover variant="low" className="mb-6 max-w-2xl">
+      <CardHeader>
+        <CardTitle>Register a CAS service</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && <Alert variant="error">{error}</Alert>}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label="Name"
             required
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             placeholder="Wiki"
           />
+          <div>
+            <Input
+              label="Service URL pattern"
+              required
+              className="font-mono"
+              value={form.service_url_pattern}
+              onChange={(e) => setForm((f) => ({ ...f, service_url_pattern: e.target.value }))}
+              placeholder="https://wiki.example.com/"
+            />
+            <p className="ml-1 mt-1 text-xs text-on-surface-variant">
+              Trailing slash is treated as a prefix match.
+            </p>
+          </div>
         </div>
-        <div>
-          <label className="label" htmlFor="cas-url">Service URL pattern</label>
-          <input
-            id="cas-url"
-            className="input font-mono"
-            required
-            value={form.service_url_pattern}
-            onChange={(e) => setForm((f) => ({ ...f, service_url_pattern: e.target.value }))}
-            placeholder="https://wiki.example.com/"
-          />
-          <p className="hint">Trailing slash is treated as a prefix match.</p>
-        </div>
-      </div>
 
-      <div>
-        <label className="label" htmlFor="cas-attrs">Released attributes</label>
-        <input
-          id="cas-attrs"
-          className="input"
-          value={attrsRaw}
-          onChange={(e) => setAttrsRaw(e.target.value)}
-          placeholder="email, display_name (comma-separated; leave empty for username-only)"
+        {/* Was a comma-separated text field; TagInput makes the list explicit
+            and stops "email,, display_name" style entries reaching the API. */}
+        <TagInput
+          label="Released attributes"
+          value={form.released_attributes ?? []}
+          onChange={(next) => setForm((f) => ({ ...f, released_attributes: next }))}
+          placeholder="email"
         />
-      </div>
+        <p className="-mt-2 ml-1 text-xs text-on-surface-variant">
+          Leave empty to release the username only.
+        </p>
 
-      <div>
-        <label className="label" htmlFor="cas-desc">Description (optional)</label>
-        <input
-          id="cas-desc"
-          className="input"
+        <Input
+          label="Description (optional)"
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
         />
-      </div>
 
-      <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
-        <button type="submit" disabled={busy} className="btn-primary">
-          {busy ? "Registering…" : "Register"}
-        </button>
-      </div>
-    </form>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || !valid}>
+            {busy ? "Registering…" : "Register"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
+export default CASServices

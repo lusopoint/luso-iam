@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CodeBlock,
+  EmptyState,
+  Loading,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  useConfirm,
+  useToast,
+} from "@lusopoint/luso-ui";
+import { Plus } from "lucide-react";
 
-import { useConfirm } from "../components/Confirm";
-import CopyButton from "../components/CopyButton";
-import PageHeader from "../components/PageHeader";
-import { EmptyState, ErrorState, Loading } from "../components/States";
-import { useToast } from "../components/Toast";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { OIDCClient } from "../lib/types";
 import { formatDateTime } from "../lib/util";
 
-/*
- * OIDC clients list. The list endpoint returns all clients regardless
- * of enabled state (the SPA filters visually, the API doesn't), so an
- * admin can see and re-enable a disabled client without a separate view.
- *
- * Rotating the secret happens inline: clicking "Rotate secret" prompts
- * for confirmation, calls the API, and shows the plaintext exactly once.
- */
-
-export default function Clients() {
+const Clients = () => {
   const toast = useToast();
   const confirm = useConfirm();
   const [clients, setClients] = useState<OIDCClient[]>([]);
@@ -42,7 +48,7 @@ export default function Clients() {
     return () => ctrl.abort();
   }, []);
 
-  async function rotate(id: string) {
+  const rotate = async (id: string) => {
     const ok = await confirm({
       title: `Rotate the secret for "${id}"?`,
       message: "All integrations using the old secret will fail until they're updated with the new one. This takes effect immediately.",
@@ -59,10 +65,10 @@ export default function Clients() {
     }
   }
 
-  async function remove(id: string) {
+  const remove = async (id: string) => {
     const ok = await confirm({
       title: `Delete client "${id}"?`,
-      message: "This is a soft delete — tokens already issued continue to validate until they expire.",
+      message: "This is a soft delete: tokens already issued continue to validate until they expire.",
       confirmLabel: "Delete",
       danger: true,
     });
@@ -76,21 +82,30 @@ export default function Clients() {
     }
   }
 
+  const registerButton = (
+    <Link to="/clients/new">
+      <Button className="gap-2">
+        <Plus size={16} />
+        Register client
+      </Button>
+    </Link>
+  );
+
   return (
     <>
       <PageHeader
         title="OIDC clients"
         subtitle="Registered relying parties for OAuth 2.0 / OpenID Connect."
-        actions={<Link to="/clients/new" className="btn-primary">Register client</Link>}
+        actions={registerButton}
       />
 
-      {loading && <Loading />}
+      {loading && <Loading label="Loading clients…" />}
       {error && <ErrorState error={error} />}
       {!loading && !error && clients.length === 0 && (
         <EmptyState
           title="No OIDC clients registered yet."
           description="Register your first client to start issuing tokens."
-          action={<Link to="/clients/new" className="btn-primary">Register client</Link>}
+          action={registerButton}
         />
       )}
 
@@ -107,133 +122,186 @@ export default function Clients() {
           {/* Mobile: stacked cards. Each card surfaces name+id, type/PKCE
               badges, status, and the same Rotate/Delete actions as the
               desktop row. We omit grants and full redirect URI list to
-              keep the card scannable — operators can tap into the JSON
+              keep the card scannable, operators can tap into the JSON
               from a desktop session if they need that depth. */}
-          <ul className="space-y-2 md:hidden">
+          <ul className="space-y-3 md:hidden">
             {clients.map((c) => (
-              <li key={c.id} className="card p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {c.name}
-                    </p>
-                    <code className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                      {c.id}
-                    </code>
+              <li key={c.id}>
+                <Card noHover className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-on-surface">{c.name}</p>
+                      <code className="block truncate font-mono text-xs text-on-surface-variant">
+                        {c.id}
+                      </code>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <Badge
+                        status={c.enabled ? "operational" : "critical"}
+                        label={c.enabled ? "enabled" : "disabled"}
+                      />
+                      <Badge
+                        status={c.is_public ? "pending" : "in_progress"}
+                        label={c.is_public ? "public" : "confidential"}
+                      />
+                    </div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {c.enabled ? <span className="badge-green">enabled</span> : <span className="badge-red">disabled</span>}
-                    {c.is_public ? <span className="badge-slate">public</span> : <span className="badge-brand">confidential</span>}
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+                    {c.require_pkce && <Badge status="operational" label="PKCE" />}
+                    <span>
+                      {c.redirect_uris.length} redirect
+                      {c.redirect_uris.length === 1 ? "" : "s"}
+                    </span>
+                    <span>·</span>
+                    <span>{formatDateTime(c.created_at)}</span>
                   </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  {c.require_pkce && <span className="badge-green">PKCE</span>}
-                  <span>{c.redirect_uris.length} redirect{c.redirect_uris.length === 1 ? "" : "s"}</span>
-                  <span>·</span>
-                  <span>{formatDateTime(c.created_at)}</span>
-                </div>
-                <div className="mt-3 flex justify-end gap-3 text-sm">
-                  <Link to={`/clients/${c.id}`} className="text-brand-600 hover:underline dark:text-brand-100">
-                    Edit
-                  </Link>
-                  {!c.is_public && (
-                    <button onClick={() => rotate(c.id)} className="text-brand-600 hover:underline dark:text-brand-100">
-                      Rotate secret
-                    </button>
-                  )}
-                  <button onClick={() => remove(c.id)} className="text-red-600 hover:underline">
-                    Delete
-                  </button>
-                </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Link to={`/clients/${c.id}`}>
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </Link>
+                    {!c.is_public && (
+                      <Button variant="ghost" size="sm" onClick={() => rotate(c.id)}>
+                        Rotate secret
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => remove(c.id)}
+                      className="text-error hover:bg-error/10"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </Card>
               </li>
             ))}
           </ul>
 
           {/* Desktop: full table. Hidden under md. */}
-          <div className="hidden md:block">
-            <div className="card overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-slate-950/40">
-                  <tr>
-                    <th className="table-th">Client</th>
-                    <th className="table-th">Type</th>
-                    <th className="table-th">Grants</th>
-                    <th className="table-th">Redirect URIs</th>
-                    <th className="table-th">Status</th>
-                    <th className="table-th">Created</th>
-                    <th className="table-th text-right pr-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clients.map((c) => (
-                    <tr key={c.id} className="table-row">
-                      <td className="table-td">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">{c.name}</div>
-                        <code className="text-xs text-slate-500 dark:text-slate-400">{c.id}</code>
-                      </td>
-                      <td className="table-td">
-                        {c.is_public ? <span className="badge-slate">public</span> : <span className="badge-brand">confidential</span>}
-                        {c.require_pkce && <span className="badge-green ml-1">PKCE</span>}
-                      </td>
-                      <td className="table-td text-xs">
+          <Card noHover className="hidden overflow-hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Grants</TableHead>
+                  <TableHead>Redirect URIs</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <div className="font-bold text-on-surface">{c.name}</div>
+                      <code className="font-mono text-xs text-on-surface-variant">{c.id}</code>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge
+                          status={c.is_public ? "pending" : "in_progress"}
+                          label={c.is_public ? "public" : "confidential"}
+                        />
+                        {c.require_pkce && <Badge status="operational" label="PKCE" />}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
                         {c.allowed_grant_types.map((g) => (
-                          <span key={g} className="badge-slate mr-1 mb-1">{g}</span>
+                          <Badge key={g} status="pending" label={g} />
                         ))}
-                      </td>
-                      <td className="table-td text-xs">
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-xs text-xs">
                         {c.redirect_uris.slice(0, 2).map((u) => (
-                          <div key={u} className="truncate max-w-xs" title={u}>{u}</div>
+                          <div key={u} className="truncate" title={u}>
+                            {u}
+                          </div>
                         ))}
                         {c.redirect_uris.length > 2 && (
-                          <div className="text-slate-400">+ {c.redirect_uris.length - 2} more</div>
+                          <div className="text-on-surface-variant/60">
+                            + {c.redirect_uris.length - 2} more
+                          </div>
                         )}
-                      </td>
-                      <td className="table-td">
-                        {c.enabled ? <span className="badge-green">enabled</span> : <span className="badge-red">disabled</span>}
-                      </td>
-                      <td className="table-td">{formatDateTime(c.created_at)}</td>
-                      <td className="table-td text-right pr-3">
-                        <Link to={`/clients/${c.id}`} className="text-xs text-brand-600 hover:underline dark:text-brand-100">Edit</Link>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        status={c.enabled ? "operational" : "critical"}
+                        label={c.enabled ? "enabled" : "disabled"}
+                      />
+                    </TableCell>
+                    <TableCell>{formatDateTime(c.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Link to={`/clients/${c.id}`}>
+                          <Button variant="ghost" size="sm">Edit</Button>
+                        </Link>
                         {!c.is_public && (
-                          <button onClick={() => rotate(c.id)} className="ml-3 text-xs text-brand-600 hover:underline dark:text-brand-100">Rotate</button>
+                          <Button variant="ghost" size="sm" onClick={() => rotate(c.id)}>
+                            Rotate
+                          </Button>
                         )}
-                        <button onClick={() => remove(c.id)} className="ml-3 text-xs text-red-600 hover:underline">Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => remove(c.id)}
+                          className="text-error hover:bg-error/10"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </>
       )}
     </>
   );
 }
 
-export function SecretBanner({ title, secret, onDismiss }: { title: string; secret: string; onDismiss: () => void }) {
+/**
+ * Shown exactly once, immediately after a secret is minted or rotated. The
+ * plaintext is never retrievable again, so the copy affordance matters more
+ * than the styling, CodeBlock handles the clipboard fallback for insecure
+ * origins, and toasts on success so the confirmation survives focus moving.
+ */
+export const SecretBanner = ({
+  title,
+  secret,
+  onDismiss,
+}: {
+  title: string;
+  secret: string;
+  onDismiss: () => void;
+}) => {
+  const toast = useToast();
+
   return (
-    <div className="card mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700/50 dark:bg-amber-950/40">
+    <Alert variant="warning" title={title} className="mb-6 flex-col sm:flex-row">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-            {title}
-          </h3>
-          <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
-            This is the only time you'll see this value. Copy it now.
-          </p>
-          <div className="mt-2 flex items-start gap-2 rounded bg-white p-2 dark:bg-slate-900">
-            <code className="min-w-0 flex-1 break-all font-mono text-xs text-slate-900 dark:text-slate-100">
-              {secret}
-            </code>
-            {/* CopyButton handles the secure-context fallback and shows a
-                "Copied" flash; toast-on-success is on so the confirmation
-                is also visible after focus moves elsewhere. */}
-            <CopyButton value={secret} toastOnSuccess label="" className="shrink-0" />
-          </div>
+        <div className="min-w-0 flex-1">
+          <p>This is the only time you'll see this value. Copy it now.</p>
+          <CodeBlock
+            value={secret}
+            inline
+            className="mt-2"
+            onCopied={() => toast.success("Copied to clipboard")}
+          />
         </div>
-        <button className="btn-secondary self-end sm:self-start" onClick={onDismiss}>Dismiss</button>
+        <Button variant="outline" size="sm" onClick={onDismiss} className="shrink-0">
+          Dismiss
+        </Button>
       </div>
-    </div>
+    </Alert>
   );
 }
+
+export default Clients

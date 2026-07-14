@@ -1,91 +1,9 @@
 @import "tailwindcss";
+/* luso ui style*/
+@import "@lusopoint/luso-ui/style.css";
 
-/*
- * Design tokens for the IAM admin. Kept short on purpose: the goal is a
- * crisp, opinionated administrative interface, not a marketing site.
- *
- * Colors:
- *   - brand:   primary actions, links, focus rings
- * Tailwind v4 reads CSS custom properties at the @theme block and
- * exposes them as utilities (e.g. bg-brand-600, text-brand-100).
- */
-@theme {
-  --color-brand-50:  oklch(0.97 0.02 250);
-  --color-brand-100: oklch(0.93 0.04 250);
-  --color-brand-500: oklch(0.62 0.18 250);
-  --color-brand-600: oklch(0.55 0.18 250);
-  --color-brand-700: oklch(0.48 0.18 250);
-
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,
-               Consolas, "Liberation Mono", "Courier New", monospace;
+html,
+body,
+#root {
+  min-height: 100%;
 }
-
-/*
- * Component-shaped utilities. We promote a handful of patterns into
- * named classes so JSX stays tidy.
- *
- * Tailwind v4 changed the @apply story: you cannot @apply a custom class
- * (.btn) from inside another @layer-components definition. Pragmatic
- * workaround — inline the shared rules into each variant. The variants
- * differ mainly in colour, so the duplication is small and local.
- */
-@layer components {
-  .card {
-    @apply rounded-lg border border-slate-200 bg-white shadow-sm
-           dark:border-slate-800 dark:bg-slate-900;
-  }
-
-  /* Buttons. Shared shape rules applied to each variant via grouped selector. */
-  .btn-primary,
-  .btn-secondary,
-  .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md
-           px-3 py-1.5 text-sm font-medium transition
-           focus:outline-none focus:ring-2 focus:ring-offset-2
-           focus:ring-brand-500 focus:ring-offset-white
-           dark:focus:ring-offset-slate-900
-           disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-primary    { @apply bg-brand-600 text-white hover:bg-brand-700; }
-  .btn-secondary  { @apply bg-slate-100 text-slate-700 hover:bg-slate-200
-                           dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700; }
-  .btn-danger     { @apply bg-red-600 text-white hover:bg-red-700; }
-
-  .input {
-    @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-1.5
-           text-sm text-slate-900 placeholder:text-slate-400
-           focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500
-           dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
-  }
-  .label {
-    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
-  }
-  .hint {
-    @apply mt-1 text-xs text-slate-500 dark:text-slate-400;
-  }
-
-  /* Badges. Same pattern as buttons - shared shape via grouped selector. */
-  .badge-green, .badge-red, .badge-amber, .badge-slate, .badge-brand {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
-  }
-  .badge-green   { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300; }
-  .badge-red     { @apply bg-red-100      text-red-800     dark:bg-red-900/40     dark:text-red-300; }
-  .badge-amber   { @apply bg-amber-100    text-amber-800   dark:bg-amber-900/40   dark:text-amber-300; }
-  .badge-slate   { @apply bg-slate-100    text-slate-700   dark:bg-slate-800      dark:text-slate-300; }
-  .badge-brand   { @apply bg-brand-100    text-brand-700   dark:bg-brand-700/40   dark:text-brand-100; }
-
-  .table-th {
-    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide
-           text-slate-500 dark:text-slate-400;
-  }
-  .table-td {
-    @apply px-3 py-2 text-sm text-slate-800 dark:text-slate-200;
-  }
-  .table-row {
-    @apply border-t border-slate-100 dark:border-slate-800;
-  }
-}
-
-/* Layout safety net: body classes are applied in index.html - this is
-   the fallback if some other tooling strips them. */
-html, body, #root { min-height: 100%; }

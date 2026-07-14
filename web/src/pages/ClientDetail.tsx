@@ -1,26 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Input,
+  Loading,
+  PageHeader,
+  TagInput,
+  useToast,
+} from "@lusopoint/luso-ui";
 
-import PageHeader from "../components/PageHeader";
 import { ScopesEditor } from "../components/ScopesEditor";
-import { ErrorState, Loading } from "../components/States";
-import { useToast } from "../components/Toast";
+import { ErrorState } from "../components/States";
 import { ApiError, api } from "../lib/api";
 import type { OIDCClient } from "../lib/types";
-
-/*
- * ClientDetail: view and edit a registered OIDC client.
- *
- * The server's PATCH endpoint accepts a subset of fields — name,
- * redirect_uris, allowed_scopes, allowed_grant_types, require_pkce,
- * require_consent, enabled. The client_id and is_public are identity- and
- * security-defining and are intentionally NOT editable here (matching the
- * API). To change those, delete and re-register.
- */
+import { validRedirectURI } from "../lib/util";
 
 const GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials"];
 
-export default function ClientDetail() {
+const ClientDetail = () => {
   const { id = "" } = useParams<{ id: string }>();
   const toast = useToast();
 
@@ -31,7 +31,7 @@ export default function ClientDetail() {
 
   // editable form fields
   const [name, setName] = useState("");
-  const [redirectURIs, setRedirectURIs] = useState<string[]>([""]);
+  const [redirectURIs, setRedirectURIs] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([]);
   const [grantTypes, setGrantTypes] = useState<string[]>([]);
   const [requirePKCE, setRequirePKCE] = useState(false);
@@ -46,7 +46,7 @@ export default function ClientDetail() {
       .then((c) => {
         setClient(c);
         setName(c.name);
-        setRedirectURIs(c.redirect_uris.length ? c.redirect_uris : [""]);
+        setRedirectURIs(c.redirect_uris);
         setScopes(c.allowed_scopes);
         setGrantTypes(c.allowed_grant_types);
         setRequirePKCE(c.require_pkce);
@@ -66,31 +66,16 @@ export default function ClientDetail() {
     return () => ctrl.abort();
   }, [id]);
 
-  function setRedirect(i: number, v: string) {
-    setRedirectURIs((prev) => {
-      const next = [...prev];
-      next[i] = v;
-      return next;
-    });
-  }
-  function addRedirect() {
-    setRedirectURIs((prev) => [...prev, ""]);
-  }
-  function removeRedirect(i: number) {
-    setRedirectURIs((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  function toggleGrant(g: string, on: boolean) {
+  const toggleGrant = (g: string, on: boolean) => {
     setGrantTypes((prev) => (on ? [...new Set([...prev, g])] : prev.filter((x) => x !== g)));
   }
 
-  async function save() {
+  const save = async () => {
     setSaving(true);
     try {
-      const cleanRedirects = redirectURIs.map((u) => u.trim()).filter(Boolean);
       const updated = await api.updateClient(id, {
         name,
-        redirect_uris: cleanRedirects,
+        redirect_uris: redirectURIs,
         allowed_scopes: scopes,
         allowed_grant_types: grantTypes,
         require_pkce: requirePKCE,
@@ -106,7 +91,7 @@ export default function ClientDetail() {
     }
   }
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading label="Loading client…" />;
   if (error) return <ErrorState error={error} />;
   if (!client) return <ErrorState error={new Error("Client not found.")} />;
 
@@ -114,137 +99,92 @@ export default function ClientDetail() {
   const pkceLocked = client.is_public;
 
   return (
-    <div className="space-y-6">
+    <>
       <PageHeader
+        breadcrumbs={[{ label: "Clients", href: "/clients" }, { label: client.name || client.id }]}
         title={client.name || client.id}
         subtitle={`${client.id} · ${client.is_public ? "public" : "confidential"}`}
         actions={
-          <Link to="/clients" className="btn-secondary">
-            Back to clients
+          <Link to="/clients">
+            <Button variant="outline">Back to clients</Button>
           </Link>
         }
       />
 
-      <div className="card space-y-5 p-6">
-        <div>
-          <label className="label" htmlFor="name">
-            Display name
-          </label>
-          <input
-            id="name"
-            className="input"
+      <Card noHover className="max-w-2xl">
+        <CardContent className="space-y-6 pt-6">
+          <Input
+            label="Display name"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-        </div>
 
-        <div>
-          <label className="label">Redirect URIs</label>
-          <div className="space-y-2">
-            {redirectURIs.map((u, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  value={u}
-                  onChange={(e) => setRedirect(i, e.target.value)}
-                  placeholder="https://app.example.com/callback"
-                />
-                {redirectURIs.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => removeRedirect(i)}
-                    aria-label="Remove redirect URI"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-            <button type="button" className="btn-secondary" onClick={addRedirect}>
-              + Add another
-            </button>
+          <div>
+            <TagInput
+              label="Redirect URIs"
+              value={redirectURIs}
+              onChange={setRedirectURIs}
+              placeholder="https://app.example.com/callback"
+              validate={validRedirectURI}
+            />
+            <p className="ml-1 mt-2 text-xs text-on-surface-variant">
+              Exact-match; at least one required.
+            </p>
           </div>
-          <p className="hint">Exact-match; at least one required.</p>
-        </div>
 
-        <div>
-          <label className="label">Allowed scopes</label>
           <ScopesEditor value={scopes} onChange={setScopes} />
-          <p className="hint">
-            Include <span className="font-mono">offline_access</span> to allow refresh tokens.
-          </p>
-        </div>
 
-        <div>
-          <label className="label">Grant types</label>
-          <div className="flex flex-wrap gap-4">
-            {GRANT_TYPES.map((g) => (
-              <label key={g} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          <div>
+            <span className="ml-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+              Grant types
+            </span>
+            <div className="mt-3 flex flex-wrap gap-6">
+              {GRANT_TYPES.map((g) => (
+                <Checkbox
+                  key={g}
+                  label={g}
                   checked={grantTypes.includes(g)}
                   onChange={(e) => toggleGrant(g, e.target.checked)}
+                  className="font-mono"
                 />
-                <span className="font-mono">{g}</span>
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <label className={`flex items-start gap-2 text-sm ${pkceLocked ? "opacity-60" : ""}`}>
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Checkbox
+              label="Require PKCE (S256)"
+              description={
+                pkceLocked
+                  ? "Always required for public clients."
+                  : "Recommended for confidential clients."
+              }
               checked={pkceLocked ? true : requirePKCE}
               disabled={pkceLocked}
               onChange={(e) => setRequirePKCE(e.target.checked)}
             />
-            <span>
-              <span className="font-medium text-slate-800 dark:text-slate-200">Require PKCE (S256)</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">
-                {pkceLocked ? "Always required for public clients." : "Recommended for confidential clients."}
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            <Checkbox
+              label="Require consent"
+              description="Show a consent screen."
               checked={requireConsent}
               onChange={(e) => setRequireConsent(e.target.checked)}
             />
-            <span>
-              <span className="font-medium text-slate-800 dark:text-slate-200">Require consent</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">Show a consent screen.</span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            <Checkbox
+              label="Enabled"
+              description="Disabled clients are rejected at authorization."
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
-            <span>
-              <span className="font-medium text-slate-800 dark:text-slate-200">Enabled</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">
-                Disabled clients are rejected at authorization.
-              </span>
-            </span>
-          </label>
-        </div>
+          </div>
 
-        <div className="flex justify-end">
-          <button className="btn-primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
-      </div>
-    </div>
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving || redirectURIs.length === 0}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
+export default ClientDetail

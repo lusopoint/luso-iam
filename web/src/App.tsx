@@ -1,10 +1,14 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { ConfirmProvider } from "./components/Confirm";
+import {
+  ConfirmProvider,
+  Loading,
+  PromptProvider,
+  ToastProvider,
+} from "@lusopoint/luso-ui";
+
 import Layout from "./components/Layout";
-import { PromptProvider } from "./components/Prompt";
 import PwaUpdater from "./components/PwaUpdater";
-import { ErrorState, Loading } from "./components/States";
-import { ToastProvider } from "./components/Toast";
+import { ErrorState } from "./components/States";
 import { useMe } from "./lib/auth";
 import Audit from "./pages/Audit";
 import ClientNew from "./pages/ClientNew";
@@ -17,17 +21,7 @@ import CASServices from "./pages/CASServices";
 import UserDetail from "./pages/UserDetail";
 import Users from "./pages/Users";
 
-/*
- * Top-level routing. The /me call gates everything — if the visitor
- * isn't an authenticated admin we show ErrorState (which surfaces a
- * Sign-In button pointing at /cas/login), not a Login page. Putting the
- * actual sign-in on the CAS UI keeps a single source of truth for
- * authentication and lets MFA, federation, etc. work transparently.
- *
- * Toast + Confirm providers wrap everything so every page can call
- * useToast() / useConfirm() without prop drilling.
- */
-export default function App() {
+const App = () => {
   const me = useMe();
 
   if (me.loading) {
@@ -40,11 +34,8 @@ export default function App() {
 
   if (me.error || !me.user) {
     return (
-      <div className="mx-auto max-w-md p-10">
-        <h1 className="mb-3 text-xl font-semibold">IAM admin</h1>
-        <ErrorState
-          error={me.error ?? new Error("Not signed in.")}
-        />
+      <div className="mx-auto grid min-h-screen max-w-lg place-items-center p-6">
+        <ErrorState error={me.error ?? new Error("Not signed in.")} />
       </div>
     );
   }
@@ -68,12 +59,16 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
-          {/* Side-effect component: registers the SW, surfaces "ready
-              offline" once, and renders the reload banner when a new
-              version is available. Has to live inside ToastProvider. */}
+          {/*
+          side-effect component: registers the SW, surfaces "ready
+          offline" once, and renders the reload banner when a new
+          version is available. Has to live inside ToastProvider
+          */}
           <PwaUpdater />
         </PromptProvider>
       </ConfirmProvider>
     </ToastProvider>
   );
 }
+
+export default App
