@@ -1,0 +1,589 @@
+/*
+ * Auth page styles — the one stylesheet behind every server-rendered page.
+ *
+ * Replaces the fourteen near-identical <style> blocks that each template used
+ * to carry. Every colour here comes from tokens.css, which is copied verbatim
+ * out of @lusopoint/luso-ui (`make sync-tokens`) — so the login page and the
+ * admin SPA are literally driven by the same design tokens and cannot drift.
+ *
+ * Hand-written CSS on purpose. These pages are zero-build and near-zero-JS:
+ * pulling Tailwind (or React) in here would mean the sign-in form depends on a
+ * bundle, and that is a bad trade for the one page that must never break.
+ *
+ * Only the tokens are shared, not the machinery — this file mirrors the LusoUI
+ * *look* (radii, weights, the uppercase tracking, the ambient shadow) by hand.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--on-surface);
+  font-family:
+    "Plus Jakarta Sans",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* page shell */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--on-surface);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.brand svg {
+  width: 22px;
+  height: 22px;
+  color: var(--primary);
+}
+
+/* card */
+.card {
+  width: 100%;
+  max-width: 26rem;
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+}
+
+.dark .card {
+  box-shadow: 0 4px 20px -4px rgba(var(--primary-rgb), 0.05);
+}
+
+/* wider card for the settings page, which lists methods in rows */
+.card.card-wide {
+  max-width: 34rem;
+}
+
+.card h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.card h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--on-surface-variant);
+}
+
+.card h2:first-of-type {
+  margin-top: 1.5rem;
+}
+
+/* `.subtitle` and `.sub` were used interchangeably across templates. Both are
+   honoured so no page is left unstyled; new pages should use .subtitle. */
+.subtitle,
+.sub {
+  margin: 0 0 1.5rem;
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.card p {
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.card ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.1rem;
+  color: var(--on-surface-variant);
+  font-size: 0.85rem;
+}
+
+.card ol li {
+  margin-bottom: 0.35rem;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+/* Fields */
+
+.field {
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--on-surface-variant);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+}
+
+input::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+.hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+}
+
+/* Buttons */
+
+.btn,
+button[type="submit"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  border: none;
+  border-radius: 12px;
+  background-image: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-container) 100%
+  );
+  color: var(--on-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.btn:hover,
+button[type="submit"]:hover {
+  box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.5);
+}
+
+.btn:active,
+button[type="submit"]:active {
+  transform: scale(0.985);
+}
+
+.btn:disabled,
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* `.btn-primary` is an alias of `.btn` — both names were in use across the old
+   templates, and honouring both means no page is left unstyled during the
+   migration. New pages should use `.btn`. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  border: none;
+  border-radius: 12px;
+  background-image: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-container) 100%
+  );
+  color: var(--on-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.5);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  background-color: transparent;
+  background-image: none;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--primary);
+  background-color: var(--surface-container);
+  box-shadow: none;
+}
+
+/* Destructive / low-emphasis inline action, e.g. "Remove" next to a method. */
+.btn-link {
+  width: auto;
+  padding: 0.35rem 0.6rem;
+  background: none;
+  background-image: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--error);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  box-shadow: none;
+}
+
+/* Consent screen: the two decisions must be visually distinguishable. */
+.btn-deny {
+  background-image: none;
+  background-color: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+}
+
+.btn-deny:hover {
+  border-color: var(--error);
+  color: var(--error);
+  box-shadow: none;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/* Alerts */
+
+.error,
+.warn,
+.notice {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid;
+  font-size: 0.85rem;
+}
+
+.error {
+  background-color: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--error);
+}
+
+.warn {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #b45309;
+}
+
+.dark .warn {
+  color: #fbbf24;
+}
+
+.notice {
+  background-color: rgba(var(--primary-rgb), 0.08);
+  border-color: rgba(var(--primary-rgb), 0.2);
+  color: var(--on-surface-variant);
+}
+
+/* Divider */
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--on-surface-variant);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--outline-variant);
+}
+
+/* Upstream SSO buttons */
+
+.sso-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sso-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  color: var(--on-surface);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.sso-btn:hover {
+  border-color: var(--primary);
+  background-color: var(--surface-container);
+}
+
+.sso-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Secondary links under a form */
+
+.alt,
+.back {
+  display: block;
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--on-surface-variant);
+  text-decoration: none;
+}
+
+.alt a,
+.back:hover {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.service-hint {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--outline-variant);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+}
+
+/* MFA: enrolled methods list */
+
+.method {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.method:last-of-type {
+  border-bottom: none;
+}
+
+.method .name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.method .meta {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+}
+
+form.inline {
+  margin: 0;
+}
+
+.empty {
+  padding: 1rem 0;
+  font-size: 0.85rem;
+  color: var(--on-surface-variant);
+}
+
+/* MFA: TOTP enrolment */
+
+.qr {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0;
+}
+
+.qr img {
+  width: 180px;
+  height: 180px;
+  padding: 0.75rem;
+  background: #fff; /* QR codes need a white quiet zone, in both themes */
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+}
+
+.secret {
+  margin-bottom: 1.5rem;
+  padding: 0.75rem;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  word-break: break-all;
+}
+
+/* MFA: backup codes */
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.codes div {
+  padding: 0.6rem;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* WebAuthn status line */
+
+.webauthn-block {
+  margin-bottom: 0.5rem;
+}
+
+#wa-status {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--on-surface-variant);
+  text-align: center;
+}
+
+#wa-status.error {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--error);
+}
+
+/* OIDC consent: requested scopes */
+
+.scopes {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.scopes li {
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+/* Footer */
+
+@media (max-width: 400px) {
+  .card {
+    padding: 1.5rem;
+  }
+
+  .codes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

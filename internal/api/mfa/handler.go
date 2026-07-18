@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/lusopoint/lusoiam/internal/api/web"
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
@@ -22,7 +23,9 @@ import (
 
 //go:embed templates/*.html
 var templatesFS embed.FS
-var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+
+// one parsed set per page, each combining the shared base layout (internal/api/web)
+var templates = web.MustPages(templatesFS, "templates/*.html")
 
 // handler owns all /mfa/* endpoints
 type Handler struct {
@@ -576,13 +579,9 @@ type enrollData struct {
 	BackupCodesRemaining int
 }
 
-// render helpers, TODO: not sure but we could try to move this to the web (react)
-
+// render helpers
 func renderTemplate(w http.ResponseWriter, name string, status int, data any) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, name, data)
+	web.Render(w, templates, name, status, data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

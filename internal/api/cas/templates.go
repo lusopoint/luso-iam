@@ -2,16 +2,18 @@ package cas
 
 import (
 	"embed"
-	"html/template"
 	"net/http"
+
+	"github.com/lusopoint/lusoiam/internal/api/web"
 )
 
 //go:embed templates/*.html
 var templatesFS embed.FS
 
-// templates is the parsed template set. Parsed once at init() so we
-// fail fast at startup if a template is malformed.
-var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+// templates holds one parsed set per page, each combining the shared base
+// layout (internal/api/web) with that page's content block. Parsed at init so a
+// malformed template fails at startup rather than on a user's sign-in attempt
+var templates = web.MustPages(templatesFS, "templates/*.html")
 
 // loginPageData drives the login.html template
 type loginPageData struct {
@@ -42,19 +44,9 @@ type errorPageData struct {
 }
 
 func renderLogin(w http.ResponseWriter, status int, data loginPageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	if err := templates.ExecuteTemplate(w, "login.html", data); err != nil {
-		// Headers are already sent; nothing useful to do with the error
-		// AccessLog middleware captures status.
-		return
-	}
+	web.Render(w, templates, "login.html", status, data)
 }
 
 func renderError(w http.ResponseWriter, status int, data errorPageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, "error.html", data)
+	web.Render(w, templates, "error.html", status, data)
 }

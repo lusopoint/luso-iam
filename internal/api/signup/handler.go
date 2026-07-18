@@ -3,9 +3,10 @@ package signup
 import (
 	"embed"
 	"errors"
-	"html/template"
 	"log/slog"
 	"net/http"
+
+	"github.com/lusopoint/lusoiam/internal/api/web"
 
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authsignup "github.com/lusopoint/lusoiam/internal/auth/signup"
@@ -15,7 +16,7 @@ import (
 //go:embed templates/*.html
 var templatesFS embed.FS
 
-var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+var templates = web.MustPages(templatesFS, "templates/*.html")
 
 // signupPageData drives signup.html.
 type signupPageData struct {
@@ -169,24 +170,15 @@ func (h *Handler) verifyGET(w http.ResponseWriter, r *http.Request) {
 // renderers
 
 func renderSignup(w http.ResponseWriter, status int, data signupPageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, "signup.html", data)
+	web.Render(w, templates, "signup.html", status, data)
 }
 
 func renderSignupDone(w http.ResponseWriter, status int, data signupDoneData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, "signup_done.html", data)
+	web.Render(w, templates, "signup_done.html", status, data)
 }
 
 func renderVerifyInvalid(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusBadRequest)
-	_ = templates.ExecuteTemplate(w, "verify_invalid.html", nil)
+	web.Render(w, templates, "verify_invalid.html", http.StatusBadRequest, nil)
 }
 
 // itoa avoids pulling in strconv for one trivial use.

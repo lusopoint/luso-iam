@@ -1,0 +1,162 @@
+/* GENERATED FILE, DO NOT EDIT!
+ * Run `make sync-tokens`. Source: @lusopoint/luso-ui/src/styles/palette.css
+ * Edit the tokens there; they are shared with the admin SPA.
+ *
+ * The @font-face import is stripped on purpose: the auth pages make ZERO
+ * external requests (the SSO icons are inlined SVG for the same reason), so
+ * they never tell Google that a given user is sitting on a login page. It is
+ * also blocked by our CSP (style-src self). The pages fall back to system-ui.
+ */
+
+/**
+ * CELESTIAL GOLD (Default Light Mode)
+ * Defines the baseline palette for the application's light theme.
+ */
+:root {
+  --background: #f8f9fc;
+  --surface: #ffffff;
+  --surface-dim: #f0f2f7;
+  --surface-variant: rgba(255, 255, 255, 0.7);
+
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f8f9fc;
+  --surface-container: #f0f2f7;
+  --surface-container-high: #e2e7ef;
+  --surface-container-highest: #d8dde7;
+
+  --on-surface: #0f172a;
+  --on-surface-variant: #475569;
+
+  --primary: #b3922d;
+  --primary-rgb: 179, 146, 45;
+  --primary-container: #8c7223;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(179, 146, 45, 0.05);
+
+  --secondary: #64748b;
+  --error: #ef4444;
+  --outline-variant: #e2e8f0;
+}
+
+/**
+ * CELESTIAL GOLD (Default Dark Mode)
+ * Midnight-inspired palette with high-contrast gold accents.
+ */
+.dark {
+  --background: #0b0f19;
+  --surface: #111827;
+  --surface-dim: #1e293b;
+  --surface-variant: rgba(17, 24, 39, 0.7);
+
+  --surface-container-lowest: #020617;
+  --surface-container-low: #0f172a;
+  --surface-container: #1e293b;
+  --surface-container-high: #334155;
+  --surface-container-highest: #475569;
+
+  --on-surface: #f8fafc;
+  --on-surface-variant: #94a3b8;
+
+  --primary: #f2ca50;
+  --primary-rgb: 242, 202, 80;
+  --primary-container: #d4af37;
+  --on-primary: #3c2f00;
+  --spotlight-color: rgba(242, 202, 80, 0.03);
+
+  --secondary: #94a3b8;
+  --error: #f87171;
+  --outline-variant: rgba(255, 255, 255, 0.05);
+}
+
+/**
+ * TECH SAPPHIRE (Blue Colour Theme Override)
+ */
+:root.theme-sapphire {
+  --primary: #0284c7;
+  --primary-rgb: 2, 132, 199;
+  --primary-container: #0369a1;
+  --spotlight-color: rgba(2, 132, 199, 0.05);
+}
+:root.theme-sapphire.dark {
+  --primary: #38bdf8;
+  --primary-rgb: 56, 189, 248;
+  --primary-container: #0ea5e9;
+  --on-primary: #082f49;
+  --spotlight-color: rgba(56, 189, 248, 0.03);
+}
+
+/**
+ * ECO EMERALD (Green Colour Theme Override)
+ */
+:root.theme-emerald {
+  --primary: #059669;
+  --primary-rgb: 5, 150, 105;
+  --primary-container: #047857;
+  --spotlight-color: rgba(5, 150, 105, 0.05);
+}
+:root.theme-emerald.dark {
+  --primary: #34d399;
+  --primary-rgb: 52, 211, 153;
+  --primary-container: #10b981;
+  --on-primary: #022c22;
+  --spotlight-color: rgba(52, 211, 153, 0.03);
+}
+
+/**
+ * CRIMSON RUBY (Red Colour Theme Override)
+ */
+:root.theme-ruby {
+  --primary: #e11d48;
+  --primary-rgb: 225, 29, 72;
+  --primary-container: #be123c;
+  --spotlight-color: rgba(225, 29, 72, 0.05);
+}
+:root.theme-ruby.dark {
+  --primary: #fb7185;
+  --primary-rgb: 251, 113, 133;
+  --primary-container: #f43f5e;
+  --on-primary: #4c0519;
+  --spotlight-color: rgba(251, 113, 133, 0.03);
+}
+
+/**
+ * AMETHYST VIOLET (Purple Colour Theme Override)
+ */
+:root.theme-amethyst {
+  --primary: #7c3aed;
+  --primary-rgb: 124, 58, 237;
+  --primary-container: #6d28d9;
+  --spotlight-color: rgba(124, 58, 237, 0.05);
+}
+:root.theme-amethyst.dark {
+  --primary: #a78bfa;
+  --primary-rgb: 167, 139, 250;
+  --primary-container: #8b5cf6;
+  --on-primary: #2e1065;
+  --spotlight-color: rgba(167, 139, 250, 0.03);
+}
+
+/**
+ * Custom scrollbar styling for a more integrated feel across all apps.
+ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--surface-container-high);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--surface-container-highest);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

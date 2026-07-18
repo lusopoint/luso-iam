@@ -23,6 +23,7 @@ import (
 	apiproxy "github.com/lusopoint/lusoiam/internal/api/proxy"
 	apisignup "github.com/lusopoint/lusoiam/internal/api/signup"
 	apispa "github.com/lusopoint/lusoiam/internal/api/spa"
+	apiweb "github.com/lusopoint/lusoiam/internal/api/web"
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
 	authfed "github.com/lusopoint/lusoiam/internal/auth/federation"
@@ -212,6 +213,10 @@ func run() error {
 	// routes
 	mux := http.NewServeMux()
 	apihealth.Register(mux, pool)
+
+	// shared static assets for the server-rendered pages (design tokens,
+	// auth stylesheet, webauthn helpers). Embedded in the binary.
+	apiweb.Register(mux)
 
 	// CAS 1.0 / 2.0 / 3.0
 	providerLabels := map[string]string{}

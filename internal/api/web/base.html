@@ -1,0 +1,82 @@
+{{/*
+  shared base layout for every server-rendered page (CAS login, MFA, consent,
+  signup, password reset)
+
+  each page supplies three optional blocks:
+    - {{define "title"}}: <title> text, defaults to "IAM"
+    - {{define "content"}}: the page body, inside the centred card column
+    - {{define "scripts"}}: page-specific JS, emitted at end of <body>
+
+  defaults are declared at the bottom of this file
+  because the page template is parsed AFTER this one, any block the page defines replaces the default
+
+  these pages are deliberately zero-build and almost zero js: no bundler, no
+  framework, no hydration. They sit between a user and their account, and the
+  login form must work even if every script on the page fails!!
+*/}}
+
+{{define "base"}}<!doctype html>
+<html lang="en" class="theme-sapphire">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{{ template "title" . }}</title>
+
+    {{/*
+      Dark mode. The design tokens key off a `.dark` class (the same convention
+      the admin SPA's ThemeProvider uses), so we set it from the OS preference
+      before first paint to avoid a white flash.
+
+      This is the only script on the critical path, and it is deliberately
+      fail-open: wrapped in try/catch, and if it doesn't run at all the page
+      simply renders in the light palette. Nothing about signing in depends on it.
+    */}}
+    <script>
+      (function () {
+        try {
+          if (
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+          ) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {
+          /* light palette is a perfectly good fallback */
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="/static/tokens.css" />
+    <link rel="stylesheet" href="/static/auth.css" />
+  </head>
+
+  <body>
+    <div class="page">
+      <a class="brand" href="/">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span>IAM</span>
+      </a>
+
+      {{ template "content" . }}
+    </div>
+
+    {{ template "scripts" . }}
+  </body>
+</html>
+{{end}}
+
+{{define "title"}}IAM{{end}}
+{{define "content"}}{{end}}
+{{define "scripts"}}{{end}}
+

@@ -3,9 +3,10 @@ package passwordreset
 import (
 	"embed"
 	"errors"
-	"html/template"
 	"log/slog"
 	"net/http"
+
+	"github.com/lusopoint/lusoiam/internal/api/web"
 
 	authpr "github.com/lusopoint/lusoiam/internal/auth/passwordreset"
 	"github.com/lusopoint/lusoiam/internal/middleware"
@@ -13,7 +14,7 @@ import (
 
 //go:embed templates/*.html
 var templatesFS embed.FS
-var templates = template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+var templates = web.MustPages(templatesFS, "templates/*.html")
 
 // forgotPageData drives forgot.html
 type forgotPageData struct {
@@ -153,24 +154,15 @@ func (h *Handler) resetPOST(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderForgot(w http.ResponseWriter, status int, data forgotPageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, "forgot.html", data)
+	web.Render(w, templates, "forgot.html", status, data)
 }
 
 func renderReset(w http.ResponseWriter, status int, data resetPageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = templates.ExecuteTemplate(w, "reset.html", data)
+	web.Render(w, templates, "reset.html", status, data)
 }
 
 func renderResetInvalid(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusBadRequest)
-	_ = templates.ExecuteTemplate(w, "reset_invalid.html", nil)
+	web.Render(w, templates, "reset_invalid.html", http.StatusBadRequest, nil)
 }
 
 // clientIP pulls the client IP from the request

@@ -1,7 +1,7 @@
 .PHONY: help build run dev-server smoke-test test test-cover tidy \
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new \
-        web-install web-build web-dev web-clean \
+        web-install web-build web-dev web-clean sync-tokens \
         keygen rotate-key seed-client grant-admin seed-user \
         prod-build prod-run prod-push vuln vuln-web
 
@@ -75,8 +75,24 @@ migrate-new: ## create a new migration pair: - make migrate-new name=add_foo
 web-install: ## Install react dependencies (npm handles its own caching)
 	cd $(WEB_DIR) && npm install --no-audit --no-fund
 
-web-build: web-install ## Build the React admin SPA into web/dist
+web-build: web-install sync-tokens ## Build the React admin SPA into web/dist
 	cd $(WEB_DIR) && npm run build
+
+# The server-rendered pages (CAS login, MFA, consent, signup, password reset)
+# are plain HTML + CSS with no build step, but they use the same design tokens
+# as the admin SPA. Rather than maintain a second copy of the palette (which is
+# what the fourteen old <style> blocks did, and they had already drifted), we
+# copy LusoUI's palette.css straight into the embedded static dir.
+#
+# palette.css is deliberately framework-free: no @theme, no @apply, just custom
+# properties, precisely so a Go template can consume it as-is.
+sync-tokens: web-install ## Copy LusoUI design tokens into the Go-embedded static assets
+	@printf '/* GENERATED FILE, DO NOT EDIT!\n * Run `make sync-tokens`. Source: @lusopoint/luso-ui/src/styles/palette.css\n * Edit the tokens there; they are shared with the admin SPA.\n *\n * The @font-face import is stripped on purpose: the auth pages make ZERO\n * external requests (the SSO icons are inlined SVG for the same reason), so\n * they never tell Google that a given user is sitting on a login page. It is\n * also blocked by our CSP (style-src self). The pages fall back to system-ui.\n */\n\n' \
+		> internal/api/web/static/tokens.css
+	@grep -v "fonts.googleapis.com" \
+		$(WEB_DIR)/node_modules/@lusopoint/luso-ui/src/styles/palette.css \
+		>> internal/api/web/static/tokens.css
+	@echo "  synced design tokens -> internal/api/web/static/tokens.css"
 
 web-dev: web-install ## Start the Vite dev server (with API proxy to :8080)
 	cd $(WEB_DIR) && npm run dev

@@ -1,104 +1,16 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Check your inbox · IAM</title>
-    <style>
-      :root {
-        --bg: #f4f5f7;
-        --card: #ffffff;
-        --border: #e3e6ea;
-        --text: #1f2328;
-        --muted: #6b7280;
-        --success: #15803d;
-        --success-bg: #f0fdf4;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0f1115;
-          --card: #161922;
-          --border: #2a2f3a;
-          --text: #e6e8eb;
-          --muted: #9aa1ab;
-          --success: #86efac;
-          --success-bg: #0f2a1d;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-      }
-      body {
-        background: var(--bg);
-        color: var(--text);
-        font:
-          15px/1.5 -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          system-ui,
-          sans-serif;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 28px;
-        width: 100%;
-        max-width: 420px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-      }
-      h1 {
-        font-size: 1.25rem;
-        margin: 0 0 0.5rem;
-      }
-      .sub {
-        color: var(--muted);
-        margin: 0 0 1rem;
-        font-size: 0.9rem;
-      }
-      .notice {
-        background: var(--success-bg);
-        color: var(--success);
-        padding: 12px 14px;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        margin-bottom: 12px;
-      }
-      .back {
-        display: block;
-        margin-top: 14px;
-        text-align: center;
-        font-size: 0.85rem;
-        color: var(--muted);
-        text-decoration: none;
-      }
-      .back:hover {
-        color: var(--text);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Check your inbox</h1>
-      <p class="sub">
-        We sent a confirmation link to <strong>{{ .Email }}</strong>. Click the
-        link to activate your account.
-      </p>
-      <div class="notice">
-        The link expires in {{ .ExpiryHours }} hours. Didn't get the email?
-        Check spam.
-      </div>
-      <a class="back" href="/cas/login">Back to sign in</a>
-    </div>
-  </body>
-</html>
+{{define "title"}}Check your inbox - IAM{{end}} {{define "content"}}
+<main class="card">
+  <h1>Check your inbox</h1>
+  <p class="subtitle">
+    We sent a confirmation link to <strong>{{ .Email }}</strong>. Click the link
+    to activate your account.
+  </p>
+
+  <div class="notice">
+    The link expires in {{ .ExpiryHours }} hours. Didn't get the email? Check
+    spam.
+  </div>
+
+  <a class="back" href="/cas/login">← Back to sign in</a>
+</main>
+{{end}}

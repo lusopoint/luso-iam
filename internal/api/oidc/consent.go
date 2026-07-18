@@ -2,15 +2,16 @@ package oidc
 
 import (
 	"embed"
-	"html/template"
 	"net/http"
+
+	"github.com/lusopoint/lusoiam/internal/api/web"
 )
 
 //go:embed templates/consent.html
 var oidcTemplatesFS embed.FS
-var oidcTemplates = template.Must(
-	template.ParseFS(oidcTemplatesFS, "templates/consent.html"),
-)
+
+// combined with the shared base layout from internal/api/web
+var oidcTemplates = web.MustPages(oidcTemplatesFS, "templates/*.html")
 
 // consentData is the template data for the consent screen
 // all form values are round-tripped as hidden inputs so the POST handler
@@ -29,8 +30,5 @@ type consentData struct {
 }
 
 func renderConsent(w http.ResponseWriter, status int, data consentData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = oidcTemplates.ExecuteTemplate(w, "consent.html", data)
+	web.Render(w, oidcTemplates, "consent.html", status, data)
 }

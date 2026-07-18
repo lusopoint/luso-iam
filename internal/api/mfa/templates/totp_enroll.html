@@ -1,193 +1,45 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Set up authenticator - IAM</title>
-    <style>
-      :root {
-        --bg: #f4f5f7;
-        --card: #ffffff;
-        --border: #e3e6ea;
-        --text: #1f2328;
-        --muted: #6b7280;
-        --accent: #2563eb;
-        --accent-hover: #1d4ed8;
-        --error: #b91c1c;
-        --error-bg: #fef2f2;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0f1115;
-          --card: #161922;
-          --border: #2a2f3a;
-          --text: #e6e8eb;
-          --muted: #9aa1ab;
-          --error: #fca5a5;
-          --error-bg: #3f1c1c;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        padding: 1rem;
-        min-height: 100vh;
-        background: var(--bg);
-        color: var(--text);
-        font:
-          15px/1.5 -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          system-ui,
-          sans-serif;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 2rem;
-        width: 100%;
-        max-width: 420px;
-      }
-      h1 {
-        margin: 0 0 0.25rem;
-        font-size: 1.3rem;
-      }
-      .subtitle {
-        color: var(--muted);
-        margin: 0 0 1.5rem;
-        font-size: 0.9rem;
-      }
-      ol {
-        padding-left: 1.2rem;
-        margin: 0 0 1.25rem;
-      }
-      ol li {
-        margin-bottom: 0.4rem;
-        font-size: 0.9rem;
-      }
-      .qr {
-        display: flex;
-        justify-content: center;
-        margin: 1rem 0;
-      }
-      .qr img {
-        width: 200px;
-        height: 200px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        background: #fff;
-        padding: 0.5rem;
-      }
-      .secret {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.8rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        padding: 0.45rem 0.65rem;
-        border-radius: 6px;
-        word-break: break-all;
-        margin-bottom: 1rem;
-        text-align: center;
-      }
-      .error {
-        background: var(--error-bg);
-        color: var(--error);
-        padding: 0.55rem 0.7rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        margin-bottom: 1rem;
-      }
-      .field {
-        margin-bottom: 1rem;
-      }
-      label {
-        display: block;
-        font-size: 0.85rem;
-        font-weight: 500;
-        margin-bottom: 0.35rem;
-      }
-      input[type="text"] {
-        width: 100%;
-        padding: 0.55rem 0.7rem;
-        font: inherit;
-        color: inherit;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        outline: none;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        letter-spacing: 0.1em;
-        text-align: center;
-        font-size: 1.1rem;
-      }
-      input:focus {
-        border-color: var(--accent);
-      }
-      .btn {
-        width: 100%;
-        padding: 0.6rem;
-        font: inherit;
-        font-weight: 500;
-        color: #fff;
-        background: var(--accent);
-        border: 0;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      .btn:hover {
-        background: var(--accent-hover);
-      }
-    </style>
-  </head>
-  <body>
-    <main class="card">
-      <h1>Set up authenticator</h1>
-      <p class="subtitle">
-        Scan the QR code with your authenticator app, then enter the 6-digit
-        code to confirm.
-      </p>
+{{define "title"}}Set up authenticator - IAM{{end}} {{define "content"}}
+<main class="card">
+  <h1>Set up authenticator</h1>
+  <p class="subtitle">
+    Scan the QR code with your authenticator app, then enter the 6-digit code to
+    confirm.
+  </p>
 
-      {{ if .Error }}
-      <div class="error" role="alert">{{ .Error }}</div>
-      {{ end }}
+  {{ if .Error }}
+  <div class="error" role="alert">{{ .Error }}</div>
+  {{ end }}
 
-      <ol>
-        <li>Open Google Authenticator, 1Password, or any TOTP app.</li>
-        <li>Scan the QR code below (or paste the secret manually).</li>
-        <li>Enter the 6-digit code your app displays.</li>
-      </ol>
+  <ol>
+    <li>Open Google Authenticator, 1Password, or any TOTP app.</li>
+    <li>Scan the QR code below (or paste the secret manually).</li>
+    <li>Enter the 6-digit code your app displays.</li>
+  </ol>
 
-      <div class="qr">
-        <img src="{{ .QRCodeData }}" alt="TOTP QR code" />
-      </div>
+  <div class="qr">
+    <img src="{{ .QRCodeData }}" alt="TOTP QR code" />
+  </div>
 
-      <div class="secret">{{ .Secret }}</div>
+  <div class="secret">{{ .Secret }}</div>
 
-      <form method="POST" action="/mfa/enroll/totp/confirm">
-        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
-        <input type="hidden" name="method_id" value="{{ .MethodID }}" />
-        <div class="field">
-          <label for="code">Verification code</label>
-          <input
-            type="text"
-            id="code"
-            name="code"
-            required
-            autofocus
-            inputmode="numeric"
-            pattern="[0-9]*"
-            maxlength="6"
-            autocomplete="one-time-code"
-          />
-        </div>
-        <button class="btn" type="submit">Confirm</button>
-      </form>
-    </main>
-  </body>
-</html>
+  <form method="POST" action="/mfa/enroll/totp/confirm">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+    <input type="hidden" name="method_id" value="{{ .MethodID }}" />
+    <div class="field">
+      <label for="code">Verification code</label>
+      <input
+        type="text"
+        id="code"
+        name="code"
+        required
+        autofocus
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="6"
+        autocomplete="one-time-code"
+      />
+    </div>
+    <button class="btn" type="submit">Confirm</button>
+  </form>
+</main>
+{{end}}

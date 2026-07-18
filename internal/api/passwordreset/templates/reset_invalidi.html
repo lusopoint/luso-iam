@@ -1,79 +1,11 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Link expired - IAM</title>
-    <style>
-      :root {
-        --bg: #f4f5f7;
-        --card: #ffffff;
-        --border: #e3e6ea;
-        --text: #1f2328;
-        --muted: #6b7280;
-        --accent: #2563eb;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0f1115;
-          --card: #161922;
-          --border: #2a2f3a;
-          --text: #e6e8eb;
-          --muted: #9aa1ab;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        background: var(--bg);
-        color: var(--text);
-        font:
-          15px/1.5 -apple-system,
-          BlinkMacSystemFont,
-          system-ui,
-          sans-serif;
-        margin: 0;
-        padding: 1rem;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 28px;
-        width: 100%;
-        max-width: 360px;
-        text-align: center;
-      }
-      h1 {
-        font-size: 1.25rem;
-        margin: 0 0 0.5rem;
-      }
-      p {
-        color: var(--muted);
-      }
-      a {
-        color: var(--accent);
-        text-decoration: none;
-        font-weight: 500;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Link expired or invalid</h1>
-      <p>
-        This reset link no longer works. It may have expired, already been used,
-        or be invalid.
-      </p>
-      <p><a href="/password/forgot">Request a new reset link</a></p>
-    </div>
-  </body>
-</html>
+{{define "title"}}Link expired - IAM{{end}} {{define "content"}}
+<main class="card">
+  <h1>Link expired or invalid</h1>
+  <p class="subtitle">
+    This reset link no longer works. It may have expired, already been used, or
+    be invalid.
+  </p>
+
+  <a class="btn" href="/password/forgot">Request a new reset link</a>
+</main>
+{{end}}
