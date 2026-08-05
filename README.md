@@ -70,7 +70,7 @@ Open **http://localhost:8080** and sign in.
 
 ## Run it in production (Docker)
 
-Everything runs in Docker on your server. Caddy handles HTTPS for you automatically.
+Everything runs in Docker on your server.
 
 ```bash
 cd deployments
@@ -89,12 +89,9 @@ openssl genrsa -out signing/signing.pem 2048
 sudo chown 65532:65532 signing/signing.pem
 chmod 600 signing/signing.pem
 
-# 3. Put your real domain in the Caddyfile
-$EDITOR Caddyfile
+# 3. Use cloudflare and create a tunnel to http://localhost:32773
 
-# 4. Point a DNS A record at this server, and open ports 80 + 443
-
-# 5. Start everything (Postgres + IAM + Caddy)
+# 4. Start everything (Postgres + IAM)
 docker compose up -d --build
 ```
 

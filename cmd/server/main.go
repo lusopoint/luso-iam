@@ -296,7 +296,7 @@ func run() error {
 		BaseURL:    cfg.BaseURL,
 	}).Register(mux)
 
-	// Admin SPA, serves the react from web/dist embedded at compile time
+	// admin, serves the react from web/dist embedded at compile time
 	apispa.Register(mux)
 
 	// redirect to /admin

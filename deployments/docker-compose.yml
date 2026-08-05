@@ -1,7 +1,3 @@
-# Production docker-compose for the IAM server.
-#
-# Three services: postgres, iam, caddy. Caddy handles TLS (Let's
-# Encrypt) and reverse-proxies to the IAM container.
 services:
   postgres:
     image: postgres:16-alpine
@@ -33,25 +29,28 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-iam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iam}?sslmode=disable
-      BASE_URL: ${BASE_URL:?BASE_URL is required, e.g. https://auth.example.com}
+      BASE_URL: ${BASE_URL:?BASE_URL is required, example https://auth.lusopoint.com}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required; generate with openssl rand -hex 32}
       SIGNING_KEY_PATH: /etc/iam/signing.pem
+      # trust the forwarded headers coming from the cloudflared tunnel
+      # per-IP rate limiting see the real client ip (from X-Forwarded-For) rather
+      # than the docker bridge gateway, when a port is published the container
+      # sees the connection arrive from the docker network gateway, so trust the
+      # private bridge range
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12,127.0.0.1,::1}
 
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-password123}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@mail.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-auth@lusopoint.com}
       ADMIN_NAME: ${ADMIN_NAME:-admin}
-
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
 
-      # Production posture.
       ENV: production
       LOG_LEVEL: info
       LOG_FORMAT: json
-      # OK in a single-instance docker-compose deploy; set false + run migrations manually for multi-instance / blue-green
       AUTO_MIGRATE: "true"
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
 
@@ -59,7 +58,7 @@ services:
       MFA_ISSUER: ${MFA_ISSUER:-IAM}
       MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-IAM}
 
-      # Optional federation, uncomment and set in .env to enable
+      # optional federation set in .env to enable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
@@ -68,23 +67,8 @@ services:
       # (per-provider OIDC_<SLUG>_* vars also flow through, add them
     volumes:
       - ./signing/signing.pem:/etc/iam/signing.pem:ro
-    expose:
-      - "8080"
-
-  caddy:
-    image: caddy:2.8-alpine
-    restart: unless-stopped
-    depends_on:
-      - iam
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      - "32773:8080"
 
 volumes:
   pgdata:
-  caddy-data:
-  caddy-config:
