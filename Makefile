@@ -147,7 +147,7 @@ prod-build: ## Build the production container image
 	  -t $(IMAGE_TAG) \
 	  .
 
-prod-run: ## Boot the production compose stack (postgres + iam + caddy)
+prod-run: ## Boot the production compose stack (postgres + iam)
 	cd deployments && docker compose up --detach --build
 
 prod-push: ## Push the image (requires IMAGE_TAG to point at a registry)

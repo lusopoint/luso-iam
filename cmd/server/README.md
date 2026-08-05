@@ -1,4 +1,4 @@
-# `cmd/server` — Server Entry Point
+# `cmd/server` Server Entry Point
 
 This is the main IAM server. It does no business logic of its own, its job is to load configuration, construct every service in the right order, and finally run the http server.
 
@@ -111,7 +111,7 @@ go build -ldflags "-X main.version=v1.2.3" ./cmd/server
 To mount a new handler group, follow the existing pattern:
 
 1. Create `internal/api/<name>` with a `New(Config) *Handler` and `(*Handler).Register(mux *http.ServeMux)`.
-2. Construct its dependencies in `run()` (services live in `internal/auth/*` or similar — never in `main.go`).
+2. Construct its dependencies in `run()` (services live in `internal/auth/*` or similar never in `main.go`).
 3. Call `.Register(mux)` **before** `apispa.Register(mux)` so the SPA fallthrough doesn't shadow your routes.
 4. If the new routes are state-mutating browser endpoints, CSRF covers them automatically. If they are machine-to-machine, add them to the CSRF `ExemptPaths` with a comment explaining why.
 5. If they need rate limiting, add a case to `perRouteLimit`.

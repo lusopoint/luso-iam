@@ -17,7 +17,6 @@ import (
 )
 
 // Handler owns all /admin/v1/* endpoints
-// TODO: think about how to manage other versions (v2...)
 type Handler struct {
 	store    *postgres.Store
 	sessions *session.Service
