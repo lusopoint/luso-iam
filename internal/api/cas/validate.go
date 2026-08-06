@@ -135,12 +135,18 @@ func principalName(result *authcas.ValidationResult) string {
 // attributes are emitted; otherwise all base attributes are released.
 func releaseAttributes(result *authcas.ValidationResult) map[string]string {
 	// Collect all available base attributes.
-	all := make(map[string]string, 4)
+	all := make(map[string]string, 6)
 	if result.User.Email != nil {
 		all["email"] = *result.User.Email
 	}
 	if result.User.DisplayName != nil {
 		all["displayName"] = *result.User.DisplayName
+	}
+	if result.User.FirstName != nil {
+		all["firstName"] = *result.User.FirstName
+	}
+	if result.User.LastName != nil {
+		all["lastName"] = *result.User.LastName
 	}
 	if result.User.Username != nil {
 		all["username"] = *result.User.Username

@@ -19,6 +19,8 @@ type userDTO struct {
 	Email         *string `json:"email,omitempty"`
 	Username      *string `json:"username,omitempty"`
 	DisplayName   *string `json:"display_name,omitempty"`
+	FirstName     *string `json:"first_name,omitempty"`
+	LastName      *string `json:"last_name,omitempty"`
 	Status        string  `json:"status"`
 	IsAdmin       bool    `json:"is_admin"`
 	EmailVerified bool    `json:"email_verified"`
@@ -33,6 +35,8 @@ func toUserDTO(u *postgres.User) userDTO {
 		Email:         u.Email,
 		Username:      u.Username,
 		DisplayName:   u.DisplayName,
+		FirstName:     u.FirstName,
+		LastName:      u.LastName,
 		Status:        u.Status,
 		IsAdmin:       u.IsAdmin,
 		EmailVerified: u.EmailVerifiedAt != nil,
@@ -91,6 +95,8 @@ type createUserRequest struct {
 	Email         string  `json:"email"`
 	Username      *string `json:"username,omitempty"`
 	DisplayName   *string `json:"display_name,omitempty"`
+	FirstName     *string `json:"display_name,omitempty"`
+	LastName      *string `json:"display_name,omitempty"`
 	Password      string  `json:"password,omitempty"`
 	IsAdmin       bool    `json:"is_admin,omitempty"`
 	EmailVerified *bool   `json:"email_verified,omitempty"`
@@ -152,6 +158,8 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		Email:       &email,
 		Username:    req.Username,
 		DisplayName: req.DisplayName,
+		FirstName:   req.FirstName,
+		LastName:    req.LastName,
 	})
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error",

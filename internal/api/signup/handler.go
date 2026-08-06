@@ -22,6 +22,8 @@ var templates = web.MustPages(templatesFS, "templates/*.html")
 type signupPageData struct {
 	CSRFToken         string
 	Email             string // re-emit on failure so the user doesn't have to retype
+	FirstName         string //re-emit on failure
+	LastName          string //re-emit on failure
 	MinPasswordLength int
 	Error             string
 }
@@ -82,8 +84,18 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 	}
 	email := r.PostFormValue("email")
 	password := r.PostFormValue("password")
+	firstName := r.PostFormValue("first_name")
+	lastName := r.PostFormValue("last_name")
 
-	user, err := h.svc.Register(r.Context(), email, password, clientIP(r), r.Header.Get("User-Agent"))
+	user, err := h.svc.Register(r.Context(), authsignup.RegisterParams{
+		Email:     email,
+		Password:  password,
+		FirstName: firstName,
+		LastName:  lastName,
+		RequestIP: clientIP(r),
+		UserAgent: r.Header.Get("User-Agent"),
+	})
+
 	if err != nil {
 		// Translate the sentinel errors to user-facing messages. Any
 		// other error is operator-side (DB or SMTP down) and shows a
@@ -96,6 +108,9 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 			msg = "That doesn't look like a valid email address."
 		case errors.Is(err, authsignup.ErrWeakPassword):
 			msg = "Password must be at least " + itoa(h.svc.MinPasswordLength()) + " characters."
+		case errors.Is(err, authsignup.ErrMissingName):
+			msg = "Please enter both your first and last name."
+
 		default:
 			slog.ErrorContext(r.Context(), "signup: register failed", "err", err)
 			http.Error(w, "Internal error. Please try again.", http.StatusInternalServerError)
@@ -104,6 +119,8 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 		renderSignup(w, http.StatusBadRequest, signupPageData{
 			CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
 			Email:             email,
+			FirstName:         firstName,
+			LastName:          lastName,
 			MinPasswordLength: h.svc.MinPasswordLength(),
 			Error:             msg,
 		})

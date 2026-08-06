@@ -70,6 +70,8 @@ export interface ListUsersResponse {
 export interface CreateUserRequest {
   email: string;
   username?: string;
+  firstName?: string;
+  lastName?: string;
   display_name?: string;
   password?: string;
   is_admin?: boolean;

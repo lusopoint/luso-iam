@@ -72,7 +72,8 @@ func (s *Store) ListUsers(ctx context.Context, f ListUsersFilter) (*ListUsersRes
 		var u User
 		var total int
 		if err := rows.Scan(
-			&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.Status, &u.IsAdmin,
+			&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.FirstName, &u.LastName,
+			&u.Status, &u.IsAdmin,
 			&u.EmailVerifiedAt, &u.LastLoginAt,
 			&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
 			&total,
