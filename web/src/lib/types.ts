@@ -67,14 +67,14 @@ export interface ListUsersResponse {
 // else is optional. If password is omitted the server generates one and
 // returns it in `generated_password` (shown once, like a client secret)
 export interface CreateUserRequest {
-  email: string;
-  username: string;
-  first_name: string;
-  last_name: string;
-  display_name?: string;
-  password?: string;
-  is_admin?: boolean;
-  email_verified?: boolean;
+  email: string
+  username: string
+  first_name: string
+  last_name: string
+  display_name?: string
+  password?: string
+  is_admin?: boolean
+  email_verified?: boolean
 }
 
 export interface CreateUserResponse {

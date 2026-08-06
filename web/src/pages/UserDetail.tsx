@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ApiError, api } from '../lib/api'
+import { StatusBadge } from './Users'
+import { ErrorState } from '../components/States'
+import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -20,10 +22,8 @@ import {
   usePrompt,
   useToast,
 } from '@lusopoint/luso-ui'
-import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
-import { ErrorState } from '../components/States'
-import { StatusBadge } from './Users'
-import { ApiError, api } from '../lib/api'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import type {
   AdminSession,
   AdminUser,
@@ -518,7 +518,7 @@ const UserDetail = () => {
                       <span className="font-mono">
                         sub:{' '}
                         {link.sub.length > 30
-                          ? link.sub.slice(0, 27) + '...'
+                          ? `${link.sub.slice(0, 27)}...`
                           : link.sub}
                       </span>
                       {' - '}

@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 import { useToast } from '@lusopoint/luso-ui'
+import { useEffect } from 'react'
 
 /*
  * PwaUpdater: mounts once near the app root, registers the service
@@ -79,21 +79,23 @@ const UpdateBanner = ({
           New version available
         </span>
         <button
+          type="button"
           onClick={onReload}
           className="rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-medium text-white hover:bg-brand-700"
         >
           Reload
         </button>
         <button
+          type="button"
           onClick={onDismiss}
           aria-label="Dismiss update notification"
           className="rounded-full p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         >
           <svg
+            aria-hidden="true"
             viewBox="0 0 20 20"
             className="h-4 w-4"
             fill="currentColor"
-            aria-hidden
           >
             <path d="M5.7 5.7a1 1 0 0 1 1.4 0L10 8.6l2.9-2.9a1 1 0 1 1 1.4 1.4L11.4 10l2.9 2.9a1 1 0 0 1-1.4 1.4L10 11.4l-2.9 2.9a1 1 0 0 1-1.4-1.4L8.6 10 5.7 7.1a1 1 0 0 1 0-1.4Z" />
           </svg>
