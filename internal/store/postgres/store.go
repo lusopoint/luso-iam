@@ -33,6 +33,8 @@ type User struct {
 	Email           *string
 	Username        *string
 	DisplayName     *string `db:"display_name"`
+	FirstName       *string `db:"first_name"`
+	LastName        *string `db:"last_name"`
 	Status          string
 	IsAdmin         bool       `db:"is_admin"`
 	EmailVerifiedAt *time.Time `db:"email_verified_at"`

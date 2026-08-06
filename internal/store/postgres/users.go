@@ -12,7 +12,8 @@ import (
 
 // userColumnNames is the canonical column list for the users table
 var userColumnNames = []string{
-	"id", "email", "username", "display_name", "status", "is_admin",
+	"id", "email", "username", "display_name", "first_name", "last_name",
+	"status", "is_admin",
 	"email_verified_at", "last_login_at",
 	"created_at", "updated_at", "deleted_at",
 }
@@ -70,14 +71,16 @@ type CreateUserParams struct {
 	Email       *string
 	Username    *string
 	DisplayName *string
+	FirstName   *string
+	LastName    *string
 }
 
 // CreateUser inserts a new user and returns the created row
 func (s *Store) CreateUser(ctx context.Context, p CreateUserParams) (*User, error) {
-	q := `INSERT INTO users (email, username, display_name)
-	      VALUES ($1, $2, $3)
+	q := `INSERT INTO users (email, username, display_name, first_name, last_name)
+	      VALUES ($1, $2, $3, $4, $5)
 	      RETURNING ` + userColumns
-	rows, err := s.pool.Query(ctx, q, p.Email, p.Username, p.DisplayName)
+	rows, err := s.pool.Query(ctx, q, p.Email, p.Username, p.DisplayName, p.FirstName, p.LastName)
 	if err != nil {
 		return nil, fmt.Errorf("insert user: %w", err)
 	}

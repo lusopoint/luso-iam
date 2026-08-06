@@ -23,6 +23,8 @@ const EMPTY: CreateUserRequest = {
   email: "",
   display_name: "",
   username: "",
+  firstName: '',
+  lastName: '',
   is_admin: false,
   email_verified: true,
 };
@@ -67,6 +69,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         // Empty strings → omit, so optional columns stay NULL.
         display_name: form.display_name?.trim() || undefined,
         username: form.username?.trim() || undefined,
+        firstName: form.firstName?.trim() || undefined,
+        lastName: form.lastName?.trim() || undefined,
         is_admin: form.is_admin,
         email_verified: form.email_verified,
       };
@@ -141,7 +145,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy || !valid}>
-            {busy ? "Creating…" : "Create user"}
+            {busy ? "Creating..." : "Create user"}
           </Button>
         </>
       }
@@ -165,6 +169,20 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
+            label="First name"
+            autoComplete="off"
+            placeholder="alice"
+            value={form.firstName ?? ""}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+          />
+          <Input
+            label="Last name"
+            autoComplete="off"
+            placeholder="silva"
+            value={form.lastName ?? ""}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+          />
+          <Input
             label="Display name"
             autoComplete="off"
             placeholder="Alice Smith"
@@ -174,8 +192,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
           <Input
             label="Username"
             autoComplete="off"
-            placeholder="alice"
-            value={form.username ?? ""}
+            placeholder="alice-Smith"
+            value={form.username ?? `${form.firstName?.trim()}-${form.lastName?.trim()}`}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
           />
         </div>

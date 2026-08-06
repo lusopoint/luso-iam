@@ -29,6 +29,9 @@ var (
 
 	// ErrInvalidToken verification token is unknown, expired, already used, OR points to an email that no longer matches
 	ErrInvalidToken = errors.New("signup: token is unknown, expired, already used, or stale")
+
+	// ErrMissingName first name and/or last name was blank
+	ErrMissingName = errors.New("signup: first and last name are required")
 )
 
 type Config struct {
@@ -92,17 +95,41 @@ func (s *Service) MinPasswordLength() int { return s.minPasswordLength }
 // TokenTTL surfaces the verification token lifetime
 func (s *Service) TokenTTL() time.Duration { return s.tokenTTL }
 
+// maxNameLength caps the stored length of first/last name
+// generous enough for real names, tight enough to reject junk paste-bombs
+const maxNameLength = 100
+
+type RegisterParams struct {
+	Email     string
+	Password  string
+	FirstName string
+	LastName  string
+	RequestIP string
+	UserAgent string
+}
+
 // Register creates a new user, stores their hashed password, generates
 // a verification token, and emails the verification link
-func (s *Service) Register(ctx context.Context, addr, password, requestIP, userAgent string) (*postgres.User, error) {
+func (s *Service) Register(ctx context.Context, p RegisterParams) (*postgres.User, error) {
 	// normalise + validate email
-	addr = strings.TrimSpace(strings.ToLower(addr))
+	addr := strings.TrimSpace(strings.ToLower(p.Email))
 	if _, err := mail.ParseAddress(addr); err != nil {
 		return nil, ErrInvalidEmail
 	}
 
+	password := p.Password
 	if len(password) < s.minPasswordLength {
 		return nil, ErrWeakPassword
+	}
+
+	// first + last name are required at self signup
+	firstName := strings.TrimSpace(p.FirstName)
+	lastName := strings.TrimSpace(p.LastName)
+	if firstName == "" || lastName == "" {
+		return nil, ErrMissingName
+	}
+	if len(firstName) > maxNameLength || len(lastName) > maxNameLength {
+		return nil, ErrMissingName
 	}
 
 	// duplicate check
@@ -124,8 +151,15 @@ func (s *Service) Register(ctx context.Context, addr, password, requestIP, userA
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
+	// derive a display name from the two parts so the existing displayName-based surfaces
+	// (CAS principal fallback, admin list, OIDC profile) have something sensible without a separate field
+	displayName := firstName + " " + lastName
+
 	user, err := s.store.CreateUser(ctx, postgres.CreateUserParams{
-		Email: &addr,
+		Email:       &addr,
+		DisplayName: &displayName,
+		FirstName:   &firstName,
+		LastName:    &lastName,
 	})
 	if err != nil {
 		// unique-violation translation, the error string check is
@@ -149,7 +183,7 @@ func (s *Service) Register(ctx context.Context, addr, password, requestIP, userA
 	}
 	tokenHash := hashToken(token)
 	expiresAt := time.Now().Add(s.tokenTTL)
-	if err := s.store.CreateEmailVerificationToken(ctx, tokenHash, user.ID, addr, expiresAt, requestIP, userAgent); err != nil {
+	if err := s.store.CreateEmailVerificationToken(ctx, tokenHash, user.ID, addr, expiresAt, p.RequestIP, p.UserAgent); err != nil {
 		return nil, fmt.Errorf("store token: %w", err)
 	}
 
