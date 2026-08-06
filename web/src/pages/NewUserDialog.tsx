@@ -23,17 +23,28 @@ const EMPTY: CreateUserRequest = {
   email: "",
   display_name: "",
   username: "",
-  firstName: '',
-  lastName: '',
+  first_name: "",
+  last_name: "",
   is_admin: false,
   email_verified: true,
 };
+
+const slugify = (s: string): string =>
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const deriveUsername = (first?: string, last?: string): string =>
+  [slugify(first ?? ""), slugify(last ?? "")].filter(Boolean).join("-");
 
 const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
   const toast = useToast();
   const [form, setForm] = useState<CreateUserRequest>(EMPTY);
   const [generatePassword, setGeneratePassword] = useState(true);
   const [manualPassword, setManualPassword] = useState("");
+  const [usernameDirty, setUsernameDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateUserResponse | null>(null);
@@ -46,6 +57,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
     setForm(EMPTY);
     setGeneratePassword(true);
     setManualPassword("");
+    setUsernameDirty(false);
     setError(null);
     setResult(null);
   }, [open]);
@@ -60,6 +72,25 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, result, onClose]);
 
+  const onFirstName = (value: string) => {
+    setForm((f) => ({
+      ...f,
+      first_name: value,
+      username: usernameDirty ? f.username : deriveUsername(value, f.last_name),
+    }));
+  };
+  const onLastName = (value: string) => {
+    setForm((f) => ({
+      ...f,
+      last_name: value,
+      username: usernameDirty ? f.username : deriveUsername(f.first_name, value),
+    }));
+  };
+  const onUsername = (value: string) => {
+    setUsernameDirty(value.trim() !== "");
+    setForm((f) => ({ ...f, username: value }));
+  };
+
   const submit = async () => {
     setError(null);
     setBusy(true);
@@ -68,9 +99,9 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         email: form.email.trim(),
         // Empty strings → omit, so optional columns stay NULL.
         display_name: form.display_name?.trim() || undefined,
-        username: form.username?.trim() || undefined,
-        firstName: form.firstName?.trim() || undefined,
-        lastName: form.lastName?.trim() || undefined,
+        username: form.username.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
         is_admin: form.is_admin,
         email_verified: form.email_verified,
       };
@@ -88,7 +119,9 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
   }
 
   const valid =
-    form.email.trim() !== "" && (generatePassword || manualPassword.length >= 12);
+    form.email.trim() !== "" &&
+    (form.username?.trim() ?? "") !== "" &&
+    (generatePassword || manualPassword.length >= 12);
 
   const requestClose = () => {
     if (result) return;
@@ -169,18 +202,18 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
-            label="First name"
+            label="First name *"
             autoComplete="off"
-            placeholder="alice"
-            value={form.firstName ?? ""}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            placeholder="Alice"
+            value={form.first_name ?? ""}
+            onChange={(e) => onFirstName(e.target.value)}
           />
           <Input
-            label="Last name"
+            label="Last name *"
             autoComplete="off"
-            placeholder="silva"
-            value={form.lastName ?? ""}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            placeholder="Smith"
+            value={form.last_name ?? ""}
+            onChange={(e) => onLastName(e.target.value)}
           />
           <Input
             label="Display name"
@@ -190,11 +223,11 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             onChange={(e) => setForm({ ...form, display_name: e.target.value })}
           />
           <Input
-            label="Username"
+            label="Username *"
             autoComplete="off"
-            placeholder="alice-Smith"
-            value={form.username ?? `${form.firstName?.trim()}-${form.lastName?.trim()}`}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            placeholder="alice-smith"
+            value={form.username ?? ""}
+            onChange={(e) => onUsername(e.target.value)}
           />
         </div>
 
@@ -237,7 +270,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
       </div>
     </Dialog>
   );
-}
+};
 
 const Pair = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -248,4 +281,4 @@ const Pair = ({ label, value }: { label: string; value: React.ReactNode }) => (
   </div>
 );
 
-export default NewUserDialog
+export default NewUserDialog;
