@@ -1,6 +1,6 @@
-## Seed User
+# Seed User
 
-Just like the name says, it allows us to automatically add new users to the database.
+The command adds a new user to the database.
 
 Usage:
 
@@ -10,5 +10,4 @@ go run ./cmd/seed-user -email l@mail.com -password password123 -admin
 
 # run using makefile
 make seed-user email=someone@mail.com password=password123 admin=true name=some username=someone
-
 ```

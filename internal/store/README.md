@@ -1,24 +1,24 @@
 # Database schema
 
-## TLDR — what's in here
+## TLDR — what is in here
 
-| Table                       | What it stores                                           | Cleanup                                     |
-| --------------------------- | -------------------------------------------------------- | ------------------------------------------- |
-| `users`                     | Canonical user record (one row per person).              | Soft delete (`deleted_at`).                 |
-| `user_credentials`          | Argon2id password hash, one per user.                    | Cascade with user.                          |
-| `user_identities`           | Federation links — Google/GitHub/etc. sub → local user.  | Cascade with user.                          |
-| `user_mfa_methods`          | TOTP secrets + WebAuthn credentials.                     | Cascade with user.                          |
-| `user_backup_codes`         | Single-use recovery codes (hashed).                      | Cascade with user; row stays after use.     |
-| `sessions`                  | Browser sessions; doubles as CAS Ticket-Granting Ticket. | Sliding expiry + revoked_at.                |
-| `cas_services`              | Registered CAS service URL patterns.                     | Soft delete.                                |
-| `cas_tickets`               | Ephemeral CAS service tickets (~60s).                    | Consumed-once; expire fast.                 |
-| `oidc_clients`              | Registered OIDC/OAuth2 client apps.                      | Soft delete.                                |
-| `oidc_auth_codes`           | Authorization codes (≤10 min).                           | Consumed-once.                              |
-| `oidc_access_tokens`        | Opaque bearer tokens.                                    | Expires + revoke.                           |
-| `oidc_refresh_tokens`       | Refresh tokens (with rotation chain).                    | Rotated or revoked.                         |
-| `password_reset_tokens`     | Hashed forgot-password tokens (~30 min).                 | Consumed-once.                              |
-| `email_verification_tokens` | Hashed signup-verification tokens (~24h).                | Consumed-once.                              |
-| `audit_log`                 | Append-only event log.                                   | Never modified; pruning is operator policy. |
+| Table                       | What it stores                                                   | Cleanup                                     |
+| --------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
+| `users`                     | Canonical user record (one row per person).                      | Soft delete (`deleted_at`).                 |
+| `user_credentials`          | Argon2id password hash, one per user.                            | Cascade with user.                          |
+| `user_identities`           | Federation links. Google/GitHub/etc. sub maps to the local user. | Cascade with user.                          |
+| `user_mfa_methods`          | TOTP secrets and WebAuthn credentials.                           | Cascade with user.                          |
+| `user_backup_codes`         | Single-use recovery codes (hashed).                              | Cascade with user. Row stays after use.     |
+| `sessions`                  | Browser sessions. Also the CAS Ticket-Granting Ticket.           | Sliding expiry plus revoked_at.             |
+| `cas_services`              | Registered CAS service URL patterns.                             | Soft delete.                                |
+| `cas_tickets`               | Ephemeral CAS service tickets (~60s).                            | Consumed-once. Expire fast.                 |
+| `oidc_clients`              | Registered OIDC/OAuth2 client apps.                              | Soft delete.                                |
+| `oidc_auth_codes`           | Authorization codes (≤10 min).                                   | Consumed-once.                              |
+| `oidc_access_tokens`        | Opaque bearer tokens.                                            | Expires plus revoke.                        |
+| `oidc_refresh_tokens`       | Refresh tokens (with rotation chain).                            | Rotated or revoked.                         |
+| `password_reset_tokens`     | Hashed forgot-password tokens (~30 min).                         | Consumed-once.                              |
+| `email_verification_tokens` | Hashed signup-verification tokens (~24h).                        | Consumed-once.                              |
+| `audit_log`                 | Append-only event log.                                           | Never modified. Pruning is operator policy. |
 
 ## Master ERD — all tables, all relationships
 
@@ -45,16 +45,16 @@ erDiagram
     oidc_clients ||--o{ oidc_refresh_tokens : "owns token"
 ```
 
-`cas_services` and `audit_log` are also present but they're either standalone (`cas_services`) or one-to-many from `users` only (`audit_log`). Showing every edge would clutter the diagram. They appear in their per-table sections below.
+`cas_services` and `audit_log` are also present. `cas_services` is standalone. `audit_log` is one-to-many from `users` only. Every edge would clutter the diagram, so they appear in their per-table sections below.
 
 ## Conventions used everywhere
 
 - **Primary keys**: UUID via the `uuid()` plpgsql helper (defined in 0001). Time-sortable, index-friendly. Token tables use `TEXT` PKs because the value IS the token.
 - **Timestamps**: `TIMESTAMPTZ`, UTC, `DEFAULT now()`.
 - **Soft deletes**: a `deleted_at TIMESTAMPTZ NULL` column where applicable. Partial indexes (`WHERE deleted_at IS NULL`) keep the hot path fast.
-- **Email column**: `citext` everywhere it appears — case-insensitive comparison without `lower()` everywhere.
+- **Email column**: `citext` everywhere it appears. This gives case-insensitive comparison without `lower()`.
 - **`touch_updated_at` trigger**: every table with an `updated_at` column has a `BEFORE UPDATE` trigger that bumps it.
-- **JSONB**: used wherever payload shape can vary without a schema migration (audit `metadata`, federation `raw_claims`, MFA `credential`).
+- **JSONB**: the schema uses JSONB wherever the payload shape can vary without a schema migration (audit `metadata`, federation `raw_claims`, MFA `credential`).
 
 ---
 
@@ -81,13 +81,13 @@ erDiagram
     }
 ```
 
-Status is one of `active`, `locked`, `disabled` (CHECK constraint enforces this). `email_verified_at` is `NULL` until the user clicks the verification link (or until an admin sets it manually). `is_admin` was added in 0007 — promotion is intentionally manual.
+Status is one of `active`, `locked`, or `disabled`. A CHECK constraint enforces this. `email_verified_at` is `NULL` until the user clicks the verification link, or until an admin sets it manually. Migration 0007 added `is_admin`. Promotion is manual by design.
 
-Unique indexes are partial: `(email)` and `(username)` are unique only among non-deleted rows, so the same address can be reused after a hard-delete.
+The unique indexes are partial. `(email)` and `(username)` are unique only among non-deleted rows. So you can reuse the same address after a hard delete.
 
 ### `user_credentials`
 
-One row per user with their argon2id password hash. Separate from `users` so federation-only accounts don't have a half-populated row.
+One row per user, with the argon2id password hash. It is separate from `users`, so federation-only accounts do not carry a half-populated row.
 
 ```mermaid
 erDiagram
@@ -104,11 +104,11 @@ erDiagram
     }
 ```
 
-`failed_attempts` and `locked_until` exist for future brute-force lockout — currently rate-limiting is the only defence. `password_hash` is the full PHC-format string (`$argon2id$v=19$m=65536,t=3,p=4$...$...`) so the parameters travel with the hash and we can upgrade them later.
+`failed_attempts` and `locked_until` exist for a future brute-force lockout. Today, rate limiting is the only defence. `password_hash` is the full PHC-format string (`$argon2id$v=19$m=65536,t=3,p=4$...$...`). The parameters travel with the hash, so you can upgrade them later.
 
 ### `user_identities`
 
-Federation links. One row per `(provider, sub)` pair — Alice's Google account is one row, her GitHub account is another, both pointing at the same `user_id`.
+Federation links. One row per `(provider, sub)` pair. Alice's Google account is one row. Her GitHub account is another. Both point at the same `user_id`.
 
 ```mermaid
 erDiagram
@@ -127,11 +127,11 @@ erDiagram
     }
 ```
 
-`(provider, sub)` is unique — one provider account links to exactly one IAM user. `raw_claims` is the full token payload from the last login, kept for audit and future attribute-release without re-fetching. `email` here is cached from the provider; it is NOT authoritative (do not authorize against it).
+`(provider, sub)` is unique. One provider account links to exactly one IAM user. `raw_claims` is the full token payload from the last login. The server keeps it for audit and for future attribute release without a re-fetch. The `email` here is cached from the provider. It is NOT authoritative, so do not authorise against it.
 
 ### `user_mfa_methods`
 
-Enrolled second factors. The `method` column drives which payload columns are read.
+Enrolled second factors. The `method` column decides which payload columns the server reads.
 
 ```mermaid
 erDiagram
@@ -151,11 +151,11 @@ erDiagram
     }
 ```
 
-`method` is `'totp'` or `'webauthn'` (CHECK constraint). For TOTP the `secret` column holds the base32 shared secret. For WebAuthn the `credential` JSONB holds the serialized go-webauthn credential and `counter` tracks the FIDO sign-count (clone detection). A row is only usable once `confirmed_at` is set — issued-but-unconfirmed enrollments are pending.
+A CHECK constraint restricts `method` to `'totp'` or `'webauthn'`. For TOTP, the `secret` column holds the base32 shared secret. For WebAuthn, the `credential` JSONB holds the serialised go-webauthn credential, and `counter` tracks the FIDO sign-count for clone detection. A row is usable only after `confirmed_at` is set. Issued-but-unconfirmed enrolments stay pending.
 
 ### `user_backup_codes`
 
-Single-use MFA recovery codes. Each row is the argon2id hash of one code; plaintext is shown to the user once at generation and never persisted.
+Single-use MFA recovery codes. Each row is the argon2id hash of one code. The server shows the plaintext to the user once at generation and never stores it.
 
 ```mermaid
 erDiagram
@@ -169,7 +169,7 @@ erDiagram
     }
 ```
 
-Regenerating a user's codes is atomic: delete the old set, insert the new set, all in one transaction. Used codes stay in the table (with `used_at` set) so the audit log can reference them.
+The regeneration of a user's codes is atomic. The server deletes the old set and inserts the new set in one transaction. Used codes stay in the table with `used_at` set, so the audit log can reference them.
 
 ---
 
@@ -177,7 +177,7 @@ Regenerating a user's codes is atomic: delete the old set, insert the new set, a
 
 ### `sessions`
 
-Browser sessions. The session ID lives in an HMAC-signed cookie; this row holds the actual state. Doubles as the CAS Ticket-Granting Ticket — service tickets and OIDC tokens are bound to a `session_id`.
+Browser sessions. The session ID lives in an HMAC-signed cookie. This row holds the actual state. The session also acts as the CAS Ticket-Granting Ticket. Service tickets and OIDC tokens bind to a `session_id`.
 
 ```mermaid
 erDiagram
@@ -200,7 +200,7 @@ erDiagram
     }
 ```
 
-Two expiry knobs: `expires_at` is the absolute ceiling, `last_seen_at` is the sliding anchor (bumped on every authenticated request). The `acr` + `amr` columns (added in 0006) carry the authentication context onto OIDC id_tokens — `acr='1'` means MFA was satisfied, `amr` lists the factors used.
+There are two expiry knobs. `expires_at` is the absolute ceiling. `last_seen_at` is the sliding anchor, bumped on every authenticated request. The `acr` and `amr` columns (added in 0006) carry the authentication context onto OIDC id_tokens. `acr='1'` means MFA was satisfied. `amr` lists the factors used.
 
 ---
 
@@ -226,11 +226,11 @@ erDiagram
     }
 ```
 
-Matching uses SQL `LIKE`. The operator writes a human-readable pattern (`https://app.example.com/*`); the application stores the SQL-LIKE form (`https://app.example.com/%`) in `match_pattern` at write time so lookups are a single indexed predicate. `released_attributes` controls which user fields are released in CAS 3.0 / SAML 1.1 validation responses; empty means username only.
+Matching uses SQL `LIKE`. The operator writes a human-readable pattern (`https://app.example.com/*`). At write time, the application stores the SQL-LIKE form (`https://app.example.com/%`) in `match_pattern`, so a lookup is a single indexed predicate. `released_attributes` controls which user fields the server releases in CAS 3.0 and SAML 1.1 validation responses. An empty value means username only.
 
 ### `cas_tickets`
 
-Ephemeral CAS service tickets issued by `/cas/login` and consumed by `/cas/serviceValidate`. Single-use, ~60-second TTL.
+Ephemeral CAS service tickets. `/cas/login` issues them and `/cas/serviceValidate` consumes them. Single-use, with a ~60-second TTL.
 
 ```mermaid
 erDiagram
@@ -246,7 +246,7 @@ erDiagram
     }
 ```
 
-The ticket itself is the primary key (server-generated random string with the `ST-` prefix required by the CAS spec). When the relying app calls validate, the row is read, `consumed_at` is set, and a second use returns failure. Cascade-delete with sessions: revoking the session kills any pending tickets too.
+The ticket itself is the primary key. It is a server-generated random string with the `ST-` prefix that the CAS spec requires. When the relying app calls validate, the server reads the row and sets `consumed_at`. A second use returns failure. Tickets cascade-delete with sessions. So when you revoke a session, the server also removes any pending tickets.
 
 ---
 
@@ -281,11 +281,11 @@ erDiagram
     }
 ```
 
-`id` is the client_id (short string, human-friendly when possible). `secret_hash` is argon2id; NULL for public clients. `redirect_uris` is an exact-match allowlist — wildcards are NOT allowed per spec. Per-client TTL overrides server defaults. Public clients ALWAYS require PKCE regardless of the flag.
+`id` is the client_id (a short string, human-friendly when possible). `secret_hash` is argon2id. It is NULL for public clients. `redirect_uris` is an exact-match allowlist. The spec does not allow wildcards. A per-client TTL overrides the server defaults. Public clients ALWAYS require PKCE, regardless of the flag.
 
 ### `oidc_auth_codes`
 
-Short-lived authorization codes (≤10 min). Consumed once by the token endpoint.
+Short-lived authorization codes (≤10 min). The token endpoint consumes them once.
 
 ```mermaid
 erDiagram
@@ -310,7 +310,7 @@ erDiagram
     }
 ```
 
-Format: `code_<32 hex chars>`. The `pkce_challenge` is the S256-hashed challenge stored at issue time; the verifier is checked at exchange. `acr`/`amr`/`auth_time` capture the authentication context at issue, so they can be reflected back into the id_token even if the session changed by the time the code is exchanged.
+Format: `code_<32 hex chars>`. The `pkce_challenge` is the S256-hashed challenge, stored at issue time. The server checks the verifier at exchange. `acr`, `amr`, and `auth_time` capture the authentication context at issue time. So the server can reflect them back into the id_token, even if the session changed before the code exchange.
 
 ### `oidc_access_tokens`
 
@@ -333,11 +333,11 @@ erDiagram
     }
 ```
 
-Format: `at_<32 hex chars>`. `user_id` is NULL for the client_credentials grant (no user, just an app calling on its own behalf). `session_id` is `ON DELETE SET NULL` — revoking a session doesn't kill outstanding access tokens, but introspection can join back to see they're orphaned.
+Format: `at_<32 hex chars>`. `user_id` is NULL for the client_credentials grant. There is no user, just an app that calls on its own behalf. `session_id` uses `ON DELETE SET NULL`. A session revocation does not kill outstanding access tokens. But introspection can join back to see that they are orphaned.
 
 ### `oidc_refresh_tokens`
 
-Long-lived tokens redeemed for new access tokens. Rotation chain: each use consumes the current token (`rotated_at`) and issues a new one whose `previous_id` points back.
+Long-lived tokens. The client redeems them for new access tokens. Rotation chain: each use consumes the current token (sets `rotated_at`) and issues a new one whose `previous_id` points back.
 
 ```mermaid
 erDiagram
@@ -358,7 +358,7 @@ erDiagram
     }
 ```
 
-Format: `rt_<32 hex chars>`. Reuse of a rotated token (i.e. `rotated_at IS NOT NULL` on lookup) means the chain has been compromised — service code revokes the entire family.
+Format: `rt_<32 hex chars>`. Reuse of a rotated token (that is, `rotated_at IS NOT NULL` on lookup) means an attacker compromised the chain. The service code then revokes the entire family.
 
 ---
 
@@ -366,7 +366,7 @@ Format: `rt_<32 hex chars>`. Reuse of a rotated token (i.e. `rotated_at IS NOT N
 
 ### `password_reset_tokens`
 
-Forgot-password tokens. Plaintext goes to the user's inbox; only `sha256(token)` is stored.
+Forgot-password tokens. The plaintext goes to the user's inbox. The server stores only `sha256(token)`.
 
 ```mermaid
 erDiagram
@@ -382,11 +382,11 @@ erDiagram
     }
 ```
 
-`token_hash` is the primary key, so a lookup is one indexed read on the only piece of data the server ever sees. Default TTL 30 minutes (enforced application-side). Single-use: `used_at` is set on consumption.
+`token_hash` is the primary key. So a lookup is one indexed read on the only data the server ever sees. The default TTL is 30 minutes, enforced in the application. Single-use: the server sets `used_at` on consumption.
 
 ### `email_verification_tokens`
 
-Signup-verification tokens. Symmetric to password reset, with two differences: longer TTL (~24h) and the verified email is snapshotted at issue time.
+Signup-verification tokens. They are symmetric to password reset, with two differences. The TTL is longer (~24h). The server also snapshots the verified email at issue time.
 
 ```mermaid
 erDiagram
@@ -403,7 +403,7 @@ erDiagram
     }
 ```
 
-The `email` column captures the address being verified. If the user changes their email between issue and click, the token is still valid for the OLD address — the service code checks that the snapshot still matches the user's current email and refuses otherwise. This avoids accidentally verifying a new address with a token meant for the old one.
+The `email` column captures the address to verify. If the user changes their email between issue and click, the token is still valid for the OLD address. The service code checks that the snapshot still matches the user's current email. Otherwise it refuses. This prevents the server from verifying a new address with a token meant for the old one.
 
 ---
 
@@ -429,11 +429,11 @@ erDiagram
     }
 ```
 
-Two user references with different meanings: `actor_id` is who CAUSED the event (an admin doing the action, or the subject themselves), `target_id` is who the event is ABOUT (different from actor when an admin acts on someone else). Both are `ON DELETE SET NULL` so user deletion doesn't lose history. `metadata` is JSONB so each event type can carry its own shape without schema migrations.
+There are two user references with different meanings. `actor_id` is who CAUSED the event, either an admin or the subject. `target_id` is who the event is ABOUT. The target differs from the actor when an admin acts on someone else. Both use `ON DELETE SET NULL`, so a user deletion does not lose history. `metadata` is JSONB, so each event type can carry its own shape without a schema migration.
 
 Event types emitted today (from `internal/audit/service.go`): `login_success`, `login_failure`, `logout`, `mfa_enrolled`, `mfa_challenge_success`, `mfa_challenge_failure`, `password_changed`, `password_reset_requested`, `password_reset_completed`, `user_created`, `user_updated`, `user_deleted`, `user_locked`, `user_unlocked`, `email_verified`, `client_created`, `client_updated`, `client_deleted`, `client_secret_rotated`, `cas_service_created`, `cas_service_updated`, `cas_service_deleted`, `federation_linked`, `federation_unlinked`, `admin_action`.
 
-Indexes are tuned for the common access patterns: reverse-chronological listing, filter by type, filter by actor, filter by target.
+The schema tunes the indexes for the common access patterns: reverse-chronological listing, and filters by type, actor, and target.
 
 ---
 
@@ -446,9 +446,9 @@ Indexes are tuned for the common access patterns: reverse-chronological listing,
 | 0003 | `0003_cas.up.sql`                      | `cas_services`, `cas_tickets`                                                              |
 | 0004 | `0004_federation.up.sql`               | `user_identities`                                                                          |
 | 0005 | `0005_oidc.up.sql`                     | `oidc_clients`, `oidc_auth_codes`, `oidc_access_tokens`, `oidc_refresh_tokens`             |
-| 0006 | `0006_mfa.up.sql`                      | `user_mfa_methods`, `user_backup_codes`; adds `acr`/`amr` to `sessions`                    |
-| 0007 | `0007_admin_audit.up.sql`              | Adds `is_admin` to `users`; creates `audit_log`                                            |
+| 0006 | `0006_mfa.up.sql`                      | `user_mfa_methods`, `user_backup_codes`. Adds `acr`/`amr` to `sessions`                    |
+| 0007 | `0007_admin_audit.up.sql`              | Adds `is_admin` to `users`. Creates `audit_log`                                            |
 | 0008 | `0008_password_reset.up.sql`           | `password_reset_tokens`                                                                    |
 | 0009 | `0009_email_verification.up.sql`       | `email_verification_tokens`                                                                |
 
-`AUTO_MIGRATE=true` applies anything pending on boot. For production rollbacks, prefer `make migrate-up` / `make migrate-down` instead.
+`AUTO_MIGRATE=true` applies any pending migration on boot. For production rollbacks, prefer `make migrate-up` and `make migrate-down`.

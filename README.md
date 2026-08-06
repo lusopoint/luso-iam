@@ -1,32 +1,32 @@
 # IAM Server
 
-A self-hosted identity server. It gives your apps single sign-on (SSO), multi-factor authentication (MFA), and OpenID Connect, plus CAS support and a reverse-proxy gatekeeper.
+IAM Server is a self-hosted identity server. It gives your apps single sign-on (SSO), multi-factor authentication (MFA), and OpenID Connect. It also adds CAS support and protects other apps behind a reverse proxy.
 
-It ships as **one Go binary** with the admin web UI built in. You only need the binary and a PostgreSQL database to run it.
+IAM Server ships as **one Go binary** with the admin UI built in. You need only the binary and a PostgreSQL database to run it.
 
 It can:
 
-- Act as an **OIDC / OAuth 2** provider for your apps
-- Act as a **CAS** server for older apps
-- Let users **sign in with Google, GitHub, or any OIDC provider** (Microsoft, Okta, GitLab, Keycloak, ...)
-- Enforce **MFA** (authenticator apps + passkeys)
-- Guard other apps behind **Caddy or Traefik** via forward-auth
-- Be managed from a built-in **admin portal**
+- Act as an **OIDC / OAuth 2** provider for your apps.
+- Act as a **CAS** server for older apps.
+- Let users **sign in with Google, GitHub, or any OIDC provider** (Microsoft, Okta, GitLab, Keycloak).
+- Enforce **MFA** (authenticator apps and passkeys).
+- Protect other apps behind **Caddy or Traefik** with forward-auth.
+- Give you a built-in **admin UI** to manage everything.
 
 ---
 
 ## Requirements
 
 - **Go** 1.26+
-- **Node** 20+ (only needed to build the web UI)
-- **Docker** (for PostgreSQL, and for production deployment)
+- **Node** 20+ (needed only to build the web UI)
+- **Docker** (for PostgreSQL and for production deployment)
 - **PostgreSQL** 16+ (Docker provides this automatically)
 
 ---
 
 ## Run it locally (development)
 
-Postgres runs in Docker; the server runs on your machine.
+Postgres runs in Docker. The server runs on your machine.
 
 ```bash
 # 1. Start Postgres
@@ -53,7 +53,7 @@ make migrate-up
 make seed-user email=you@example.com password=devpass123 admin=1
 ```
 
-Now start it (two terminals):
+Start it in two terminals:
 
 ```bash
 make dev-server   # Terminal A: backend on http://localhost:8080
@@ -62,9 +62,9 @@ make web-dev      # Terminal B: web UI with hot reload on http://localhost:5173
 
 Open **http://localhost:8080** and sign in.
 
-> Use `:5173` while working on the web UI (instant reload). Use `:8080` to test the real, embedded build. Both share the login session.
+> Use `:5173` when you work on the web UI. It reloads instantly. Use `:8080` to test the real embedded build. Both share the login session.
 
-**Reset the database:** `make compose-dev-clear` (deletes all data), then repeat steps 1, 4, and 5.
+**Reset the database.** Run `make compose-dev-clear` to delete all data. Then repeat steps 1, 4, and 5.
 
 ---
 
@@ -89,27 +89,27 @@ openssl genrsa -out signing/signing.pem 2048
 sudo chown 65532:65532 signing/signing.pem
 chmod 600 signing/signing.pem
 
-# 3. Use cloudflare and create a tunnel to http://localhost:32773
+# 3. Create a Cloudflare tunnel to http://localhost:32773
 
 # 4. Start everything (Postgres + IAM)
 docker compose up -d --build
 ```
 
-The first admin account is created automatically from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
-Open your URL, sign in, then **go to `/mfa/enroll` right away and add a second factor.**
+Open your URL and sign in. Then go to `/mfa/enroll` and add a second factor.
 
-**Updates:** `docker compose up -d --build`
-**Logs:** `docker compose logs -f iam`
+**Updates:** run `docker compose up -d --build`.
+**Logs:** run `docker compose logs -f iam`.
 
 ### Two things you must back up
 
-- The **`pgdata`** volume: your whole database.
-- **`signing/signing.pem`**: if you lose it, every token the server has issued stops working.
+- The **`pgdata`** volume holds your whole database.
+- The **`signing/signing.pem`** file signs your tokens. If you lose it, every issued token stops working.
 
 ---
 
-## Build & test
+## Build and test
 
 ```bash
 make build        # compile one binary with the web UI embedded -> ./bin/iam-server
@@ -118,13 +118,13 @@ make test         # run all tests
 make smoke-test   # quick health check against a running server
 ```
 
-`make build` runs the web build for you, so the binary is fully self-contained.
+The `make build` target also builds the web UI. This makes the binary self-contained.
 
 ---
 
 ## Configuration
 
-The server is configured with environment variables. The four you always need:
+You configure the server with environment variables. You always need these four:
 
 | Variable           | What it is                                               |
 | ------------------ | -------------------------------------------------------- |
@@ -133,9 +133,9 @@ The server is configured with environment variables. The four you always need:
 | `SESSION_SECRET`   | 32-byte hex secret, generate with `openssl rand -hex 32` |
 | `SIGNING_KEY_PATH` | Path to the RSA key that signs tokens                    |
 
-`BASE_URL` does more than build links. The server turns on **secure cookies** when it starts with `https://`, and it derives the **passkey domain** from its host. So set it to exactly what users type in the browser.
+`BASE_URL` does more than build links. When `BASE_URL` starts with `https://`, the server turns on secure cookies. The server also derives the passkey domain from the host. So set `BASE_URL` to exactly what users type in the browser.
 
-Common optional settings: `LOG_LEVEL` (`debug`/`info`/`warn`/`error`), `LOG_FORMAT` (`text`/`json`), `AUTO_MIGRATE` (`true`/`false`), `FORCE_MFA` (`true` to require MFA for everyone). The full list with examples lives in `deployments/.env.example`.
+Common optional settings: `LOG_LEVEL` (`debug`/`info`/`warn`/`error`), `LOG_FORMAT` (`text`/`json`), `AUTO_MIGRATE` (`true`/`false`), and `FORCE_MFA` (`true` to require MFA for everyone). The full list with examples is in `deployments/.env.example`.
 
 ---
 
@@ -143,28 +143,26 @@ Common optional settings: `LOG_LEVEL` (`debug`/`info`/`warn`/`error`), `LOG_FORM
 
 ```bash
 make seed-user email=... password=... admin=1   # create a user
-make grant-admin email=...                     # make an existing user an admin
-make migrate-up                              # apply database migrations
-make rotate-key dir=/etc/iam/keys            # generate a new signing key
-make compose-dev-up / -down / -clear         # manage the dev Postgres container
+make grant-admin email=...                       # make an existing user an admin
+make migrate-up                                  # apply database migrations
+make rotate-key dir=/etc/iam/keys                # generate a new signing key
+make compose-dev-up / -down / -clear             # manage the dev Postgres container
 ```
 
 Run `make help` to see every target.
 
 ---
 
-## Setting up the rest
+## Set up the rest
 
-This README covers getting the server up. For the deeper setup steps, connecting Google/GitHub/other login providers, registering CAS and OIDC apps, MFA enrollment, and the reverse-proxy gatekeeper, see the **Setup & Operations Guide**.
+This README covers how to start the server. For the deeper setup, see the **Setup & Operations Guide**. It covers upstream login providers, CAS and OIDC app registration, MFA enrolment, and the reverse proxy.
 
 ---
 
 ## Security
 
-Found a security vulnerability? Please **do not** open a public issue. See
-[SECURITY.md](SECURITY.md) for how to report it privately through GitHub's
-private vulnerability reporting.
+Did you find a security vulnerability? Do not open a public issue. See [SECURITY.md](SECURITY.md) for how to report it privately through GitHub.
 
 ## License
 
-AGPL-3.0 license, see [LICENSE](LICENSE).
+AGPL-3.0 license. See [LICENSE](LICENSE).

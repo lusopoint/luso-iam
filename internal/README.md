@@ -2,7 +2,7 @@
 
 ## 1. Overall request flow
 
-Every http request passes through this layered pipeline before reaching a handler.
+Every HTTP request passes through this layered pipeline before it reaches a handler.
 
 ```mermaid
 flowchart TD
@@ -25,11 +25,11 @@ flowchart TD
   Mux --> ApiSpa[api/spa]
 ```
 
-The middleware order is important.
+The middleware order matters.
 
-`SecurityHeaders` runs before Rate limit and CSRF(Cross-Site Request Forgery) so its headers are present even on rate limit `429` responses.
+`SecurityHeaders` runs before the rate limit and CSRF (Cross-Site Request Forgery). This way, its headers appear even on rate-limit `429` responses.
 
-CSRF runs after rate limit so a request is checked against the rate limit before hitting the CSRF validation.
+CSRF runs after the rate limit. So the server checks a request against the rate limit before the CSRF validation.
 
 ---
 
@@ -39,7 +39,7 @@ CSRF runs after rate limit so a request is checked against the rate limit before
 
 ### internal/config
 
-Central env loaded configuration. Read once when building, shared as a value.
+Central, env-loaded configuration. The server reads it once at build time and shares it as a value.
 
 ```mermaid
 flowchart TD
@@ -49,7 +49,7 @@ flowchart TD
   Config --> YAML([CONFIG_FILE YAML overlay])
 ```
 
-**Env vars**, every env var the server reads passes through here:
+**Env vars.** Every env var the server reads passes through here:
 
 | Variable                         | Purpose                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -61,15 +61,15 @@ flowchart TD
 | `ENV`                            | `dev` or `production`. Affects cookie Secure flag and log defaults.                             |
 | `LOG_LEVEL`                      | `debug`, `info`, `warn`, `error`.                                                               |
 | `LOG_FORMAT`                     | `text` (default in dev) or `json` (production).                                                 |
-| `AUTO_MIGRATE`                   | When `true`, apply pending migrations on build.                                                 |
+| `AUTO_MIGRATE`                   | When `true`, apply pending migrations at startup.                                               |
 | `CONFIG_FILE`                    | Optional path to a YAML overlay (non-secret fields).                                            |
-| `TRUSTED_PROXIES`                | CIDR basically range of ip addresses allowlist for X-Forwarded-For honouring.                   |
+| `TRUSTED_PROXIES`                | CIDR allowlist of proxy IP ranges for X-Forwarded-For.                                          |
 | `SESSION_COOKIE_DOMAIN`          | Optional explicit Domain attribute on session cookie.                                           |
 | `PROXY_ALLOWED_CALLBACK_ORIGINS` | Allowlisted cross-origin `rd=` callbacks for the proxy companion.                               |
 
 ### internal/store/postgres
 
-The only place queries called is here. All other packages call typed. You can read more about it [store-docs](./store/README.md)
+This is the only place that runs queries. All other packages call typed functions. For more detail, see [store-docs](./store/README.md).
 
 ```mermaid
 flowchart TD
@@ -91,7 +91,7 @@ flowchart TD
 
 ### internal/crypto
 
-Cryptographic primitives
+Cryptographic primitives.
 
 ```mermaid
 flowchart TD
@@ -107,10 +107,10 @@ flowchart TD
 
 ### internal/email
 
-Email sender. The `Sender` interface has two implementations
+Email sender. The `Sender` interface has two implementations:
 
-- normal smtp
-- noop, for development, basically logs the links that should be in the email through the logger
+- Normal SMTP.
+- Noop, for development. It logs the email links through the logger instead of sending them.
 
 ```mermaid
 flowchart TD
@@ -122,7 +122,7 @@ flowchart TD
   Smtp --> SmtpServer([SMTP server])
 ```
 
-**Env vars used**, empty `SMTP_HOST` selects the noop sender:
+**Env vars used.** An empty `SMTP_HOST` selects the noop sender:
 
 | Variable        | Purpose                                                |
 | --------------- | ------------------------------------------------------ |
@@ -134,7 +134,7 @@ flowchart TD
 
 ### internal/audit
 
-Append only event log. Every security relevant action passes through here.
+Append-only event log. Every security-relevant action passes through here.
 
 ```mermaid
 flowchart TD
@@ -151,12 +151,12 @@ flowchart TD
 
 ### internal/middleware
 
-Http protection:
+HTTP protection:
 
 - Route limiting
 - CSRF
 - SecurityHeaders
-- Logs the proper errors (Recovery)
+- Recovers from panics and logs the error (Recovery)
 
 ```mermaid
 flowchart TD
@@ -171,7 +171,7 @@ flowchart TD
   AccessLog --> TP
 ```
 
-**Env vars used**: `TRUSTED_PROXIES` (parsed once and shared with rate limiter + access log).
+**Env vars used**: `TRUSTED_PROXIES`. The server parses it once and shares it with the rate limiter and the access log.
 
 ---
 
@@ -179,11 +179,11 @@ flowchart TD
 
 ## 3. Auth services (business policy)
 
-These hold the rules, what's a valid session, what's a valid MFA challenge and what counts as a weak password.
+These hold the rules. They decide what is a valid session, what is a valid MFA challenge, and what counts as a weak password.
 
 ### internal/auth/session
 
-Browser session management. cookies + db backed session rows.
+Browser session management. Cookies plus db-backed session rows.
 
 ```mermaid
 flowchart TD
@@ -201,7 +201,7 @@ flowchart TD
 
 ### internal/auth/password
 
-Password verification. Argon2id + failed attempt tracking.
+Password verification. Argon2id plus failed-attempt tracking.
 
 ```mermaid
 flowchart TD
@@ -211,11 +211,11 @@ flowchart TD
   Password --> Audit([audit: login_success / login_failure])
 ```
 
-**Env vars used**: none directly. Argon2 params (time=3, memory=64MB, threads=4) are baked in the code (maybe in the future we could change that)
+**Env vars used**: none directly. The code hard-codes the Argon2 params (time=3, memory=64MB, threads=4). This may change later.
 
 ### internal/auth/mfa
 
-TOTP, WebAuthn, backup codes. Includes the force MFA global policy gate.
+TOTP, WebAuthn, and backup codes. It also holds the force-MFA global policy gate.
 
 ```mermaid
 flowchart TD
@@ -230,13 +230,13 @@ flowchart TD
 
 **Env vars used**:
 
-| Variable               | Purpose                                                       |
-| ---------------------- | ------------------------------------------------------------- |
-| `MFA_ISSUER`           | TOTP issuer label (basically shows on authentication app).    |
-| `MFA_WEBAUTHN_RP_NAME` | Human readable RP name shown in passkey prompts.              |
-| `FORCE_MFA`            | When true, every user must enrol MFA before completing login. |
+| Variable               | Purpose                                            |
+| ---------------------- | -------------------------------------------------- |
+| `MFA_ISSUER`           | TOTP issuer label. Shows in the authenticator app. |
+| `MFA_WEBAUTHN_RP_NAME` | Human-readable RP name shown in passkey prompts.   |
+| `FORCE_MFA`            | When true, every user must enrol MFA before login. |
 
-WebAuthn RPID is derived from `BASE_URL` (no env var).
+The server derives the WebAuthn RPID from `BASE_URL` (no env var).
 
 ### internal/auth/cas
 
@@ -251,11 +251,11 @@ flowchart TD
   CasSvc --> Store[store/postgres]
 ```
 
-**Env vars used**: none directly (cookie security derived from `BASE_URL`).
+**Env vars used**: none directly (the server derives cookie security from `BASE_URL`).
 
 ### internal/auth/passwordreset
 
-Forgot password flow. Token insurance, verification, password change.
+Forgot-password flow. Token issuance, verification, and password change.
 
 ```mermaid
 flowchart TD
@@ -265,11 +265,11 @@ flowchart TD
   PrSvc --> Store[store/postgres]
 ```
 
-**Env vars used**: none directly, using `BASE_URL`, `SMTP_*` via the email and store/config layers. No reset specific env vars.
+**Env vars used**: none directly. It uses `BASE_URL` and `SMTP_*` through the email and store/config layers. There are no reset-specific env vars.
 
 ### internal/auth/signup
 
-Registration + email verification. Similar to passwordreset.
+Registration plus email verification. Similar to passwordreset.
 
 ```mermaid
 flowchart TD
@@ -281,15 +281,15 @@ flowchart TD
 
 **Env vars used**:
 
-| Variable                     | Purpose                                                                      |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| `SIGNUP_ENABLED`             | Default false. When false the entire flow is unwired: `/signup` returns 404. |
-| `SIGNUP_MIN_PASSWORD_LENGTH` | Floor for chosen passwords (default 12).                                     |
-| `SIGNUP_TOKEN_TTL_HOURS`     | Verification-link lifetime (default 24).                                     |
+| Variable                     | Purpose                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `SIGNUP_ENABLED`             | Default false. When false, the server unwires the whole flow and `/signup` returns 404. |
+| `SIGNUP_MIN_PASSWORD_LENGTH` | Floor for chosen passwords (default 12).                                                |
+| `SIGNUP_TOKEN_TTL_HOURS`     | Verification-link lifetime (default 24).                                                |
 
 ### internal/auth/federation
 
-Service that connects provides (`internal/federation/*`) to our db.
+Service that connects the providers (`internal/federation/*`) to our db.
 
 ```mermaid
 flowchart TD
@@ -298,7 +298,7 @@ flowchart TD
   AuthFed --> Store[store/postgres]
 ```
 
-**Env vars used**: none directly. Provider configs are read by `internal/federation/*`.
+**Env vars used**: none directly. `internal/federation/*` reads the provider configs.
 
 ---
 
@@ -306,7 +306,7 @@ flowchart TD
 
 ## 4. Federation providers
 
-Each provider implements the same interface. Configured by env, registered at boot.
+Each provider implements the same interface. The server configures each one from env and registers it at boot.
 
 ```mermaid
 flowchart TD
@@ -334,7 +334,7 @@ flowchart TD
 | `OIDC_<SLUG>_SCOPES`        | Optional scope override (default `openid email profile`).             |
 | `OIDC_<SLUG>_DISPLAY_NAME`  | Optional button label override.                                       |
 
-Reserved slugs (`google`, `github`) cannot be used as generic OIDC slugs.
+You cannot use the reserved slugs (`google`, `github`) as generic OIDC slugs.
 
 ---
 
@@ -342,7 +342,7 @@ Reserved slugs (`google`, `github`) cannot be used as generic OIDC slugs.
 
 ## 5. OIDC logic
 
-`internal/oidc` is the protocol layer logic (token issuance, code exchange, claim assembly). Distinct from `internal/api/oidc` which is just the http handler and this one is the service.
+`internal/oidc` is the protocol-layer logic (token issuance, code exchange, claim assembly). It is distinct from `internal/api/oidc`. That package is the HTTP handler. This package is the service.
 
 ```mermaid
 flowchart TD
@@ -352,7 +352,7 @@ flowchart TD
   OidcSvc --> JwksOut([JWT signing via crypto.KeyManager])
 ```
 
-**Env vars used (indirectly via config)**: `BASE_URL` (issuer), `SIGNING_KEY_PATH` (used by KeyManager).
+**Env vars used (indirectly via config)**: `BASE_URL` (issuer), `SIGNING_KEY_PATH` (the KeyManager uses it).
 
 ---
 
@@ -360,7 +360,7 @@ flowchart TD
 
 ## 6. HTTP layer (api/\*)
 
-Each `api/*` package owns a route and translates http into calls on the auth/services above.
+Each `api/*` package owns a route. It translates HTTP into calls on the auth services above.
 
 ### internal/api/cas
 
@@ -389,7 +389,7 @@ flowchart TD
 | -------------------------------- | ---------------------------------------------------------------- |
 | `PROXY_ALLOWED_CALLBACK_ORIGINS` | Allowlist for `?rd=` cross-origin redirects.                     |
 | `SIGNUP_ENABLED`                 | Controls whether the login page renders a "Create account" link. |
-| `MFA_*`, `FORCE_MFA`             | Determine the MFA challenge / enrollment branch in login.        |
+| `MFA_*`, `FORCE_MFA`             | Determine the MFA challenge or enrolment branch in login.        |
 
 ### internal/api/oidc
 
@@ -410,7 +410,7 @@ flowchart TD
 
 **Env vars relevant**: `BASE_URL` (issuer), `SIGNING_KEY_PATH`.
 
-Rate limit: `/oauth2/token` is keyed on `client_id` (Basic auth -> form -> IP fallback), 20/min default.
+Rate limit: the limiter keys `/oauth2/token` on `client_id` (Basic auth -> form -> IP fallback), 20/min by default.
 
 ### internal/api/mfa
 
@@ -451,7 +451,7 @@ flowchart TD
   ApiAdmin --> Federation[federation registry]
 ```
 
-**Env vars relevant**: none specific to admin; auth gating comes via `auth/session`.
+**Env vars relevant**: none specific to admin. Auth gating comes through `auth/session`.
 
 ### internal/api/federation
 
@@ -468,7 +468,7 @@ flowchart TD
   ApiFed --> Audit[audit]
 ```
 
-**Env vars relevant**: `GOOGLE_*`, `GITHUB_*`, `OIDC_PROVIDERS` + per-slug vars.
+**Env vars relevant**: `GOOGLE_*`, `GITHUB_*`, `OIDC_PROVIDERS` plus per-slug vars.
 
 ### internal/api/passwordreset
 
@@ -500,7 +500,7 @@ flowchart TD
 
 **Env vars relevant**: `SIGNUP_ENABLED`, `SIGNUP_MIN_PASSWORD_LENGTH`, `SIGNUP_TOKEN_TTL_HOURS`, `SMTP_*`, `BASE_URL`.
 
-When `SIGNUP_ENABLED=false`, the routes are not registered at all.
+When `SIGNUP_ENABLED=false`, the server does not register the routes at all.
 
 ### internal/api/proxy
 
@@ -528,9 +528,9 @@ flowchart TD
   ApiHealth[api/health] --> Store[store/postgres]
 ```
 
-**Env vars relevant**: none. `/healthz` is unconditional; `/readyz` pings the db pool.
+**Env vars relevant**: none. `/healthz` is unconditional. `/readyz` pings the db pool.
 
-CSRF: exempt (read-only; load-balancer probes shouldn't accumulate state cookies).
+CSRF: exempt. The endpoints are read-only, and load-balancer probes should not accumulate state cookies.
 
 ### internal/api/spa (TODO: this will probably change)
 
@@ -547,7 +547,7 @@ flowchart TD
 
 ## 7. Where the env vars actually come from
 
-Putting it all together, a single env var typically flows through `config` to one or two services:
+In summary, a single env var usually flows through `config` to one or two services:
 
 ```mermaid
 flowchart LR
@@ -565,6 +565,6 @@ flowchart LR
   EmailFactory -.or.-> Smtp[email/smtp]
 ```
 
-The complete env variable reference lives in:
+The complete env variable reference is in:
 
-- `internal/config/config.go`, authoritative; if these two diverge the code wins
+- `internal/config/config.go`. This file is authoritative. If the docs and the code diverge, the code wins.
