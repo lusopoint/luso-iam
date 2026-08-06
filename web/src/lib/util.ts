@@ -42,7 +42,7 @@ export const relativeTime = (iso: string | null | undefined): string => {
 // shortID returns the first 8 chars of a UUID, with an ellipsis.
 // Useful in dense tables where the full UUID overwhelms the layout
 export const shortID = (id: string): string =>
-  !id ? '' : id.length > 8 ? id.slice(0, 8) + '...' : id
+  !id ? '' : id.length > 8 ? `${id.slice(0, 8)}...` : id
 
 // validates a redirect URI for the TagInput on the client forms. Mirrors the
 //server's check (absolute http/https, no fragment) so an operator finds out

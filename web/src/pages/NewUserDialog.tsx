@@ -20,11 +20,11 @@ interface Props {
 }
 
 const EMPTY: CreateUserRequest = {
-  email: "",
-  display_name: "",
-  username: "",
-  first_name: "",
-  last_name: "",
+  email: '',
+  display_name: '',
+  username: '',
+  first_name: '',
+  last_name: '',
   is_admin: false,
   email_verified: true,
 }
@@ -33,34 +33,34 @@ const slugify = (s: string): string =>
   s
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 
 const deriveUsername = (first?: string, last?: string): string =>
-  [slugify(first ?? ""), slugify(last ?? "")].filter(Boolean).join("-");
+  [slugify(first ?? ''), slugify(last ?? '')].filter(Boolean).join('-')
 
 const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
-  const toast = useToast();
-  const [form, setForm] = useState<CreateUserRequest>(EMPTY);
-  const [generatePassword, setGeneratePassword] = useState(true);
-  const [manualPassword, setManualPassword] = useState("");
-  const [usernameDirty, setUsernameDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CreateUserResponse | null>(null);
+  const toast = useToast()
+  const [form, setForm] = useState<CreateUserRequest>(EMPTY)
+  const [generatePassword, setGeneratePassword] = useState(true)
+  const [manualPassword, setManualPassword] = useState('')
+  const [usernameDirty, setUsernameDirty] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<CreateUserResponse | null>(null)
 
   // reset everything when the dialog opens fresh, doing this on `open`
   // rather than on mount lets us reuse the component instance across
   // multiple opens without stale fields
   useEffect(() => {
-    if (!open) return;
-    setForm(EMPTY);
-    setGeneratePassword(true);
-    setManualPassword("");
-    setUsernameDirty(false);
-    setError(null);
-    setResult(null);
-  }, [open]);
+    if (!open) return
+    setForm(EMPTY)
+    setGeneratePassword(true)
+    setManualPassword('')
+    setUsernameDirty(false)
+    setError(null)
+    setResult(null)
+  }, [open])
 
   // Esc to cancel, but only during the form step
   useEffect(() => {
@@ -73,23 +73,25 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
   }, [open, result, onClose])
 
   const onFirstName = (value: string) => {
-    setForm((f) => ({
+    setForm(f => ({
       ...f,
       first_name: value,
       username: usernameDirty ? f.username : deriveUsername(value, f.last_name),
-    }));
-  };
+    }))
+  }
   const onLastName = (value: string) => {
-    setForm((f) => ({
+    setForm(f => ({
       ...f,
       last_name: value,
-      username: usernameDirty ? f.username : deriveUsername(f.first_name, value),
-    }));
-  };
+      username: usernameDirty
+        ? f.username
+        : deriveUsername(f.first_name, value),
+    }))
+  }
   const onUsername = (value: string) => {
-    setUsernameDirty(value.trim() !== "");
-    setForm((f) => ({ ...f, username: value }));
-  };
+    setUsernameDirty(value.trim() !== '')
+    setForm(f => ({ ...f, username: value }))
+  }
 
   const submit = async () => {
     setError(null)
@@ -119,9 +121,9 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
   }
 
   const valid =
-    form.email.trim() !== "" &&
-    (form.username?.trim() ?? "") !== "" &&
-    (generatePassword || manualPassword.length >= 12);
+    form.email.trim() !== '' &&
+    (form.username?.trim() ?? '') !== '' &&
+    (generatePassword || manualPassword.length >= 12)
 
   const requestClose = () => {
     if (result) return
@@ -186,7 +188,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy || !valid}>
-            {busy ? "Creating..." : "Create user"}
+            {busy ? 'Creating...' : 'Create user'}
           </Button>
         </>
       }
@@ -213,15 +215,15 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             label="First name *"
             autoComplete="off"
             placeholder="Alice"
-            value={form.first_name ?? ""}
-            onChange={(e) => onFirstName(e.target.value)}
+            value={form.first_name ?? ''}
+            onChange={e => onFirstName(e.target.value)}
           />
           <Input
             label="Last name *"
             autoComplete="off"
             placeholder="Smith"
-            value={form.last_name ?? ""}
-            onChange={(e) => onLastName(e.target.value)}
+            value={form.last_name ?? ''}
+            onChange={e => onLastName(e.target.value)}
           />
           <Input
             label="Display name"
@@ -234,8 +236,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             label="Username *"
             autoComplete="off"
             placeholder="alice-smith"
-            value={form.username ?? ""}
-            onChange={(e) => onUsername(e.target.value)}
+            value={form.username ?? ''}
+            onChange={e => onUsername(e.target.value)}
           />
         </div>
 
@@ -277,8 +279,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         />
       </div>
     </Dialog>
-  );
-};
+  )
+}
 
 const Pair = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -289,4 +291,4 @@ const Pair = ({ label, value }: { label: string; value: React.ReactNode }) => (
   </div>
 )
 
-export default NewUserDialog;
+export default NewUserDialog

@@ -18,7 +18,7 @@ export const ErrorState = ({ error }: { error: ApiError | Error }) => {
   const status = 'status' in error ? (error as ApiError).status : undefined
 
   if (status === 401 || status === 403) {
-    const next = '/admin' + window.location.pathname + window.location.search
+    const next = `/admin${window.location.pathname}${window.location.search}`
     return (
       <UIErrorState
         error={{
