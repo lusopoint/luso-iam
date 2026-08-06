@@ -69,9 +69,9 @@ export interface ListUsersResponse {
 // returns it in `generated_password` (shown once, like a client secret)
 export interface CreateUserRequest {
   email: string;
-  username?: string;
-  firstName?: string;
-  lastName?: string;
+  username: string;
+  first_name: string;
+  last_name: string;
   display_name?: string;
   password?: string;
   is_admin?: boolean;
