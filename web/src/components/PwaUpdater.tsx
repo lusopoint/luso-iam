@@ -1,7 +1,7 @@
-import { useEffect } from "react";
-import { useRegisterSW } from "virtual:pwa-register/react";
+import { useEffect } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
-import { useToast } from "@lusopoint/luso-ui";
+import { useToast } from '@lusopoint/luso-ui'
 
 /*
  * PwaUpdater: mounts once near the app root, registers the service
@@ -18,7 +18,7 @@ import { useToast } from "@lusopoint/luso-ui";
  * audit log fill up with phantom sessions.
  */
 const PwaUpdater = () => {
-  const toast = useToast();
+  const toast = useToast()
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -29,43 +29,47 @@ const PwaUpdater = () => {
       // only checks on full page reload, so admins who keep the tab
       // open for hours would never see new versions
       if (registration && swUrl) {
-        setInterval(() => {
-          registration.update().catch(() => {
-            // network blip or auth challenge
-          });
-        }, 15 * 60 * 1000);
+        setInterval(
+          () => {
+            registration.update().catch(() => {
+              // network blip or auth challenge
+            })
+          },
+          15 * 60 * 1000,
+        )
       }
     },
-  });
+  })
 
   useEffect(() => {
     if (offlineReady) {
-      toast.info("Ready to use offline.", "The admin shell loads without a network.");
+      toast.info(
+        'Ready to use offline.',
+        'The admin shell loads without a network.',
+      )
       // one shot, flip the flag so we don't re toast
-      setOfflineReady(false);
+      setOfflineReady(false)
     }
-  }, [offlineReady, setOfflineReady, toast]);
+  }, [offlineReady, setOfflineReady, toast])
 
-  if (!needRefresh) return null;
+  if (!needRefresh) return null
   return (
     <UpdateBanner
       onReload={() => updateServiceWorker(true)}
       onDismiss={() => setNeedRefresh(false)}
     />
-  );
+  )
 }
 
 const UpdateBanner = ({
   onReload,
   onDismiss,
 }: {
-  onReload: () => void;
-  onDismiss: () => void;
+  onReload: () => void
+  onDismiss: () => void
 }) => {
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:inset-x-auto sm:right-3 sm:justify-end"
-    >
+    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:inset-x-auto sm:right-3 sm:justify-end">
       <div
         role="status"
         aria-live="polite"
@@ -85,12 +89,17 @@ const UpdateBanner = ({
           aria-label="Dismiss update notification"
           className="rounded-full p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         >
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden>
+          <svg
+            viewBox="0 0 20 20"
+            className="h-4 w-4"
+            fill="currentColor"
+            aria-hidden
+          >
             <path d="M5.7 5.7a1 1 0 0 1 1.4 0L10 8.6l2.9-2.9a1 1 0 1 1 1.4 1.4L11.4 10l2.9 2.9a1 1 0 0 1-1.4 1.4L10 11.4l-2.9 2.9a1 1 0 0 1-1.4-1.4L8.6 10 5.7 7.1a1 1 0 0 1 0-1.4Z" />
           </svg>
         </button>
       </div>
     </div>
-  );
+  )
 }
 export default PwaUpdater

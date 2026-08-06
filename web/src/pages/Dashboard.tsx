@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Badge,
   Card,
@@ -10,28 +10,33 @@ import {
   Loading,
   PageHeader,
   StatsCard,
-} from "@lusopoint/luso-ui";
-import { ArrowRight, Boxes, ShieldCheck, Users as UsersIcon } from "lucide-react";
+} from '@lusopoint/luso-ui'
+import {
+  ArrowRight,
+  Boxes,
+  ShieldCheck,
+  Users as UsersIcon,
+} from 'lucide-react'
 
-import { ErrorState } from "../components/States";
-import { ApiError, api } from "../lib/api";
-import type { AuditEvent } from "../lib/types";
-import { relativeTime } from "../lib/util";
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
+import type { AuditEvent } from '../lib/types'
+import { relativeTime } from '../lib/util'
 
 interface Counters {
-  users?: number;
-  clients?: number;
-  services?: number;
+  users?: number
+  clients?: number
+  services?: number
 }
 
 const Dashboard = () => {
-  const [counters, setCounters] = useState<Counters>({});
-  const [recent, setRecent] = useState<AuditEvent[]>([]);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [counters, setCounters] = useState<Counters>({})
+  const [recent, setRecent] = useState<AuditEvent[]>([])
+  const [error, setError] = useState<ApiError | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const ctrl = new AbortController();
+    const ctrl = new AbortController()
     // Issue all four queries in parallel; settle them together so the
     // page doesn't reflow as each one arrives.
     Promise.all([
@@ -45,24 +50,29 @@ const Dashboard = () => {
           users: u.total,
           clients: c.clients.length,
           services: s.services.length,
-        });
-        setRecent(a.events);
-        setLoading(false);
+        })
+        setRecent(a.events)
+        setLoading(false)
       })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return;
+      .catch(err => {
+        if (ctrl.signal.aborted) return
         setError(
           err instanceof ApiError
             ? err
-            : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }),
-        );
-        setLoading(false);
-      });
-    return () => ctrl.abort();
-  }, []);
+            : new ApiError({
+                type: 'about:blank',
+                title: 'Error',
+                status: 0,
+                detail: String(err),
+              }),
+        )
+        setLoading(false)
+      })
+    return () => ctrl.abort()
+  }, [])
 
-  if (loading) return <Loading label="Loading overview…" />;
-  if (error) return <ErrorState error={error} />;
+  if (loading) return <Loading label="Loading overview…" />
+  if (error) return <ErrorState error={error} />
 
   return (
     <>
@@ -117,12 +127,15 @@ const Dashboard = () => {
             />
           ) : (
             <ul className="divide-y divide-border">
-              {recent.map((e) => (
+              {recent.map(e => (
                 <li
                   key={e.id}
                   className="flex items-center justify-between gap-3 py-3 text-sm"
                 >
-                  <Badge status={statusFor(e.event_type)} label={e.event_type} />
+                  <Badge
+                    status={statusFor(e.event_type)}
+                    label={e.event_type}
+                  />
                   <span className="shrink-0 text-xs font-medium text-on-surface-variant">
                     {relativeTime(e.created_at)}
                   </span>
@@ -133,26 +146,33 @@ const Dashboard = () => {
         </CardContent>
       </Card>
     </>
-  );
+  )
 }
 
 // map an audit event type onto a Badge status so failures read red at a glance
 // Badge accepts an arbitrary string and falls back to a neutral
 // treatment, so unknown event types are safe
 const statusFor = (eventType: string): string => {
-  if (eventType.endsWith("_failure")) return "critical";
-  if (eventType.endsWith("_success")) return "operational";
-  if (eventType.startsWith("admin_") || eventType.includes("_deleted")) return "medium";
-  return "pending";
+  if (eventType.endsWith('_failure')) return 'critical'
+  if (eventType.endsWith('_success')) return 'operational'
+  if (eventType.startsWith('admin_') || eventType.includes('_deleted'))
+    return 'medium'
+  return 'pending'
 }
 
-const CounterLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
+const CounterLink = ({
+  to,
+  children,
+}: {
+  to: string
+  children: React.ReactNode
+}) => (
   <Link
     to={to}
     className="rounded-2xl outline-none focus-visible:ring-1 focus-visible:ring-primary"
   >
     {children}
   </Link>
-);
+)
 
 export default Dashboard

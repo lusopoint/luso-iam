@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Button,
@@ -7,16 +7,16 @@ import {
   Dialog,
   Input,
   useToast,
-} from "@lusopoint/luso-ui";
+} from '@lusopoint/luso-ui'
 
-import { ApiError, api } from "../lib/api";
-import type { CreateUserRequest, CreateUserResponse } from "../lib/types";
+import { ApiError, api } from '../lib/api'
+import type { CreateUserRequest, CreateUserResponse } from '../lib/types'
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
+  open: boolean
+  onClose: () => void
   // called when a user is successfully created, so the list refreshes
-  onCreated: () => void;
+  onCreated: () => void
 }
 
 const EMPTY: CreateUserRequest = {
@@ -27,7 +27,7 @@ const EMPTY: CreateUserRequest = {
   last_name: "",
   is_admin: false,
   email_verified: true,
-};
+}
 
 const slugify = (s: string): string =>
   s
@@ -64,13 +64,13 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
 
   // Esc to cancel, but only during the form step
   useEffect(() => {
-    if (!open || result) return;
+    if (!open || result) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, result, onClose]);
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, result, onClose])
 
   const onFirstName = (value: string) => {
     setForm((f) => ({
@@ -92,8 +92,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
   };
 
   const submit = async () => {
-    setError(null);
-    setBusy(true);
+    setError(null)
+    setBusy(true)
     try {
       const body: CreateUserRequest = {
         email: form.email.trim(),
@@ -104,17 +104,17 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         last_name: form.last_name.trim(),
         is_admin: form.is_admin,
         email_verified: form.email_verified,
-      };
-      if (!generatePassword) {
-        body.password = manualPassword;
       }
-      const res = await api.createUser(body);
-      setResult(res);
-      onCreated();
+      if (!generatePassword) {
+        body.password = manualPassword
+      }
+      const res = await api.createUser(body)
+      setResult(res)
+      onCreated()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(err instanceof ApiError ? err.message : String(err))
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
@@ -124,12 +124,12 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
     (generatePassword || manualPassword.length >= 12);
 
   const requestClose = () => {
-    if (result) return;
-    onClose();
-  };
+    if (result) return
+    onClose()
+  }
 
   if (result) {
-    const u = result.user;
+    const u = result.user
     return (
       <Dialog
         isOpen={open}
@@ -138,32 +138,40 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         footer={<Button onClick={onClose}>Done</Button>}
       >
         <div className="space-y-4">
-          <p className="font-semibold text-on-surface">{u.email || u.username || u.id}</p>
+          <p className="font-semibold text-on-surface">
+            {u.email || u.username || u.id}
+          </p>
 
           {result.generated_password && (
             <Alert variant="warning" title="Temporary password">
               <p>
-                This is the only time you'll see this. Copy it now and share it with the
-                user through a private channel.
+                This is the only time you'll see this. Copy it now and share it
+                with the user through a private channel.
               </p>
               <CodeBlock
                 value={result.generated_password}
                 inline
                 className="mt-2"
-                onCopied={() => toast.success("Copied to clipboard")}
+                onCopied={() => toast.success('Copied to clipboard')}
               />
             </Alert>
           )}
 
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Pair label="User ID" value={<code className="font-mono text-xs">{u.id}</code>} />
+            <Pair
+              label="User ID"
+              value={<code className="font-mono text-xs">{u.id}</code>}
+            />
             <Pair label="Status" value={u.status} />
             {u.is_admin && <Pair label="Admin" value="yes" />}
-            <Pair label="Email verified" value={u.email_verified ? "yes" : "no"} />
+            <Pair
+              label="Email verified"
+              value={u.email_verified ? 'yes' : 'no'}
+            />
           </dl>
         </div>
       </Dialog>
-    );
+    )
   }
 
   return (
@@ -197,7 +205,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
           autoComplete="off"
           placeholder="alice@example.com"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={e => setForm({ ...form, email: e.target.value })}
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -219,8 +227,8 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             label="Display name"
             autoComplete="off"
             placeholder="Alice Smith"
-            value={form.display_name ?? ""}
-            onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+            value={form.display_name ?? ''}
+            onChange={e => setForm({ ...form, display_name: e.target.value })}
           />
           <Input
             label="Username *"
@@ -236,7 +244,7 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
             label="Generate a strong password"
             description="Shown once after creation. Tell the user out-of-band."
             checked={generatePassword}
-            onChange={(e) => setGeneratePassword(e.target.checked)}
+            onChange={e => setGeneratePassword(e.target.checked)}
           />
 
           {!generatePassword && (
@@ -245,10 +253,10 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
               autoComplete="new-password"
               placeholder="≥ 12 characters"
               value={manualPassword}
-              onChange={(e) => setManualPassword(e.target.value)}
+              onChange={e => setManualPassword(e.target.value)}
               error={
                 manualPassword.length > 0 && manualPassword.length < 12
-                  ? "Must be at least 12 characters."
+                  ? 'Must be at least 12 characters.'
                   : undefined
               }
             />
@@ -258,14 +266,14 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
         <Checkbox
           label="Grant admin privileges"
           checked={form.is_admin ?? false}
-          onChange={(e) => setForm({ ...form, is_admin: e.target.checked })}
+          onChange={e => setForm({ ...form, is_admin: e.target.checked })}
         />
 
         <Checkbox
           label="Mark email as verified"
           description="Skip the (future) email-verification flow. Default on for admin-created accounts."
           checked={form.email_verified ?? true}
-          onChange={(e) => setForm({ ...form, email_verified: e.target.checked })}
+          onChange={e => setForm({ ...form, email_verified: e.target.checked })}
         />
       </div>
     </Dialog>
@@ -279,6 +287,6 @@ const Pair = ({ label, value }: { label: string; value: React.ReactNode }) => (
     </dt>
     <dd className="mt-0.5 text-sm text-on-surface">{value}</dd>
   </div>
-);
+)
 
 export default NewUserDialog;

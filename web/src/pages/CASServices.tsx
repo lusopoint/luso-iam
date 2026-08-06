@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
@@ -20,58 +20,83 @@ import {
   TableRow,
   useConfirm,
   useToast,
-} from "@lusopoint/luso-ui";
-import { Plus } from "lucide-react";
+} from '@lusopoint/luso-ui'
+import { Plus } from 'lucide-react'
 
-import { ErrorState } from "../components/States";
-import { ApiError, api } from "../lib/api";
-import type { CASService, CreateCASServiceRequest } from "../lib/types";
-import { formatDateTime } from "../lib/util";
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
+import type { CASService, CreateCASServiceRequest } from '../lib/types'
+import { formatDateTime } from '../lib/util'
 
 const CASServices = () => {
-  const toast = useToast();
-  const confirm = useConfirm();
-  const [services, setServices] = useState<CASService[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [adding, setAdding] = useState(false);
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [services, setServices] = useState<CASService[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [adding, setAdding] = useState(false)
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh()
+  }, [])
 
   const refresh = () => {
-    setLoading(true);
-    api.listCASServices()
-      .then((r) => { setServices(r.services); setError(null); setLoading(false); })
-      .catch((err) => {
-        setError(err instanceof ApiError ? err : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }));
-        setLoading(false);
-      });
+    setLoading(true)
+    api
+      .listCASServices()
+      .then(r => {
+        setServices(r.services)
+        setError(null)
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(
+          err instanceof ApiError
+            ? err
+            : new ApiError({
+                type: 'about:blank',
+                title: 'Error',
+                status: 0,
+                detail: String(err),
+              }),
+        )
+        setLoading(false)
+      })
   }
 
   const toggle = async (s: CASService) => {
     try {
-      const updated = await api.updateCASService(s.id, { enabled: !s.enabled });
-      setServices((list) => list.map((x) => x.id === s.id ? updated : x));
-      toast.success(updated.enabled ? `Enabled "${s.name}".` : `Disabled "${s.name}".`);
+      const updated = await api.updateCASService(s.id, { enabled: !s.enabled })
+      setServices(list => list.map(x => (x.id === s.id ? updated : x)))
+      toast.success(
+        updated.enabled ? `Enabled "${s.name}".` : `Disabled "${s.name}".`,
+      )
     } catch (err) {
-      toast.error("Could not update service.", err instanceof ApiError ? err.message : String(err));
+      toast.error(
+        'Could not update service.',
+        err instanceof ApiError ? err.message : String(err),
+      )
     }
   }
 
   const remove = async (s: CASService) => {
     const ok = await confirm({
       title: `Delete "${s.name}"?`,
-      message: "Active CAS tickets will continue to validate until they expire (typically 60s).",
-      confirmLabel: "Delete",
+      message:
+        'Active CAS tickets will continue to validate until they expire (typically 60s).',
+      confirmLabel: 'Delete',
       danger: true,
-    });
-    if (!ok) return;
+    })
+    if (!ok) return
     try {
-      await api.deleteCASService(s.id);
-      setServices((list) => list.filter((x) => x.id !== s.id));
-      toast.success(`Deleted "${s.name}".`);
+      await api.deleteCASService(s.id)
+      setServices(list => list.filter(x => x.id !== s.id))
+      toast.success(`Deleted "${s.name}".`)
     } catch (err) {
-      toast.error("Could not delete service.", err instanceof ApiError ? err.message : String(err));
+      toast.error(
+        'Could not delete service.',
+        err instanceof ApiError ? err.message : String(err),
+      )
     }
   }
 
@@ -80,7 +105,7 @@ const CASServices = () => {
       <Plus size={16} />
       Register service
     </Button>
-  );
+  )
 
   return (
     <>
@@ -93,7 +118,10 @@ const CASServices = () => {
       {adding && (
         <AddForm
           onCancel={() => setAdding(false)}
-          onCreated={() => { setAdding(false); refresh(); }}
+          onCreated={() => {
+            setAdding(false)
+            refresh()
+          }}
         />
       )}
 
@@ -111,12 +139,14 @@ const CASServices = () => {
         <>
           {/* Mobile: cards with the most important fields surfaced inline. */}
           <ul className="space-y-3 md:hidden">
-            {services.map((s) => (
+            {services.map(s => (
               <li key={s.id}>
                 <Card noHover className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-on-surface">{s.name}</p>
+                      <p className="truncate text-sm font-bold text-on-surface">
+                        {s.name}
+                      </p>
                       {s.description && (
                         <p className="truncate text-xs text-on-surface-variant">
                           {s.description}
@@ -124,8 +154,8 @@ const CASServices = () => {
                       )}
                     </div>
                     <Badge
-                      status={s.enabled ? "operational" : "critical"}
-                      label={s.enabled ? "enabled" : "disabled"}
+                      status={s.enabled ? 'operational' : 'critical'}
+                      label={s.enabled ? 'enabled' : 'disabled'}
                     />
                   </div>
 
@@ -135,7 +165,7 @@ const CASServices = () => {
 
                   {s.released_attributes.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {s.released_attributes.map((a) => (
+                      {s.released_attributes.map(a => (
                         <Badge key={a} status="pending" label={a} />
                       ))}
                     </div>
@@ -146,8 +176,12 @@ const CASServices = () => {
                       {formatDateTime(s.created_at)}
                     </span>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => toggle(s)}>
-                        {s.enabled ? "Disable" : "Enable"}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggle(s)}
+                      >
+                        {s.enabled ? 'Disable' : 'Enable'}
                       </Button>
                       <Button
                         variant="ghost"
@@ -178,23 +212,29 @@ const CASServices = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {services.map((s) => (
+                {services.map(s => (
                   <TableRow key={s.id}>
                     <TableCell>
                       <div className="font-bold text-on-surface">{s.name}</div>
                       {s.description && (
-                        <div className="text-xs text-on-surface-variant">{s.description}</div>
+                        <div className="text-xs text-on-surface-variant">
+                          {s.description}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>
-                      <code className="font-mono text-xs">{s.service_url_pattern}</code>
+                      <code className="font-mono text-xs">
+                        {s.service_url_pattern}
+                      </code>
                     </TableCell>
                     <TableCell>
                       {s.released_attributes.length === 0 ? (
-                        <span className="text-xs text-on-surface-variant/60">username only</span>
+                        <span className="text-xs text-on-surface-variant/60">
+                          username only
+                        </span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
-                          {s.released_attributes.map((a) => (
+                          {s.released_attributes.map(a => (
                             <Badge key={a} status="pending" label={a} />
                           ))}
                         </div>
@@ -202,15 +242,19 @@ const CASServices = () => {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        status={s.enabled ? "operational" : "critical"}
-                        label={s.enabled ? "enabled" : "disabled"}
+                        status={s.enabled ? 'operational' : 'critical'}
+                        label={s.enabled ? 'enabled' : 'disabled'}
                       />
                     </TableCell>
                     <TableCell>{formatDateTime(s.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => toggle(s)}>
-                          {s.enabled ? "Disable" : "Enable"}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggle(s)}
+                        >
+                          {s.enabled ? 'Disable' : 'Enable'}
                         </Button>
                         <Button
                           variant="ghost"
@@ -230,33 +274,40 @@ const CASServices = () => {
         </>
       )}
     </>
-  );
+  )
 }
 
-function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
+function AddForm({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void
+  onCreated: () => void
+}) {
   const [form, setForm] = useState<CreateCASServiceRequest>({
-    name: "",
-    service_url_pattern: "",
-    description: "",
+    name: '',
+    service_url_pattern: '',
+    description: '',
     released_attributes: [],
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit() {
-    setError(null);
-    setBusy(true);
+    setError(null)
+    setBusy(true)
     try {
-      await api.createCASService(form);
-      onCreated();
+      await api.createCASService(form)
+      onCreated()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(err instanceof ApiError ? err.message : String(err))
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
-  const valid = form.name.trim() !== "" && form.service_url_pattern.trim() !== "";
+  const valid =
+    form.name.trim() !== '' && form.service_url_pattern.trim() !== ''
 
   return (
     <Card noHover variant="low" className="mb-6 max-w-2xl">
@@ -271,7 +322,7 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
             label="Name"
             required
             value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             placeholder="Wiki"
           />
           <div>
@@ -280,7 +331,9 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
               required
               className="font-mono"
               value={form.service_url_pattern}
-              onChange={(e) => setForm((f) => ({ ...f, service_url_pattern: e.target.value }))}
+              onChange={e =>
+                setForm(f => ({ ...f, service_url_pattern: e.target.value }))
+              }
               placeholder="https://wiki.example.com/"
             />
             <p className="ml-1 mt-1 text-xs text-on-surface-variant">
@@ -294,7 +347,7 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
         <TagInput
           label="Released attributes"
           value={form.released_attributes ?? []}
-          onChange={(next) => setForm((f) => ({ ...f, released_attributes: next }))}
+          onChange={next => setForm(f => ({ ...f, released_attributes: next }))}
           placeholder="email"
         />
         <p className="-mt-2 ml-1 text-xs text-on-surface-variant">
@@ -304,17 +357,19 @@ function AddForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () 
         <Input
           label="Description (optional)"
           value={form.description}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
         />
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={busy || !valid}>
-            {busy ? "Registering…" : "Register"}
+            {busy ? 'Registering…' : 'Register'}
           </Button>
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 export default CASServices

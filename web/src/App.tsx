@@ -1,43 +1,43 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from 'react-router-dom'
 import {
   ConfirmProvider,
   Loading,
   PromptProvider,
   ToastProvider,
-} from "@lusopoint/luso-ui";
+} from '@lusopoint/luso-ui'
 
-import Layout from "./components/Layout";
-import PwaUpdater from "./components/PwaUpdater";
-import { ErrorState } from "./components/States";
-import { useMe } from "./lib/auth";
-import Audit from "./pages/Audit";
-import ClientNew from "./pages/ClientNew";
-import ClientDetail from "./pages/ClientDetail";
-import Clients from "./pages/Clients";
-import Dashboard from "./pages/Dashboard";
-import Federation from "./pages/Federation";
-import Keys from "./pages/Keys";
-import CASServices from "./pages/CASServices";
-import UserDetail from "./pages/UserDetail";
-import Users from "./pages/Users";
+import Layout from './components/Layout'
+import PwaUpdater from './components/PwaUpdater'
+import { ErrorState } from './components/States'
+import { useMe } from './lib/auth'
+import Audit from './pages/Audit'
+import ClientNew from './pages/ClientNew'
+import ClientDetail from './pages/ClientDetail'
+import Clients from './pages/Clients'
+import Dashboard from './pages/Dashboard'
+import Federation from './pages/Federation'
+import Keys from './pages/Keys'
+import CASServices from './pages/CASServices'
+import UserDetail from './pages/UserDetail'
+import Users from './pages/Users'
 
 const App = () => {
-  const me = useMe();
+  const me = useMe()
 
   if (me.loading) {
     return (
       <div className="grid min-h-screen place-items-center">
         <Loading label="Checking session…" />
       </div>
-    );
+    )
   }
 
   if (me.error || !me.user) {
     return (
       <div className="mx-auto grid min-h-screen max-w-lg place-items-center p-6">
-        <ErrorState error={me.error ?? new Error("Not signed in.")} />
+        <ErrorState error={me.error ?? new Error('Not signed in.')} />
       </div>
-    );
+    )
   }
 
   return (
@@ -68,7 +68,7 @@ const App = () => {
         </PromptProvider>
       </ConfirmProvider>
     </ToastProvider>
-  );
+  )
 }
 
 export default App

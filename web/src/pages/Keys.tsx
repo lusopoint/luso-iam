@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
@@ -11,32 +11,37 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@lusopoint/luso-ui";
-import { ExternalLink } from "lucide-react";
+} from '@lusopoint/luso-ui'
+import { ExternalLink } from 'lucide-react'
 
-import { ErrorState } from "../components/States";
-import { ApiError, api } from "../lib/api";
-import type { SigningKey } from "../lib/types";
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
+import type { SigningKey } from '../lib/types'
 
 const Keys = () => {
-  const [keys, setKeys] = useState<SigningKey[] | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [keys, setKeys] = useState<SigningKey[] | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
 
   useEffect(() => {
-    const ctrl = new AbortController();
+    const ctrl = new AbortController()
     api
       .listKeys(ctrl.signal)
-      .then((res) => setKeys(res.keys))
-      .catch((err) => {
-        if (ctrl.signal.aborted) return;
+      .then(res => setKeys(res.keys))
+      .catch(err => {
+        if (ctrl.signal.aborted) return
         setError(
           err instanceof ApiError
             ? err
-            : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }),
-        );
-      });
-    return () => ctrl.abort();
-  }, []);
+            : new ApiError({
+                type: 'about:blank',
+                title: 'Error',
+                status: 0,
+                detail: String(err),
+              }),
+        )
+      })
+    return () => ctrl.abort()
+  }, [])
 
   return (
     <>
@@ -62,7 +67,7 @@ const Keys = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {keys.map((k) => (
+                {keys.map(k => (
                   <TableRow key={k.kid}>
                     <TableCell>
                       <code className="font-mono text-xs">{k.kid}</code>
@@ -79,7 +84,7 @@ const Keys = () => {
                     </TableCell>
                     <TableCell>
                       <code className="font-mono text-xs text-on-surface-variant">
-                        {k.source || "-"}
+                        {k.source || '-'}
                       </code>
                     </TableCell>
                   </TableRow>
@@ -91,8 +96,8 @@ const Keys = () => {
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Alert variant="info" title="Public JWKS">
               The full JWK set is published at
-              <WellKnownLink href="/.well-known/jwks.json" />. OIDC clients fetch this
-              endpoint to validate id_token signatures.
+              <WellKnownLink href="/.well-known/jwks.json" />. OIDC clients
+              fetch this endpoint to validate id_token signatures.
             </Alert>
             <Alert variant="info" title="Discovery">
               The OpenID provider metadata is at
@@ -102,11 +107,10 @@ const Keys = () => {
         </>
       )}
     </>
-  );
+  )
 }
 
-const WellKnownLink = ({ href }: { href: string }) =>
-(
+const WellKnownLink = ({ href }: { href: string }) => (
   <a
     href={href}
     target="_blank"
@@ -116,5 +120,5 @@ const WellKnownLink = ({ href }: { href: string }) =>
     {href}
     <ExternalLink size={11} />
   </a>
-);
+)
 export default Keys
