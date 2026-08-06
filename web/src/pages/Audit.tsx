@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react'
 import {
   Badge,
   Button,
@@ -14,48 +14,49 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@lusopoint/luso-ui";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+} from '@lusopoint/luso-ui'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-import { ErrorState } from "../components/States";
-import { ApiError, api } from "../lib/api";
-import type { AuditEvent } from "../lib/types";
-import { formatDateTime, shortID } from "../lib/util";
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
+import type { AuditEvent } from '../lib/types'
+import { formatDateTime, shortID } from '../lib/util'
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50
 
 interface Filters {
-  event_type: string;
-  actor_id: string;
-  target_id: string;
+  event_type: string
+  actor_id: string
+  target_id: string
 }
 
-const emptyFilters: Filters = { event_type: "", actor_id: "", target_id: "" };
+const emptyFilters: Filters = { event_type: '', actor_id: '', target_id: '' }
 
 export const statusForEvent = (eventType: string): string => {
-  if (eventType.endsWith("_failure")) return "critical";
-  if (eventType.endsWith("_success")) return "operational";
-  if (eventType.startsWith("admin_") || eventType.includes("_deleted")) return "medium";
-  return "pending";
+  if (eventType.endsWith('_failure')) return 'critical'
+  if (eventType.endsWith('_success')) return 'operational'
+  if (eventType.startsWith('admin_') || eventType.includes('_deleted'))
+    return 'medium'
+  return 'pending'
 }
 
 const Audit = () => {
   // `active` is what the query is currently using; `draft` is what the
   // form holds before the operator submits. Keeping them separate avoids
   // a fetch on every keystroke.
-  const [active, setActive] = useState<Filters>(emptyFilters);
-  const [draft, setDraft] = useState<Filters>(emptyFilters);
+  const [active, setActive] = useState<Filters>(emptyFilters)
+  const [draft, setDraft] = useState<Filters>(emptyFilters)
 
-  const [offset, setOffset] = useState(0);
-  const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0)
+  const [events, setEvents] = useState<AuditEvent[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    setLoading(true);
+    const ctrl = new AbortController()
+    setLoading(true)
     api
       .listAudit(
         {
@@ -67,50 +68,58 @@ const Audit = () => {
         },
         ctrl.signal,
       )
-      .then((res) => {
-        setEvents(res.events);
-        setTotal(res.total);
-        setError(null);
-        setLoading(false);
+      .then(res => {
+        setEvents(res.events)
+        setTotal(res.total)
+        setError(null)
+        setLoading(false)
       })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return;
+      .catch(err => {
+        if (ctrl.signal.aborted) return
         setError(
           err instanceof ApiError
             ? err
-            : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }),
-        );
-        setLoading(false);
-      });
-    return () => ctrl.abort();
-  }, [active, offset]);
+            : new ApiError({
+                type: 'about:blank',
+                title: 'Error',
+                status: 0,
+                detail: String(err),
+              }),
+        )
+        setLoading(false)
+      })
+    return () => ctrl.abort()
+  }, [active, offset])
 
   const applyFilters = () => {
-    setOffset(0);
-    setActive(draft);
+    setOffset(0)
+    setActive(draft)
   }
   const clearFilters = () => {
-    setDraft(emptyFilters);
-    setActive(emptyFilters);
-    setOffset(0);
+    setDraft(emptyFilters)
+    setActive(emptyFilters)
+    setOffset(0)
   }
 
   const pageMeta = useMemo(() => {
-    const start = total === 0 ? 0 : offset + 1;
-    const end = Math.min(offset + PAGE_SIZE, total);
-    return { start, end };
-  }, [offset, total]);
+    const start = total === 0 ? 0 : offset + 1
+    const end = Math.min(offset + PAGE_SIZE, total)
+    return { start, end }
+  }, [offset, total])
 
   const onEnter = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      applyFilters();
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      applyFilters()
     }
-  };
+  }
 
   return (
     <>
-      <PageHeader title="Audit log" subtitle="Append-only history of security-relevant events." />
+      <PageHeader
+        title="Audit log"
+        subtitle="Append-only history of security-relevant events."
+      />
 
       <Card noHover variant="low" className="mb-6 p-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -119,7 +128,7 @@ const Audit = () => {
               label="Event type"
               placeholder="login_success"
               value={draft.event_type}
-              onChange={(e) => setDraft({ ...draft, event_type: e.target.value })}
+              onChange={e => setDraft({ ...draft, event_type: e.target.value })}
               onKeyDown={onEnter}
               autoComplete="off"
               spellCheck={false}
@@ -130,7 +139,7 @@ const Audit = () => {
               label="Actor ID"
               placeholder="uuid"
               value={draft.actor_id}
-              onChange={(e) => setDraft({ ...draft, actor_id: e.target.value })}
+              onChange={e => setDraft({ ...draft, actor_id: e.target.value })}
               onKeyDown={onEnter}
               autoComplete="off"
               spellCheck={false}
@@ -141,15 +150,19 @@ const Audit = () => {
               label="Target ID"
               placeholder="uuid"
               value={draft.target_id}
-              onChange={(e) => setDraft({ ...draft, target_id: e.target.value })}
+              onChange={e => setDraft({ ...draft, target_id: e.target.value })}
               onKeyDown={onEnter}
               autoComplete="off"
               spellCheck={false}
             />
           </div>
           <div className="flex gap-2">
-            <Button onClick={applyFilters} className="h-12">Apply</Button>
-            <Button variant="ghost" onClick={clearFilters} className="h-12">Clear</Button>
+            <Button onClick={applyFilters} className="h-12">
+              Apply
+            </Button>
+            <Button variant="ghost" onClick={clearFilters} className="h-12">
+              Clear
+            </Button>
           </div>
         </div>
       </Card>
@@ -177,8 +190,8 @@ const Audit = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((e) => {
-                  const isOpen = expanded === e.id;
+                {events.map(e => {
+                  const isOpen = expanded === e.id
                   return (
                     <Row
                       key={e.id}
@@ -186,7 +199,7 @@ const Audit = () => {
                       open={isOpen}
                       onToggle={() => setExpanded(isOpen ? null : e.id)}
                     />
-                  );
+                  )
                 })}
               </TableBody>
             </Table>
@@ -225,7 +238,7 @@ const Audit = () => {
         </>
       )}
     </>
-  );
+  )
 }
 
 const Row = ({
@@ -233,15 +246,18 @@ const Row = ({
   open,
   onToggle,
 }: {
-  event: AuditEvent;
-  open: boolean;
-  onToggle: () => void;
+  event: AuditEvent
+  open: boolean
+  onToggle: () => void
 }) => {
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
         <TableCell>
-          <Badge status={statusForEvent(event.event_type)} label={event.event_type} />
+          <Badge
+            status={statusForEvent(event.event_type)}
+            label={event.event_type}
+          />
         </TableCell>
         <TableCell>
           {event.actor_id ? (
@@ -252,13 +268,17 @@ const Row = ({
         </TableCell>
         <TableCell>
           {event.target_id ? (
-            <span className="font-mono text-xs">{shortID(event.target_id)}</span>
+            <span className="font-mono text-xs">
+              {shortID(event.target_id)}
+            </span>
           ) : (
             <Dash />
           )}
         </TableCell>
         <TableCell>{event.ip_address || <Dash />}</TableCell>
-        <TableCell className="whitespace-nowrap">{formatDateTime(event.created_at)}</TableCell>
+        <TableCell className="whitespace-nowrap">
+          {formatDateTime(event.created_at)}
+        </TableCell>
       </TableRow>
       {open && (
         <TableRow className="bg-surface-container-low">
@@ -268,27 +288,40 @@ const Row = ({
         </TableRow>
       )}
     </>
-  );
+  )
 }
 
-const Dash = () => <span className="text-on-surface-variant/40">-</span>;
+const Dash = () => <span className="text-on-surface-variant/40">-</span>
 
 const Detail = ({ event }: { event: AuditEvent }) => {
-  const hasMeta = Object.keys(event.metadata || {}).length > 0;
+  const hasMeta = Object.keys(event.metadata || {}).length > 0
 
   return (
     <div className="space-y-4 py-2">
       <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-        <DetailLine label="Event ID" value={<code className="font-mono text-xs">{event.id}</code>} />
+        <DetailLine
+          label="Event ID"
+          value={<code className="font-mono text-xs">{event.id}</code>}
+        />
         <DetailLine label="Created" value={formatDateTime(event.created_at)} />
         {event.actor_id && (
-          <DetailLine label="Actor" value={<code className="font-mono text-xs">{event.actor_id}</code>} />
+          <DetailLine
+            label="Actor"
+            value={<code className="font-mono text-xs">{event.actor_id}</code>}
+          />
         )}
         {event.target_id && (
-          <DetailLine label="Target" value={<code className="font-mono text-xs">{event.target_id}</code>} />
+          <DetailLine
+            label="Target"
+            value={<code className="font-mono text-xs">{event.target_id}</code>}
+          />
         )}
         {event.user_agent && (
-          <DetailLine label="User-Agent" value={event.user_agent} className="sm:col-span-2" />
+          <DetailLine
+            label="User-Agent"
+            value={event.user_agent}
+            className="sm:col-span-2"
+          />
         )}
       </div>
 
@@ -302,7 +335,7 @@ const Detail = ({ event }: { event: AuditEvent }) => {
         />
       )}
     </div>
-  );
+  )
 }
 
 const DetailLine = ({
@@ -310,17 +343,16 @@ const DetailLine = ({
   value,
   className,
 }: {
-  label: string;
-  value: React.ReactNode;
-  className?: string;
-}) =>
-(
+  label: string
+  value: React.ReactNode
+  className?: string
+}) => (
   <div className={className}>
     <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
       {label}
     </span>
     <div className="mt-0.5 text-sm text-on-surface">{value}</div>
   </div>
-);
+)
 
 export default Audit

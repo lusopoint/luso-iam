@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -9,45 +9,51 @@ import {
   Input,
   PageHeader,
   TagInput,
-} from "@lusopoint/luso-ui";
+} from '@lusopoint/luso-ui'
 
-import { ScopesEditor } from "../components/ScopesEditor";
-import { SecretBanner } from "./Clients";
-import { validRedirectURI } from "../lib/util";
-import { ApiError, api } from "../lib/api";
-import type { CreateClientRequest, OIDCClient } from "../lib/types";
+import { ScopesEditor } from '../components/ScopesEditor'
+import { SecretBanner } from './Clients'
+import { validRedirectURI } from '../lib/util'
+import { ApiError, api } from '../lib/api'
+import type { CreateClientRequest, OIDCClient } from '../lib/types'
 
 const ClientNew = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   const [form, setForm] = useState<CreateClientRequest>({
-    id: "",
-    name: "",
+    id: '',
+    name: '',
     redirect_uris: [],
-    allowed_scopes: ["openid", "profile", "email"],
-    allowed_grant_types: ["authorization_code", "refresh_token"],
+    allowed_scopes: ['openid', 'profile', 'email'],
+    allowed_grant_types: ['authorization_code', 'refresh_token'],
     is_public: false,
     require_pkce: true,
     require_consent: false,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [created, setCreated] = useState<{ client: OIDCClient; secret?: string } | null>(null);
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState<{
+    client: OIDCClient
+    secret?: string
+  } | null>(null)
 
-  function updateField<K extends keyof CreateClientRequest>(k: K, v: CreateClientRequest[K]) {
-    setForm((f) => ({ ...f, [k]: v }));
+  function updateField<K extends keyof CreateClientRequest>(
+    k: K,
+    v: CreateClientRequest[K],
+  ) {
+    setForm(f => ({ ...f, [k]: v }))
   }
 
   const submit = async () => {
-    setError(null);
-    setBusy(true);
+    setError(null)
+    setBusy(true)
     try {
-      const res = await api.createClient(form);
-      setCreated({ client: res.client, secret: res.secret });
+      const res = await api.createClient(form)
+      setCreated({ client: res.client, secret: res.secret })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(err instanceof ApiError ? err.message : String(err))
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
@@ -67,19 +73,22 @@ const ClientNew = () => {
           <SecretBanner
             title={`Client secret for "${created.client.id}"`}
             secret={created.secret}
-            onDismiss={() => navigate("/clients")}
+            onDismiss={() => navigate('/clients')}
           />
         ) : (
           <Alert variant="info" title="No secret issued">
-            This is a public client, so it authenticates with PKCE rather than a secret.
+            This is a public client, so it authenticates with PKCE rather than a
+            secret.
           </Alert>
         )}
       </>
-    );
+    )
   }
 
   const valid =
-    form.id.trim() !== "" && form.name.trim() !== "" && form.redirect_uris.length > 0;
+    form.id.trim() !== '' &&
+    form.name.trim() !== '' &&
+    form.redirect_uris.length > 0
 
   return (
     <>
@@ -102,7 +111,7 @@ const ClientNew = () => {
                 label="Client ID"
                 className="font-mono"
                 value={form.id}
-                onChange={(e) => updateField("id", e.target.value)}
+                onChange={e => updateField('id', e.target.value)}
                 placeholder="my-app"
                 required
               />
@@ -113,7 +122,7 @@ const ClientNew = () => {
             <Input
               label="Display name"
               value={form.name}
-              onChange={(e) => updateField("name", e.target.value)}
+              onChange={e => updateField('name', e.target.value)}
               placeholder="My App"
               required
             />
@@ -125,7 +134,7 @@ const ClientNew = () => {
             <TagInput
               label="Redirect URIs"
               value={form.redirect_uris}
-              onChange={(next) => updateField("redirect_uris", next)}
+              onChange={next => updateField('redirect_uris', next)}
               placeholder="https://app.example.com/callback"
               validate={validRedirectURI}
             />
@@ -137,7 +146,7 @@ const ClientNew = () => {
           <div>
             <ScopesEditor
               value={form.allowed_scopes ?? []}
-              onChange={(next) => updateField("allowed_scopes", next)}
+              onChange={next => updateField('allowed_scopes', next)}
             />
           </div>
 
@@ -146,11 +155,11 @@ const ClientNew = () => {
               label="Public client (no secret)"
               description="SPAs and mobile apps. PKCE is mandatory."
               checked={form.is_public}
-              onChange={(e) =>
+              onChange={e =>
                 // Public clients always require PKCE (the server enforces this
                 // too). Keep the form payload consistent by forcing the flag
                 // on when public is selected.
-                setForm((f) => ({
+                setForm(f => ({
                   ...f,
                   is_public: e.target.checked,
                   require_pkce: e.target.checked ? true : f.require_pkce,
@@ -161,18 +170,18 @@ const ClientNew = () => {
               label="Require PKCE (S256)"
               description={
                 form.is_public
-                  ? "Always required for public clients."
+                  ? 'Always required for public clients.'
                   : "Recommended. Disable only for confidential clients that can't send a code_challenge."
               }
               checked={form.is_public ? true : (form.require_pkce ?? false)}
               disabled={form.is_public}
-              onChange={(e) => updateField("require_pkce", e.target.checked)}
+              onChange={e => updateField('require_pkce', e.target.checked)}
             />
             <Checkbox
               label="Require user consent"
               description="Show a consent screen on first authorization."
               checked={form.require_consent}
-              onChange={(e) => updateField("require_consent", e.target.checked)}
+              onChange={e => updateField('require_consent', e.target.checked)}
             />
           </div>
 
@@ -181,12 +190,12 @@ const ClientNew = () => {
               <Button variant="ghost">Cancel</Button>
             </Link>
             <Button onClick={submit} disabled={busy || !valid}>
-              {busy ? "Registering…" : "Register client"}
+              {busy ? 'Registering…' : 'Register client'}
             </Button>
           </div>
         </CardContent>
       </Card>
     </>
-  );
+  )
 }
 export default ClientNew

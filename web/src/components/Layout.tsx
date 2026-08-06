@@ -3,7 +3,7 @@ import {
   Badge,
   navItemClass,
   type NavSection,
-} from "@lusopoint/luso-ui";
+} from '@lusopoint/luso-ui'
 import {
   Boxes,
   KeyRound,
@@ -13,61 +13,70 @@ import {
   ScrollText,
   ShieldCheck,
   Users as UsersIcon,
-} from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+} from 'lucide-react'
+import { NavLink, Outlet } from 'react-router-dom'
 
-import type { AdminUser } from "../lib/types";
+import type { AdminUser } from '../lib/types'
 
 interface LayoutProps {
-  me: AdminUser;
+  me: AdminUser
 }
 
-const ICON = { size: 18 } as const;
+const ICON = { size: 18 } as const
 
 const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      { href: "/", label: "Dashboard", end: true, icon: <LayoutDashboard {...ICON} /> },
+      {
+        href: '/',
+        label: 'Dashboard',
+        end: true,
+        icon: <LayoutDashboard {...ICON} />,
+      },
     ],
   },
   {
-    title: "Identity",
+    title: 'Identity',
     items: [
-      { href: "/users", label: "Users", icon: <UsersIcon {...ICON} /> },
-      { href: "/federation", label: "Federation", icon: <Network {...ICON} /> },
+      { href: '/users', label: 'Users', icon: <UsersIcon {...ICON} /> },
+      { href: '/federation', label: 'Federation', icon: <Network {...ICON} /> },
     ],
   },
   {
-    title: "Applications",
+    title: 'Applications',
     items: [
-      { href: "/clients", label: "OIDC clients", icon: <Boxes {...ICON} /> },
-      { href: "/cas-services", label: "CAS services", icon: <ShieldCheck {...ICON} /> },
+      { href: '/clients', label: 'OIDC clients', icon: <Boxes {...ICON} /> },
+      {
+        href: '/cas-services',
+        label: 'CAS services',
+        icon: <ShieldCheck {...ICON} />,
+      },
     ],
   },
   {
-    title: "Operations",
+    title: 'Operations',
     items: [
-      { href: "/audit", label: "Audit log", icon: <ScrollText {...ICON} /> },
-      { href: "/keys", label: "Signing keys", icon: <KeyRound {...ICON} /> },
+      { href: '/audit', label: 'Audit log', icon: <ScrollText {...ICON} /> },
+      { href: '/keys', label: 'Signing keys', icon: <KeyRound {...ICON} /> },
     ],
   },
   {
-    title: "Your account",
+    title: 'Your account',
     items: [
       // the MFA enrollment pages are server-rendered, not part of the SPA
       // so this one needs a full page navigation, not a client side route
       {
-        href: "/mfa/enroll",
-        label: "Security & MFA",
+        href: '/mfa/enroll',
+        label: 'Security & MFA',
         icon: <ShieldCheck {...ICON} />,
         external: true,
       },
     ],
   },
-];
+]
 
 const Layout = ({ me }: LayoutProps) => {
-  const label = me.display_name || me.email || me.username || me.id;
+  const label = me.display_name || me.email || me.username || me.id
 
   return (
     <AppShell
@@ -101,7 +110,9 @@ const Layout = ({ me }: LayoutProps) => {
       identity={
         <span className="flex items-center gap-2">
           <span className="hidden sm:inline">Signed in as</span>
-          <span className="truncate font-semibold text-on-surface">{label}</span>
+          <span className="truncate font-semibold text-on-surface">
+            {label}
+          </span>
           <Badge status="operational" label="admin" />
         </span>
       }
@@ -117,6 +128,6 @@ const Layout = ({ me }: LayoutProps) => {
     >
       <Outlet />
     </AppShell>
-  );
+  )
 }
 export default Layout

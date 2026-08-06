@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Alert,
   Badge,
@@ -17,68 +17,91 @@ import {
   TableRow,
   useConfirm,
   useToast,
-} from "@lusopoint/luso-ui";
-import { Plus } from "lucide-react";
+} from '@lusopoint/luso-ui'
+import { Plus } from 'lucide-react'
 
-import { ErrorState } from "../components/States";
-import { ApiError, api } from "../lib/api";
-import type { OIDCClient } from "../lib/types";
-import { formatDateTime } from "../lib/util";
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
+import type { OIDCClient } from '../lib/types'
+import { formatDateTime } from '../lib/util'
 
 const Clients = () => {
-  const toast = useToast();
-  const confirm = useConfirm();
-  const [clients, setClients] = useState<OIDCClient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [rotated, setRotated] = useState<{ id: string; secret: string } | null>(null);
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [clients, setClients] = useState<OIDCClient[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [rotated, setRotated] = useState<{ id: string; secret: string } | null>(
+    null,
+  )
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    api.listClients(ctrl.signal)
-      .then((res) => {
-        setClients(res.clients);
-        setLoading(false);
+    const ctrl = new AbortController()
+    api
+      .listClients(ctrl.signal)
+      .then(res => {
+        setClients(res.clients)
+        setLoading(false)
       })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return;
-        setError(err instanceof ApiError ? err : new ApiError({ type: "about:blank", title: "Error", status: 0, detail: String(err) }));
-        setLoading(false);
-      });
-    return () => ctrl.abort();
-  }, []);
+      .catch(err => {
+        if (ctrl.signal.aborted) return
+        setError(
+          err instanceof ApiError
+            ? err
+            : new ApiError({
+                type: 'about:blank',
+                title: 'Error',
+                status: 0,
+                detail: String(err),
+              }),
+        )
+        setLoading(false)
+      })
+    return () => ctrl.abort()
+  }, [])
 
   const rotate = async (id: string) => {
     const ok = await confirm({
       title: `Rotate the secret for "${id}"?`,
-      message: "All integrations using the old secret will fail until they're updated with the new one. This takes effect immediately.",
-      confirmLabel: "Rotate",
+      message:
+        "All integrations using the old secret will fail until they're updated with the new one. This takes effect immediately.",
+      confirmLabel: 'Rotate',
       danger: true,
-    });
-    if (!ok) return;
+    })
+    if (!ok) return
     try {
-      const res = await api.rotateClientSecret(id);
-      setRotated({ id, secret: res.secret });
-      toast.success("Secret rotated.", "Copy the new value before leaving this page.");
+      const res = await api.rotateClientSecret(id)
+      setRotated({ id, secret: res.secret })
+      toast.success(
+        'Secret rotated.',
+        'Copy the new value before leaving this page.',
+      )
     } catch (err) {
-      toast.error("Could not rotate secret.", err instanceof ApiError ? err.message : String(err));
+      toast.error(
+        'Could not rotate secret.',
+        err instanceof ApiError ? err.message : String(err),
+      )
     }
   }
 
   const remove = async (id: string) => {
     const ok = await confirm({
       title: `Delete client "${id}"?`,
-      message: "This is a soft delete: tokens already issued continue to validate until they expire.",
-      confirmLabel: "Delete",
+      message:
+        'This is a soft delete: tokens already issued continue to validate until they expire.',
+      confirmLabel: 'Delete',
       danger: true,
-    });
-    if (!ok) return;
+    })
+    if (!ok) return
     try {
-      await api.deleteClient(id);
-      setClients((cs) => cs.filter((c) => c.id !== id));
-      toast.success(`Deleted client "${id}".`);
+      await api.deleteClient(id)
+      setClients(cs => cs.filter(c => c.id !== id))
+      toast.success(`Deleted client "${id}".`)
     } catch (err) {
-      toast.error("Could not delete client.", err instanceof ApiError ? err.message : String(err));
+      toast.error(
+        'Could not delete client.',
+        err instanceof ApiError ? err.message : String(err),
+      )
     }
   }
 
@@ -89,7 +112,7 @@ const Clients = () => {
         Register client
       </Button>
     </Link>
-  );
+  )
 
   return (
     <>
@@ -125,42 +148,52 @@ const Clients = () => {
               keep the card scannable, operators can tap into the JSON
               from a desktop session if they need that depth. */}
           <ul className="space-y-3 md:hidden">
-            {clients.map((c) => (
+            {clients.map(c => (
               <li key={c.id}>
                 <Card noHover className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-on-surface">{c.name}</p>
+                      <p className="truncate text-sm font-bold text-on-surface">
+                        {c.name}
+                      </p>
                       <code className="block truncate font-mono text-xs text-on-surface-variant">
                         {c.id}
                       </code>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <Badge
-                        status={c.enabled ? "operational" : "critical"}
-                        label={c.enabled ? "enabled" : "disabled"}
+                        status={c.enabled ? 'operational' : 'critical'}
+                        label={c.enabled ? 'enabled' : 'disabled'}
                       />
                       <Badge
-                        status={c.is_public ? "pending" : "in_progress"}
-                        label={c.is_public ? "public" : "confidential"}
+                        status={c.is_public ? 'pending' : 'in_progress'}
+                        label={c.is_public ? 'public' : 'confidential'}
                       />
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
-                    {c.require_pkce && <Badge status="operational" label="PKCE" />}
+                    {c.require_pkce && (
+                      <Badge status="operational" label="PKCE" />
+                    )}
                     <span>
                       {c.redirect_uris.length} redirect
-                      {c.redirect_uris.length === 1 ? "" : "s"}
+                      {c.redirect_uris.length === 1 ? '' : 's'}
                     </span>
                     <span>·</span>
                     <span>{formatDateTime(c.created_at)}</span>
                   </div>
                   <div className="mt-4 flex justify-end gap-2">
                     <Link to={`/clients/${c.id}`}>
-                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm">
+                        Edit
+                      </Button>
                     </Link>
                     {!c.is_public && (
-                      <Button variant="ghost" size="sm" onClick={() => rotate(c.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => rotate(c.id)}
+                      >
                         Rotate secret
                       </Button>
                     )}
@@ -193,31 +226,35 @@ const Clients = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients.map((c) => (
+                {clients.map(c => (
                   <TableRow key={c.id}>
                     <TableCell>
                       <div className="font-bold text-on-surface">{c.name}</div>
-                      <code className="font-mono text-xs text-on-surface-variant">{c.id}</code>
+                      <code className="font-mono text-xs text-on-surface-variant">
+                        {c.id}
+                      </code>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         <Badge
-                          status={c.is_public ? "pending" : "in_progress"}
-                          label={c.is_public ? "public" : "confidential"}
+                          status={c.is_public ? 'pending' : 'in_progress'}
+                          label={c.is_public ? 'public' : 'confidential'}
                         />
-                        {c.require_pkce && <Badge status="operational" label="PKCE" />}
+                        {c.require_pkce && (
+                          <Badge status="operational" label="PKCE" />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {c.allowed_grant_types.map((g) => (
+                        {c.allowed_grant_types.map(g => (
                           <Badge key={g} status="pending" label={g} />
                         ))}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="max-w-xs text-xs">
-                        {c.redirect_uris.slice(0, 2).map((u) => (
+                        {c.redirect_uris.slice(0, 2).map(u => (
                           <div key={u} className="truncate" title={u}>
                             {u}
                           </div>
@@ -231,18 +268,24 @@ const Clients = () => {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        status={c.enabled ? "operational" : "critical"}
-                        label={c.enabled ? "enabled" : "disabled"}
+                        status={c.enabled ? 'operational' : 'critical'}
+                        label={c.enabled ? 'enabled' : 'disabled'}
                       />
                     </TableCell>
                     <TableCell>{formatDateTime(c.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Link to={`/clients/${c.id}`}>
-                          <Button variant="ghost" size="sm">Edit</Button>
+                          <Button variant="ghost" size="sm">
+                            Edit
+                          </Button>
                         </Link>
                         {!c.is_public && (
-                          <Button variant="ghost" size="sm" onClick={() => rotate(c.id)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => rotate(c.id)}
+                          >
                             Rotate
                           </Button>
                         )}
@@ -264,7 +307,7 @@ const Clients = () => {
         </>
       )}
     </>
-  );
+  )
 }
 
 /**
@@ -278,14 +321,18 @@ export const SecretBanner = ({
   secret,
   onDismiss,
 }: {
-  title: string;
-  secret: string;
-  onDismiss: () => void;
+  title: string
+  secret: string
+  onDismiss: () => void
 }) => {
-  const toast = useToast();
+  const toast = useToast()
 
   return (
-    <Alert variant="warning" title={title} className="mb-6 flex-col sm:flex-row">
+    <Alert
+      variant="warning"
+      title={title}
+      className="mb-6 flex-col sm:flex-row"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <p>This is the only time you'll see this value. Copy it now.</p>
@@ -293,15 +340,20 @@ export const SecretBanner = ({
             value={secret}
             inline
             className="mt-2"
-            onCopied={() => toast.success("Copied to clipboard")}
+            onCopied={() => toast.success('Copied to clipboard')}
           />
         </div>
-        <Button variant="outline" size="sm" onClick={onDismiss} className="shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDismiss}
+          className="shrink-0"
+        >
           Dismiss
         </Button>
       </div>
     </Alert>
-  );
+  )
 }
 
 export default Clients
