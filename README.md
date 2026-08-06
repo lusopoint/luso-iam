@@ -155,7 +155,7 @@ Run `make help` to see every target.
 
 ## Setting up the rest
 
-This README covers getting the server up. For the deeper setup steps, connecting Google/GitHub/other login providers, registering CAS and OIDC apps, MFA enrollment, and the reverse-proxy gatekeeper, see the **Setup & Operations Guide**. For how the code is organized, see **SYSTEM.md**.
+This README covers getting the server up. For the deeper setup steps, connecting Google/GitHub/other login providers, registering CAS and OIDC apps, MFA enrollment, and the reverse-proxy gatekeeper, see the **Setup & Operations Guide**.
 
 ---
 
@@ -167,4 +167,4 @@ private vulnerability reporting.
 
 ## License
 
-Apache-2.0 License, see [LICENSE](LICENSE).
+AGPL-3.0 license, see [LICENSE](LICENSE).
