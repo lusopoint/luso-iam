@@ -1,7 +1,7 @@
 .PHONY: help build run dev-server smoke-test test test-cover tidy \
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new \
-        web-install web-build web-dev web-clean sync-tokens \
+        web-install web-build web-dev web-clean web-lint web-format sync-tokens \
         keygen rotate-key seed-client grant-admin seed-user \
         prod-build prod-run prod-push vuln vuln-web
 
@@ -96,6 +96,12 @@ sync-tokens: web-install ## Copy LusoUI design tokens into the Go-embedded stati
 
 web-dev: web-install ## Start the Vite dev server (with API proxy to :8080)
 	cd $(WEB_DIR) && npm run dev
+
+web-lint: web-install ## Lint + format-check the SPA with Biome (no writes)
+	cd $(WEB_DIR) && npm run check
+
+web-format: web-install ## Auto-fix Biome lint + formatting in the SPA
+	cd $(WEB_DIR) && npm run check:write
 
 web-clean: ## Remove web/dist (resets to stub on next web-build)
 	rm -rf $(WEB_DIR)/dist/assets
