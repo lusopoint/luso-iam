@@ -154,14 +154,42 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// normalise the optional name fields, first/last are stored as given
+	// blanks become nil so the columns stay NULL
+	firstName := trimToPtr(req.FirstName)
+	lastName := trimToPtr(req.LastName)
+	username := trimToPtr(req.Username)
+	displayName := trimToPtr(req.DisplayName)
+
+	// auto-derive the username from first last name when the caller did not supply one
+	// so this way it is always filled by the first and last name
+	if username == nil {
+		if derived := deriveUsername(firstName, lastName); derived != "" {
+			username = &derived
+		}
+	}
+	// same convenience for display_name: "First Last" when both are given
+	// and no explicit display name was provided.
+	if displayName == nil && firstName != nil && lastName != nil {
+		dn := *firstName + " " + *lastName
+		displayName = &dn
+	}
+
 	u, err := h.store.CreateUser(r.Context(), postgres.CreateUserParams{
 		Email:       &email,
-		Username:    req.Username,
-		DisplayName: req.DisplayName,
-		FirstName:   req.FirstName,
-		LastName:    req.LastName,
+		Username:    username,
+		DisplayName: displayName,
+		FirstName:   firstName,
+		LastName:    lastName,
 	})
 	if err != nil {
+		// a derived (or supplied) username can collide with an existing one
+		// surface that as a clean 409 rather than a generic 500
+		if isUniqueViolation(err) {
+			writeProblem(w, http.StatusConflict, "username_taken",
+				"That username is already taken. Choose a different one.")
+			return
+		}
 		writeProblem(w, http.StatusInternalServerError, "internal_error",
 			"Could not create user.")
 		return
@@ -545,6 +573,68 @@ func changedFields(r updateUserRequest) map[string]any {
 		m["is_admin"] = *r.IsAdmin
 	}
 	return m
+}
+
+// trimToPtr trims and returns a pointer to it, or nil if its blank
+// (so optional string columns stay NULL rather than storing "")
+func trimToPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*s)
+	if t == "" {
+		return nil
+	}
+	return &t
+}
+
+// deriveUsername builds a "first-last" slug from whatever name parts are present
+// returns "" when neither part yields anything usable
+func deriveUsername(first, last *string) string {
+	var parts []string
+	if first != nil {
+		if s := slugify(*first); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	if last != nil {
+		if s := slugify(*last); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, "-")
+}
+
+// slugify lower-cases s and keeps only [a-z0-9], collapsing any run of
+// other characters (spaces, punctuation) into a single hyphen
+// leading and trailing hyphens are trimmed
+func slugify(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	lastHyphen := false
+	for _, r := range s {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			lastHyphen = false
+		default:
+			if !lastHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+				lastHyphen = true
+			}
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
+}
+
+// isUniqueViolation reports whether err looks like a postgres unique constraint violation
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint")
 }
 
 func parseUUID(s string) (pgtype.UUID, bool) {

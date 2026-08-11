@@ -159,6 +159,11 @@ func (h *Handler) issueCodeAndRedirect(
 		AMR:         amr,
 	})
 	if err != nil {
+		if errors.Is(err, oidcsvc.ErrAccessDenied) {
+			redirectError(w, r, req.RedirectURI, req.State,
+				"access_denied", "You are not authorized to access this application.")
+			return
+		}
 		slog.Error("oidc: authorize", "err", err)
 		redirectError(w, r, req.RedirectURI, req.State,
 			"server_error", "Could not issue authorization code.")

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
@@ -32,12 +34,17 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 			//   3. rd=<URL>       -> cross-origin redirect (proxy companion)
 			//   4. nothing        -> fall back to /
 			if serviceURL != "" {
-				if _, regErr := h.cas.ResolveService(r.Context(), serviceURL); regErr != nil {
+				svc, regErr := h.cas.ResolveService(r.Context(), serviceURL)
+				if regErr != nil {
 					renderError(w, http.StatusForbidden, errorPageData{
 						Title:   "Service not authorized",
 						Message: "This application is not registered with the IAM server.",
 						Detail:  serviceURL,
 					})
+					return
+				}
+				if accErr := h.cas.CheckServiceAccess(r.Context(), svc, sess.UserID); accErr != nil {
+					h.renderServiceAccessError(w, r, accErr, serviceURL, &sess.UserID)
 					return
 				}
 				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, false)
@@ -143,7 +150,8 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	// verify the service before creating a session
 	// we check early so we don't create a session that leads nowhere
 	if serviceURL != "" {
-		if _, err := h.cas.ResolveService(r.Context(), serviceURL); err != nil {
+		svc, err := h.cas.ResolveService(r.Context(), serviceURL)
+		if err != nil {
 			if errors.Is(err, authcas.ErrUnauthorizedService) {
 				renderError(w, http.StatusForbidden, errorPageData{
 					Title:   "Service not authorized",
@@ -156,6 +164,11 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 				Title:   "Login error",
 				Message: "Could not verify the requesting service.",
 			})
+			return
+		}
+		// Enforce the service's email allowlist before we mint a session.
+		if accErr := h.cas.CheckServiceAccess(r.Context(), svc, user.ID); accErr != nil {
+			h.renderServiceAccessError(w, r, accErr, serviceURL, &user.ID)
 			return
 		}
 	}
@@ -266,4 +279,32 @@ func safeNext(s string) string {
 		}
 	}
 	return s
+}
+
+// renderServiceAccessError renders the appropriate error page when a CAS
+// service access check fails and audits allowlist denials
+// ErrAccessDenied is a 403 "not authorized for this application"
+// anything else is an unexpected condition and renders a generic 500
+func (h *Handler) renderServiceAccessError(w http.ResponseWriter, r *http.Request, err error, serviceURL string, actor *pgtype.UUID) {
+	if errors.Is(err, authcas.ErrAccessDenied) {
+		if h.audit != nil {
+			h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
+				Type:     audit.EventAuthzDenied,
+				Actor:    actor,
+				Metadata: map[string]any{"service": serviceURL, "protocol": "cas"},
+			}))
+		}
+		renderError(w, http.StatusForbidden, errorPageData{
+			Title:   "Access denied",
+			Message: "You are not authorized to access this application.",
+			Detail:  serviceURL,
+		})
+		return
+	}
+	slog.ErrorContext(r.Context(), "cas: service access check failed",
+		"err", err, "service", serviceURL)
+	renderError(w, http.StatusInternalServerError, errorPageData{
+		Title:   "Login error",
+		Message: "Could not verify access to the requested service.",
+	})
 }
