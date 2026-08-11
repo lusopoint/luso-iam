@@ -4,6 +4,8 @@ import {
   Button,
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
   Checkbox,
   Input,
   Loading,
@@ -12,11 +14,12 @@ import {
   useToast,
 } from '@lusopoint/luso-ui'
 
-import { ScopesEditor } from '../components/ScopesEditor'
-import { ErrorState } from '../components/States'
-import { ApiError, api } from '../lib/api'
-import type { OIDCClient } from '../lib/types'
-import { validRedirectURI } from '../lib/util'
+import { AllowlistPanel } from '../components/AllowlistPanel.tsx'
+import { ScopesEditor } from '../components/ScopesEditor.tsx'
+import { ErrorState } from '../components/States.tsx'
+import { ApiError, api } from '../lib/api.ts'
+import type { OIDCClient } from '../lib/types.ts'
+import { validRedirectURI } from '../lib/util.ts'
 
 const GRANT_TYPES = [
   'authorization_code',
@@ -40,6 +43,7 @@ const ClientDetail = () => {
   const [grantTypes, setGrantTypes] = useState<string[]>([])
   const [requirePKCE, setRequirePKCE] = useState(false)
   const [requireConsent, setRequireConsent] = useState(false)
+  const [requireAllowlist, setRequireAllowlist] = useState(false)
   const [enabled, setEnabled] = useState(true)
 
   useEffect(() => {
@@ -55,6 +59,7 @@ const ClientDetail = () => {
         setGrantTypes(c.allowed_grant_types)
         setRequirePKCE(c.require_pkce)
         setRequireConsent(c.require_consent)
+        setRequireAllowlist(c.require_allowlist)
         setEnabled(c.enabled)
         setError(null)
       })
@@ -102,6 +107,26 @@ const ClientDetail = () => {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  // enforcement persists immediately (like the CAS page) so it stays in
+  // sync with the always live allow list below, rather than waiting for
+  // the batched "Save changes" on the settings card above
+  const toggleAllowlist = async (on: boolean) => {
+    setRequireAllowlist(on)
+    try {
+      const updated = await api.updateClient(id, { require_allowlist: on })
+      setClient(updated)
+      toast.success(
+        on ? 'Allow-list enforced.' : 'Allow-list no longer enforced.',
+      )
+    } catch (e) {
+      setRequireAllowlist(!on) // revert optimistic flip
+      toast.error(
+        'Could not update enforcement.',
+        e instanceof ApiError ? e.message : String(e),
+      )
     }
   }
 
@@ -202,6 +227,25 @@ const ClientDetail = () => {
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card noHover className="mt-6 max-w-2xl">
+        <CardHeader>
+          <CardTitle>Access allow-list</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5 pt-2">
+          <Checkbox
+            label="Require allow-list"
+            description="Only listed emails may sign in to this client."
+            checked={requireAllowlist}
+            onChange={e => toggleAllowlist(e.target.checked)}
+          />
+          <AllowlistPanel
+            kind="client"
+            id={client.id}
+            enforced={requireAllowlist}
+          />
         </CardContent>
       </Card>
     </>

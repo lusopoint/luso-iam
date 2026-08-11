@@ -9,8 +9,8 @@ import {
   useToast,
 } from '@lusopoint/luso-ui'
 
-import { ApiError, api } from '../lib/api'
-import type { CreateUserRequest, CreateUserResponse } from '../lib/types'
+import { ApiError, api } from '../lib/api.ts'
+import type { CreateUserRequest, CreateUserResponse } from '../lib/types.ts'
 
 interface Props {
   open: boolean
@@ -99,11 +99,11 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
     try {
       const body: CreateUserRequest = {
         email: form.email.trim(),
-        // Empty strings → omit, so optional columns stay NULL.
+        // empty strings -> omit, so optional columns stay NULL
         display_name: form.display_name?.trim() || undefined,
-        username: form.username.trim(),
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
+        username: form.username?.trim() || undefined,
+        first_name: form.first_name?.trim() || undefined,
+        last_name: form.last_name?.trim() || undefined,
         is_admin: form.is_admin,
         email_verified: form.email_verified,
       }
@@ -212,14 +212,14 @@ const NewUserDialog = ({ open, onClose, onCreated }: Props) => {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
-            label="First name *"
+            label="First name"
             autoComplete="off"
             placeholder="Alice"
             value={form.first_name ?? ''}
             onChange={e => onFirstName(e.target.value)}
           />
           <Input
-            label="Last name *"
+            label="Last name"
             autoComplete="off"
             placeholder="Smith"
             value={form.last_name ?? ''}
