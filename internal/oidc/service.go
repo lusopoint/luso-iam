@@ -26,6 +26,7 @@ var (
 	ErrUnsupportedGrantType    = errors.New("oidc: unsupported grant_type")
 	ErrUnsupportedResponseType = errors.New("oidc: unsupported response_type")
 	ErrInvalidToken            = errors.New("oidc: invalid token")
+	ErrAccessDenied            = errors.New("oidc: user not permitted for this client")
 )
 
 // AuthRequest carries the parsed, raw authorization request parameters
@@ -124,6 +125,13 @@ func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*po
 
 // Authorize short lived authorization code for a validated request
 func (s *Service) Authorize(ctx context.Context, p AuthorizeParams) (string, error) {
+	// allowlist gate, this is the single chokepoint every code-issuing
+	// path funnels through (both the no-consent redirect and the consent POST)
+	// so enforcing here closes the consent-bypass hole a handler
+	if err := s.checkClientAllowlist(ctx, p.ClientID, p.UserID); err != nil {
+		return "", err
+	}
+
 	tok, err := crypto.RandomToken(32)
 	if err != nil {
 		return "", err
@@ -165,6 +173,35 @@ func (s *Service) Authorize(ctx context.Context, p AuthorizeParams) (string, err
 		return "", fmt.Errorf("create auth code: %w", err)
 	}
 	return id, nil
+}
+
+// checkClientAllowlist enforces a clients email allowlist, it is a no-op
+// unless the client has require_allowlist=true, in which case the users
+// email must appear on service_email_allowlist for this client
+// a user with no email address can never satisfy an email allowlist
+func (s *Service) checkClientAllowlist(ctx context.Context, clientID string, userID pgtype.UUID) error {
+	client, err := s.store.GetOIDCClient(ctx, clientID)
+	if err != nil {
+		return fmt.Errorf("allowlist: load client: %w", err)
+	}
+	if !client.RequireAllowlist {
+		return nil
+	}
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("allowlist: load user: %w", err)
+	}
+	if user.Email == nil {
+		return ErrAccessDenied
+	}
+	allowed, err := s.store.IsOIDCClientEmailAllowed(ctx, clientID, *user.Email)
+	if err != nil {
+		return fmt.Errorf("allowlist: check email: %w", err)
+	}
+	if !allowed {
+		return ErrAccessDenied
+	}
+	return nil
 }
 
 // ExchangeCode redeems an authorization code for tokens

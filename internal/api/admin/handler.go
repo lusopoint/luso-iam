@@ -80,11 +80,21 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH  /admin/v1/clients/{id}", h.protected(h.updateClient))
 	mux.HandleFunc("DELETE /admin/v1/clients/{id}", h.protected(h.deleteClient))
 	mux.HandleFunc("POST   /admin/v1/clients/{id}/rotate", h.protected(h.rotateClientSecret))
+
+	mux.HandleFunc("GET    /admin/v1/clients/{id}/allowlist", h.protected(h.listClientAllowlist))
+	mux.HandleFunc("POST   /admin/v1/clients/{id}/allowlist", h.protected(h.addClientAllowlist))
+	mux.HandleFunc("DELETE /admin/v1/clients/{id}/allowlist", h.protected(h.deleteClientAllowlist))
+
 	mux.HandleFunc("GET    /admin/v1/cas-services", h.protected(h.listCASServices))
 	mux.HandleFunc("POST   /admin/v1/cas-services", h.protected(h.createCASService))
 	mux.HandleFunc("GET    /admin/v1/cas-services/{id}", h.protected(h.getCASService))
 	mux.HandleFunc("PATCH  /admin/v1/cas-services/{id}", h.protected(h.updateCASService))
 	mux.HandleFunc("DELETE /admin/v1/cas-services/{id}", h.protected(h.deleteCASService))
+
+	mux.HandleFunc("GET    /admin/v1/cas-services/{id}/allowlist", h.protected(h.listCASServiceAllowlist))
+	mux.HandleFunc("POST   /admin/v1/cas-services/{id}/allowlist", h.protected(h.addCASServiceAllowlist))
+	mux.HandleFunc("DELETE /admin/v1/cas-services/{id}/allowlist", h.protected(h.deleteCASServiceAllowlist))
+
 	mux.HandleFunc("GET /admin/v1/audit", h.protected(h.listAudit))
 	mux.HandleFunc("GET /admin/v1/federation/providers", h.protected(h.listFederationProviders))
 	mux.HandleFunc("GET /admin/v1/keys", h.protected(h.listKeys))

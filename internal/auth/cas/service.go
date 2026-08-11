@@ -1,12 +1,3 @@
-// Package cas implements the protocol-side logic for CAS 2.0 / 3.0:
-//
-//   - resolving the `service` query parameter against the registry of
-//     known CAS services (with wildcard URL patterns),
-//   - minting short-lived, single-use service tickets,
-//   - consuming and validating those tickets, returning the bound user.
-//
-// The package is independent of the HTTP layer (internal/api/cas) and
-// the session layer beyond accepting a session id.
 package cas
 
 import (
@@ -23,33 +14,32 @@ import (
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
 
-// ServiceTicketTTL is how long a freshly minted service ticket is
-// valid for. CAS spec says no more than a few seconds; we allow 60s
-// to be forgiving of network delays between the redirect and the
-// back-channel validate call.
+// ServiceTicketTTL is how long a freshly minted service ticket is valid for
+// cas spec says no more than a few seconds, we allow 60s to be forgiving
+// of network delays between the redirect and the back-channel validate call
 const ServiceTicketTTL = 60 * time.Second
 
-// Errors visible to the HTTP layer.
+// Errors visible to the HTTP layer
 var (
 	ErrUnauthorizedService = errors.New("cas: service is not registered")
 	ErrInvalidTicket       = errors.New("cas: invalid ticket")
 	ErrServiceMismatch     = errors.New("cas: ticket was not issued for this service")
+	// ErrAccessDenied: the service is registered but this user is not on
+	// its email allowlist (require_allowlist=true and email absent)
+	ErrAccessDenied = errors.New("cas: user not permitted for this service")
 )
 
-// Service is the CAS protocol logic.
 type Service struct {
 	store *postgres.Store
 }
 
-// New returns a CAS service.
 func New(store *postgres.Store) *Service {
 	return &Service{store: store}
 }
 
-// ResolveService returns the registered service entry whose pattern
-// matches serviceURL. Returns ErrUnauthorizedService if nothing
-// matches. The returned struct carries the attribute release policy
-// used later by serviceValidate.
+// ResolveService returns the registered service entry whose pattern matches serviceURL
+// returns ErrUnauthorizedService if nothing matches
+// the returned struct carries the attribute release policy used later by serviceValidate
 func (s *Service) ResolveService(ctx context.Context, serviceURL string) (*postgres.CASService, error) {
 	if serviceURL == "" {
 		return nil, ErrUnauthorizedService
@@ -64,9 +54,32 @@ func (s *Service) ResolveService(ctx context.Context, serviceURL string) (*postg
 	return svc, nil
 }
 
-// IssueServiceTicket mints a fresh ST bound to (sessionID, serviceURL).
-// Caller is responsible for redirecting the user back to serviceURL
-// with the returned ticket appended.
+// CheckServiceAccess enforces a CAS services email allowlist
+// it is a no-op unless svc.RequireAllowlist is set, in which case the users
+// email must appear on the services allowlist
+// a user with no email can never satisfy an email allowlist, returns ErrAccessDenied when the user is not permitted
+func (s *Service) CheckServiceAccess(ctx context.Context, svc *postgres.CASService, userID pgtype.UUID) error {
+	if svc == nil || !svc.RequireAllowlist {
+		return nil
+	}
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("allowlist: load user: %w", err)
+	}
+	if user.Email == nil {
+		return ErrAccessDenied
+	}
+	allowed, err := s.store.IsCASServiceEmailAllowed(ctx, svc.ID, *user.Email)
+	if err != nil {
+		return fmt.Errorf("allowlist: check email: %w", err)
+	}
+	if !allowed {
+		return ErrAccessDenied
+	}
+	return nil
+}
+
+// Caller is responsible for redirecting the user back to serviceURL with the returned ticket appended
 func (s *Service) IssueServiceTicket(ctx context.Context, sessionID pgtype.UUID, serviceURL string, renew bool) (string, error) {
 	tok, err := crypto.RandomToken(32) // 64 hex chars
 	if err != nil {
@@ -88,7 +101,7 @@ func (s *Service) IssueServiceTicket(ctx context.Context, sessionID pgtype.UUID,
 }
 
 // ValidationResult is what /cas/serviceValidate returns to the caller
-// after a successful ticket validation.
+// after a successful ticket validation
 type ValidationResult struct {
 	Ticket  *postgres.CASTicket
 	Session *postgres.Session
@@ -96,9 +109,9 @@ type ValidationResult struct {
 	Service *postgres.CASService
 }
 
-// Validate atomically consumes the ticket and returns the bound user.
-// If the ticket is missing, already consumed, expired, or was issued
-// for a different service, returns the matching sentinel error.
+// Validate atomically consumes the ticket and returns the bound user
+// if the ticket is missing, already consumed, expired, or was issued
+// for a different service, returns the matching sentinel error
 func (s *Service) Validate(ctx context.Context, ticketID, serviceURL string) (*ValidationResult, error) {
 	if !strings.HasPrefix(ticketID, "ST-") {
 		return nil, ErrInvalidTicket
@@ -131,10 +144,9 @@ func (s *Service) Validate(ctx context.Context, ticketID, serviceURL string) (*V
 
 	svc, err := s.store.FindCASServiceForURL(ctx, t.ServiceURL)
 	if err != nil {
-		// A ticket exists for this URL, so a service entry must have
-		// matched at issue time. If we can't find one now (e.g. it was
-		// deleted in between) we still allow the validation but return
-		// no attribute policy.
+		// a ticket exists for this URL, so a service entry must have matched at issue time
+		// if we ca not find one now (ex it was deleted in between)
+		// we still allow the validation but return no attribute policy
 		svc = nil
 	}
 
@@ -146,12 +158,8 @@ func (s *Service) Validate(ctx context.Context, ticketID, serviceURL string) (*V
 	}, nil
 }
 
-// URL helpers
-
 // normalizeServiceURL strips the fragment and any nested `ticket`
-// parameter that might still be attached from a previous round-trip.
-// Hostname and scheme casing are normalized. Query parameter order is
-// preserved otherwise.
+// parameter that might still be attached from a previous round-trip
 func normalizeServiceURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -168,15 +176,14 @@ func normalizeServiceURL(raw string) string {
 	return u.String()
 }
 
-// PatternToLike converts a user-facing service URL pattern (with '*'
-// wildcards) into a SQL LIKE pattern. Existing '%' / '_' / '\\' in the
-// input are escaped so they're treated literally.
+// PatternToLike converts a user-facing service URL pattern (with '*' wildcards)
+// into a SQL LIKE pattern, existing '%' / '_' / '\\' in the input are escaped so they're treated literally
 //
 // Examples:
 //
-//	"https://app.example.com/*"   →  "https://app.example.com/%"
-//	"https://*.example.com/cb"    →  "https://%.example.com/cb"
-//	"https://x.com/100%off"       →  "https://x.com/100\%off"
+//	"https://app.example.com/*"   ->  "https://app.example.com/%"
+//	"https://*.example.com/cb"    ->  "https://%.example.com/cb"
+//	"https://x.com/100%off"       ->  "https://x.com/100\%off"
 func PatternToLike(pattern string) string {
 	var b strings.Builder
 	b.Grow(len(pattern))
