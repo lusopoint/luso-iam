@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en" class="theme-sapphire">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>IAM Documentation</title>
+    <script>
+      (() => {
+        try {
+          if (
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+          ) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/tokens.css" />
+    <style>
+      :root {
+        --doc-max: 940px;
+        --doc-radius: 12px;
+        --m-get: #2563eb;
+        --m-post: #16a34a;
+        --m-patch: #b45309;
+        --m-delete: #dc2626;
+        --m-bg: rgba(0, 0, 0, 0.04);
+      }
+      html.dark {
+        --m-get: #60a5fa;
+        --m-post: #4ade80;
+        --m-patch: #fbbf24;
+        --m-delete: #f87171;
+        --m-bg: rgba(255, 255, 255, 0.06);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--background, #f8f9fc);
+        color: var(--on-surface, #0f172a);
+        font:
+          15px/1.6 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      code,
+      .mono {
+        font-family:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      a {
+        color: var(--primary, #b3922d);
+      }
+      .wrap {
+        max-width: var(--doc-max);
+        margin: 0 auto;
+        padding: 0 20px 96px;
+      }
+
+      header.masthead {
+        border-bottom: 1px solid var(--outline-variant, #e2e8f0);
+        background: var(--surface, #fff);
+      }
+      header.masthead .wrap {
+        padding-top: 28px;
+        padding-bottom: 24px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--on-surface-variant, #475569);
+        text-decoration: none;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .brand svg {
+        width: 20px;
+        height: 20px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 14px 0 6px;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        color: var(--on-surface-variant, #475569);
+        margin: 0;
+        max-width: 60ch;
+      }
+      .pill-note {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 2px 10px;
+        font-size: 12px;
+        border-radius: 999px;
+        color: var(--on-surface-variant, #475569);
+        background: var(--surface-container, #f0f2f7);
+        border: 1px solid var(--outline-variant, #e2e8f0);
+      }
+
+      nav.toc {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: color-mix(
+          in srgb,
+          var(--background, #f8f9fc) 88%,
+          transparent
+        );
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--outline-variant, #e2e8f0);
+      }
+      nav.toc .wrap {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        align-items: baseline;
+      }
+      nav.toc a {
+        text-decoration: none;
+        color: var(--on-surface-variant, #475569);
+        font-size: 13px;
+      }
+      nav.toc a.primary {
+        color: var(--on-surface, #0f172a);
+        font-weight: 600;
+      }
+      nav.toc a:hover {
+        color: var(--primary, #b3922d);
+      }
+      nav.toc .sep {
+        color: var(--outline-variant, #cbd5e1);
+      }
+
+      section {
+        margin-top: 44px;
+        scroll-margin-top: 64px;
+      }
+      section > h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--on-surface-variant, #475569);
+        margin: 0 0 4px;
+      }
+      h3 {
+        font-size: 19px;
+        margin: 30px 0 4px;
+        scroll-margin-top: 64px;
+      }
+      .intro {
+        color: var(--on-surface-variant, #475569);
+        margin: 0 0 14px;
+        max-width: 72ch;
+      }
+
+      .card {
+        background: var(--surface, #fff);
+        border: 1px solid var(--outline-variant, #e2e8f0);
+        border-radius: var(--doc-radius);
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      td,
+      th {
+        text-align: left;
+        padding: 9px 12px;
+        vertical-align: top;
+        border-top: 1px solid var(--outline-variant, #eef1f6);
+      }
+      tr:first-child td,
+      tr:first-child th {
+        border-top: 0;
+      }
+      td.method {
+        width: 78px;
+        white-space: nowrap;
+      }
+      td.path {
+        white-space: nowrap;
+      }
+      td.path code {
+        font-size: 13px;
+      }
+      td.access {
+        width: 92px;
+      }
+      .desc {
+        color: var(--on-surface-variant, #475569);
+      }
+
+      .m {
+        display: inline-block;
+        min-width: 62px;
+        text-align: center;
+        padding: 1px 8px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        background: var(--m-bg);
+        border: 1px solid transparent;
+      }
+      .m-get {
+        color: var(--m-get);
+      }
+      .m-post {
+        color: var(--m-post);
+      }
+      .m-patch {
+        color: var(--m-patch);
+      }
+      .m-delete {
+        color: var(--m-delete);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        color: var(--on-surface-variant, #475569);
+        background: var(--surface-container, #f0f2f7);
+        border: 1px solid var(--outline-variant, #e2e8f0);
+      }
+      .tag.req {
+        color: #b91c1c;
+        border-color: color-mix(in srgb, #b91c1c 40%, transparent);
+      }
+      .tag.secret {
+        color: var(--m-patch);
+        border-color: color-mix(in srgb, var(--m-patch) 40%, transparent);
+      }
+
+      td.env-name {
+        white-space: nowrap;
+      }
+      td.env-name code {
+        font-weight: 600;
+      }
+      td.env-default {
+        white-space: nowrap;
+      }
+      .badges {
+        display: inline-flex;
+        gap: 6px;
+        margin-left: 8px;
+      }
+      .muted {
+        color: var(--outline-variant, #94a3b8);
+      }
+
+      .sys-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .sys-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .sys {
+        background: var(--surface, #fff);
+        border: 1px solid var(--outline-variant, #e2e8f0);
+        border-radius: var(--doc-radius);
+        padding: 16px 18px;
+      }
+      .sys h4 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+      .sys p {
+        margin: 0 0 10px;
+        color: var(--on-surface-variant, #475569);
+      }
+      .sys ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .sys li {
+        margin: 3px 0;
+      }
+
+      .prereq-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--on-surface-variant, #475569);
+        margin: 16px 0 4px;
+      }
+      ul.prereqs {
+        margin: 0 0 14px;
+        padding-left: 18px;
+        color: var(--on-surface-variant, #475569);
+      }
+      ul.prereqs li {
+        margin: 2px 0;
+      }
+      ol.steps {
+        list-style: none;
+        counter-reset: step;
+        margin: 10px 0 0;
+        padding: 0;
+      }
+      ol.steps > li.step {
+        counter-increment: step;
+        position: relative;
+        padding: 0 0 18px 40px;
+      }
+      ol.steps > li.step::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -2px;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--on-primary, #fff);
+        background: var(--primary, #b3922d);
+      }
+      ol.steps > li.step::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 28px;
+        bottom: 0;
+        width: 2px;
+        background: var(--outline-variant, #e2e8f0);
+      }
+      ol.steps > li.step:last-child::after {
+        display: none;
+      }
+      .step-head {
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .step-body {
+        margin: 0 0 8px;
+        color: var(--on-surface-variant, #475569);
+        max-width: 74ch;
+      }
+      pre.code {
+        margin: 8px 0 0;
+        padding: 12px 14px;
+        overflow-x: auto;
+        background: var(--surface-container-low, #f8f9fc);
+        border: 1px solid var(--outline-variant, #e2e8f0);
+        border-radius: 10px;
+        font-family:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--on-surface, #0f172a);
+      }
+      pre.code code {
+        white-space: pre;
+      }
+
+      footer {
+        margin-top: 56px;
+        color: var(--on-surface-variant, #475569);
+        font-size: 13px;
+      }
+      hr.rule {
+        border: 0;
+        border-top: 1px solid var(--outline-variant, #e2e8f0);
+        margin: 28px 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="masthead">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>IAM</span>
+        </a>
+        <h1>Documentation</h1>
+        <p class="lede">
+          Reference for this server's HTTP API, its environment variables, and
+          what each subsystem does.
+        </p>
+        <span class="pill-note"
+          >Static reference: does not reflect this instance's live
+          configuration!!</span
+        >
+      </div>
+    </header>
+
+    <nav class="toc">
+      <div class="wrap">
+        <a class="primary" href="#setup">Setup</a>
+        <a class="primary" href="#api">API</a>
+        <a class="primary" href="#environment">Environment</a>
+        <a class="primary" href="#systems">Systems</a>
+        <span class="sep">·</span>
+        {{ range .APIGroups }}<a href="#{{ slug .Title }}">{{ .Title }}</a>{{
+        end }}
+      </div>
+    </nav>
+
+    <main class="wrap">
+      <section id="setup">
+        <h2>Setup</h2>
+        <p class="intro">
+          Get the platform running for local development or in production. Steps
+          use the project's <code>make</code> targets and the files under
+          <code>deployments/</code>.
+        </p>
+        {{ range .Guides }}
+        <h3 id="{{ slug .Title }}">{{ .Title }}</h3>
+        {{ if .Intro }}
+        <p class="intro">{{ .Intro }}</p>
+        {{ end }} {{ if .Prereqs }}
+        <p class="prereq-label">Prerequisites</p>
+        <ul class="prereqs">
+          {{ range .Prereqs }}
+          <li>{{ . }}</li>
+          {{ end }}
+        </ul>
+        {{ end }}
+        <ol class="steps">
+          {{ range .Steps }}
+          <li class="step">
+            <div class="step-head">{{ .Title }}</div>
+            {{ if .Body }}
+            <p class="step-body">{{ .Body }}</p>
+            {{ end }} {{ if .Code }}
+            <pre class="code"><code>{{ .Code }}</code></pre>
+            {{ end }}
+          </li>
+          {{ end }}
+        </ol>
+        {{ end }}
+      </section>
+
+      <section id="api">
+        <h2>HTTP API</h2>
+        <p class="intro">
+          Every route the server exposes, grouped by area.
+          <br />
+          <br />
+          <strong>Access</strong> shows who may call it: Public (no auth),
+          Session (a signed-in user), Client (an OAuth2 client), Admin (admin
+          session or scope), or Spec (protocol validation endpoint).
+        </p>
+        {{ range .APIGroups }}
+        <h3 id="{{ slug .Title }}">{{ .Title }}</h3>
+        {{ if .Intro }}
+        <p class="intro">{{ .Intro }}</p>
+        {{ end }}
+        <div class="card">
+          <table>
+            {{ range .Items }}
+            <tr>
+              <td class="method">
+                <span class="m m-{{ lower .Method }}">{{ .Method }}</span>
+              </td>
+              <td class="path"><code>{{ .Path }}</code></td>
+              <td class="access"><span class="tag">{{ .Access }}</span></td>
+              <td class="desc">{{ .Desc }}</td>
+            </tr>
+            {{ end }}
+          </table>
+        </div>
+        {{ end }}
+      </section>
+
+      <section id="environment">
+        <h2>Environment variables</h2>
+        <p class="intro">
+          Configuration: environment variables, with an optional YAML overlay
+          via <code>CONFIG_FILE</code>. Secrets must come from the environment
+          (or mounted files), never from committed YAML!
+          <br />
+          <br />
+          <span class="tag req">required</span> must be set;
+          <br />
+          <span class="tag secret">secret</span> should never be logged or
+          committed.
+        </p>
+        {{ range .EnvGroups }}
+        <h3>{{ .Title }}</h3>
+        <div class="card">
+          <table>
+            {{ range .Vars }}
+            <tr>
+              <td class="env-name">
+                <code>{{ .Name }}</code>
+                <span class="badges">
+                  {{ if .Required }}<span class="tag req">required</span>{{ end
+                  }} {{ if .Secret }}<span class="tag secret">secret</span>{{
+                  end }}
+                </span>
+              </td>
+              <td class="env-default">
+                {{ if .Default }}<code>{{ .Default }}</code>{{ else }}<span
+                  class="muted"
+                  >-</span
+                >{{ end }}
+              </td>
+              <td class="desc">{{ .Desc }}</td>
+            </tr>
+            {{ end }}
+          </table>
+        </div>
+        {{ end }}
+      </section>
+
+      <section id="systems">
+        <h2>Systems &amp; features</h2>
+        <p class="intro">What each part of the server does.</p>
+        <div class="sys-grid">
+          {{ range .Systems }}
+          <div class="sys">
+            <h4>{{ .Name }}</h4>
+            <p>{{ .Summary }}</p>
+            <ul>
+              {{ range .Features }}
+              <li>{{ . }}</li>
+              {{ end }}
+            </ul>
+          </div>
+          {{ end }}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

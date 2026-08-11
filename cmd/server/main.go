@@ -15,6 +15,7 @@ import (
 
 	apiadmin "github.com/lusopoint/lusoiam/internal/api/admin"
 	apicas "github.com/lusopoint/lusoiam/internal/api/cas"
+	apidocs "github.com/lusopoint/lusoiam/internal/api/docs"
 	apifed "github.com/lusopoint/lusoiam/internal/api/federation"
 	apihealth "github.com/lusopoint/lusoiam/internal/api/health"
 	apimfa "github.com/lusopoint/lusoiam/internal/api/mfa"
@@ -298,6 +299,9 @@ func run() error {
 
 	// admin, serves the react from web/dist embedded at compile time
 	apispa.Register(mux)
+
+	// self documentation at GET /docs (gated by DOCS_ENABLED)
+	apidocs.New(apidocs.Config{Enabled: cfg.DocsEnabled}).Register(mux)
 
 	// redirect to /admin
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
