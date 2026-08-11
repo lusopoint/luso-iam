@@ -1,7 +1,5 @@
-import { ApiError, api } from '../lib/api'
-import { StatusBadge } from './Users'
-import { ErrorState } from '../components/States'
-import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -22,15 +20,17 @@ import {
   usePrompt,
   useToast,
 } from '@lusopoint/luso-ui'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
+import { ErrorState } from '../components/States.tsx'
+import { StatusBadge } from './Users.tsx'
+import { ApiError, api } from '../lib/api.ts'
 import type {
   AdminSession,
   AdminUser,
   MFAMethod,
   UserFederationIdentity,
-} from '../lib/types'
-import { formatDateTime, relativeTime, shortID } from '../lib/util'
+} from '../lib/types.ts'
+import { formatDateTime, relativeTime, shortID } from '../lib/util.ts'
 
 const UserDetail = () => {
   const { id = '' } = useParams<{ id: string }>()
@@ -62,6 +62,7 @@ const UserDetail = () => {
     } catch {
       // if this fails, the inline panel just shows stale data
       // the next page navigation refetches everything
+      // TODO: maybe we should console err
     }
   }
 
