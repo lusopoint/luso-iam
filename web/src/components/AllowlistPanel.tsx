@@ -178,7 +178,7 @@ export const AllowlistPanel = ({
             disabled={busy || staged.length === 0}
           >
             {busy
-              ? 'Saving…'
+              ? 'Saving...'
               : `Add${staged.length ? ` ${staged.length}` : ''}`}
           </Button>
           <Button
@@ -204,7 +204,7 @@ export const AllowlistPanel = ({
         file, one address per line. Duplicates and invalid entries are ignored.
       </p>
 
-      {loading && <Loading label="Loading allow-list…" />}
+      {loading && <Loading label="Loading allow-list..." />}
       {error && <Alert variant="error">{error}</Alert>}
 
       {!loading && !error && (
