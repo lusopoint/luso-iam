@@ -12,7 +12,7 @@ import (
 
 const casServiceColumns = `
 	id, name, service_url_pattern, match_pattern, description,
-	released_attributes, enabled,
+	released_attributes, require_allowlist, enabled,
 	created_at, updated_at, deleted_at
 `
 
