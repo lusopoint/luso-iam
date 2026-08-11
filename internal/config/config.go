@@ -24,6 +24,9 @@ type Config struct {
 	// must be at least 32 bytes after hex decoding
 	SessionSecret string `yaml:"-"` // never accept from YAML
 
+	// DocsEnabled turns on the self documentation page
+	DocsEnabled bool `yaml:"docs_enabled"`
+
 	HTTP HTTPConfig `yaml:"http"`
 	DB   DBConfig   `yaml:"db"`
 	Log  LogConfig  `yaml:"log"`
@@ -292,6 +295,7 @@ func applyEnv(cfg *Config) {
 	setString(&cfg.BaseURL, "BASE_URL")
 	setString(&cfg.SessionSecret, "SESSION_SECRET")
 	setBool(&cfg.AutoMigrate, "AUTO_MIGRATE")
+	setBool(&cfg.DocsEnabled, "DOCS_ENABLED")
 
 	setString(&cfg.HTTP.Addr, "HTTP_ADDR")
 	setDuration(&cfg.HTTP.ReadTimeout, "HTTP_READ_TIMEOUT")
