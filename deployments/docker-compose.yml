@@ -53,6 +53,7 @@ services:
       LOG_FORMAT: json
       AUTO_MIGRATE: "true"
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+      DOCS_ENABLED: ${DOCS_ENABLED:-false}
 
       # MFA labels
       MFA_ISSUER: ${MFA_ISSUER:-IAM}
