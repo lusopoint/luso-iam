@@ -1,558 +1,2134 @@
 <!doctype html>
-<html lang="en" class="theme-sapphire">
+<html lang="en" class="theme-sapphire dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>IAM Documentation</title>
-    <script>
-      (() => {
-        try {
-          if (
-            window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-          ) {
-            document.documentElement.classList.add("dark");
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <title>IAM Server Documentation</title>
     <link rel="stylesheet" href="/static/tokens.css" />
     <style>
       :root {
-        --doc-max: 940px;
-        --doc-radius: 12px;
-        --m-get: #2563eb;
-        --m-post: #16a34a;
-        --m-patch: #b45309;
-        --m-delete: #dc2626;
-        --m-bg: rgba(0, 0, 0, 0.04);
-      }
-      html.dark {
-        --m-get: #60a5fa;
-        --m-post: #4ade80;
+        --doc-sidebar: 272px;
+        --doc-main-max: 840px;
+        --r-lg: 16px;
+        --r-xl: 24px;
+        --r-md: 10px;
+        --r-sm: 8px;
+        --gap: 44px;
+
+        /* luso-ui ambient shadows (dark variants glow with the primary) */
+        --shadow-ambient: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
+        --shadow-ambient-hover: 0 10px 34px -6px rgba(var(--primary-rgb), 0.22);
+        --c-info: var(--primary);
+        --c-info-rgb: var(--primary-rgb);
+        --c-ok: #34d399;
+        --c-ok-rgb: 52, 211, 153;
+        --c-warn: #fbbf24;
+        --c-warn-rgb: 251, 191, 36;
+        --c-err: #f87171;
+        --c-err-rgb: 248, 113, 113;
+
+        --m-get: #38bdf8;
+        --m-post: #34d399;
         --m-patch: #fbbf24;
         --m-delete: #f87171;
-        --m-bg: rgba(255, 255, 255, 0.06);
+
+        --sans:
+          "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+          "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --mono:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "Liberation Mono", monospace;
       }
+
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
-        background: var(--background, #f8f9fc);
-        color: var(--on-surface, #0f172a);
-        font:
-          15px/1.6 ui-sans-serif,
-          system-ui,
-          -apple-system,
-          "Segoe UI",
-          Roboto,
-          sans-serif;
+        background:
+          radial-gradient(
+            1200px 600px at 78% -10%,
+            rgba(var(--primary-rgb), 0.08),
+            transparent 60%
+          ),
+          var(--background);
+        color: var(--on-surface);
+        font: 15px/1.65 var(--sans);
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: 0.005em;
       }
       code,
       .mono {
-        font-family:
-          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-family: var(--mono);
       }
       a {
-        color: var(--primary, #b3922d);
+        color: var(--primary);
+        text-decoration: none;
       }
-      .wrap {
-        max-width: var(--doc-max);
-        margin: 0 auto;
-        padding: 0 20px 96px;
+      a:hover {
+        text-decoration: underline;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        letter-spacing: -0.02em;
       }
 
-      header.masthead {
-        border-bottom: 1px solid var(--outline-variant, #e2e8f0);
-        background: var(--surface, #fff);
-      }
-      header.masthead .wrap {
-        padding-top: 28px;
-        padding-bottom: 24px;
-      }
-      .brand {
+      /* signature luso-ui motif: uppercase tracked label with a pulsing dot */
+      .ticker {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        color: var(--on-surface-variant, #475569);
-        text-decoration: none;
-        font-weight: 600;
-        letter-spacing: 0.02em;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--on-surface-variant);
+        margin: 0 0 12px;
       }
-      .brand svg {
-        width: 20px;
-        height: 20px;
-      }
-      h1 {
-        font-size: 28px;
-        margin: 14px 0 6px;
-        letter-spacing: -0.01em;
-      }
-      .lede {
-        color: var(--on-surface-variant, #475569);
-        margin: 0;
-        max-width: 60ch;
-      }
-      .pill-note {
-        display: inline-block;
-        margin-top: 12px;
-        padding: 2px 10px;
-        font-size: 12px;
+      .ticker .dot {
+        width: 5px;
+        height: 5px;
         border-radius: 999px;
-        color: var(--on-surface-variant, #475569);
-        background: var(--surface-container, #f0f2f7);
-        border: 1px solid var(--outline-variant, #e2e8f0);
+        background: var(--primary);
+        box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.7);
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .ticker .n {
+        font-family: var(--mono);
+        color: var(--primary);
+        letter-spacing: 0.05em;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ticker .dot {
+          animation: none;
+        }
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: var(--doc-sidebar) minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .appbar {
+        display: none;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--surface-variant);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--outline-variant);
+      }
+      .menu-btn {
+        display: inline-grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--r-lg);
+        border: 1px solid var(--outline-variant);
+        background: var(--surface);
+        color: inherit;
+        cursor: pointer;
+      }
+      .menu-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+      .appbar .brand-text {
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+      }
+
+      .scrim {
+        display: none;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        border-right: 1px solid var(--outline-variant);
+      }
+      .side-head {
+        padding: 26px 22px 16px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        color: var(--on-surface);
+      }
+      .brand:hover {
+        text-decoration: none;
+      }
+      .brand .logo {
+        display: inline-grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: var(--r-md);
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-container)
+        );
+        color: var(--on-primary);
+        box-shadow: 0 0 14px rgba(var(--primary-rgb), 0.4);
+      }
+      .brand .logo svg {
+        width: 18px;
+        height: 18px;
+      }
+      .brand .title {
+        font-size: 18px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .brand .sub {
+        display: block;
+        margin-top: 4px;
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+      }
+      .filter {
+        position: relative;
+        margin-top: 18px;
+      }
+      .filter input {
+        width: 100%;
+        padding: 10px 12px 10px 34px;
+        font: 12px/1.2 var(--sans);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--on-surface);
+        background: var(--surface-container-lowest);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-lg);
+      }
+      .filter input::placeholder {
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 11px;
+        color: var(--on-surface-variant);
+      }
+      .filter input:focus {
+        outline: none;
+        border-color: rgba(var(--primary-rgb), 0.5);
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+      }
+      .filter svg {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 15px;
+        height: 15px;
+        color: var(--on-surface-variant);
+        pointer-events: none;
       }
 
       nav.toc {
-        position: sticky;
-        top: 0;
-        z-index: 5;
-        background: color-mix(
-          in srgb,
-          var(--background, #f8f9fc) 88%,
-          transparent
-        );
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid var(--outline-variant, #e2e8f0);
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px 28px;
       }
-      nav.toc .wrap {
-        padding-top: 10px;
-        padding-bottom: 10px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 18px;
-        align-items: baseline;
+      nav.toc .grp {
+        margin: 18px 10px 6px;
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        opacity: 0.7;
       }
       nav.toc a {
-        text-decoration: none;
-        color: var(--on-surface-variant, #475569);
-        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 9px 12px;
+        border-radius: var(--r-lg);
+        border: 1px solid transparent;
+        color: var(--on-surface-variant);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        line-height: 1.2;
       }
-      nav.toc a.primary {
-        color: var(--on-surface, #0f172a);
-        font-weight: 600;
+      nav.toc a svg {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        opacity: 0.75;
+      }
+      nav.toc a .num {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0;
+        color: var(--on-surface-variant);
+        opacity: 0.55;
+        min-width: 15px;
       }
       nav.toc a:hover {
-        color: var(--primary, #b3922d);
+        background: var(--surface-container);
+        color: var(--on-surface);
+        text-decoration: none;
       }
-      nav.toc .sep {
-        color: var(--outline-variant, #cbd5e1);
+      nav.toc a:hover svg {
+        opacity: 1;
+      }
+      nav.toc a.active {
+        background: rgba(var(--primary-rgb), 0.1);
+        border-color: rgba(var(--primary-rgb), 0.2);
+        color: var(--primary);
+      }
+      nav.toc a.active svg,
+      nav.toc a.active .num {
+        color: var(--primary);
+        opacity: 1;
+      }
+      nav.toc a.sub {
+        padding: 7px 12px 7px 40px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: none;
+        font-weight: 600;
       }
 
+      .side-foot {
+        padding: 14px 20px;
+        border-top: 1px solid var(--outline-variant);
+      }
+      .side-foot .precision {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+      }
+      .side-foot .precision .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--c-ok);
+        box-shadow: 0 0 8px rgba(var(--c-ok-rgb), 0.7);
+      }
+
+      main {
+        min-width: 0;
+        padding: 0 var(--gap) 130px;
+      }
+      .main-inner {
+        max-width: var(--doc-main-max);
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 70px 0 34px;
+        border-bottom: 1px solid var(--outline-variant);
+      }
+      .hero h1 {
+        font-size: clamp(32px, 4.4vw, 48px);
+        font-weight: 800;
+        line-height: 1.05;
+        margin: 0 0 16px;
+      }
+      .hero .lede {
+        font-size: 17px;
+        line-height: 1.55;
+        color: var(--on-surface-variant);
+        margin: 0;
+        max-width: 60ch;
+      }
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 28px 0 34px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        height: 46px;
+        padding: 0 22px;
+        border-radius: var(--r-lg);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.3s ease,
+          background 0.2s ease;
+      }
+      .btn svg {
+        width: 16px;
+        height: 16px;
+      }
+      .btn.primary {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-container)
+        );
+        color: var(--on-primary);
+        box-shadow: var(--shadow-ambient);
+      }
+      .btn.primary:hover {
+        transform: translateY(-1px) scale(1.01);
+        box-shadow: var(--shadow-ambient-hover);
+        text-decoration: none;
+      }
+      .btn.ghost {
+        background: var(--surface);
+        border-color: var(--outline-variant);
+        color: var(--on-surface);
+      }
+      .btn.ghost:hover {
+        border-color: rgba(var(--primary-rgb), 0.4);
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      .glance {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: 26px;
+      }
+      .cap {
+        padding: 20px;
+        background: var(--surface-variant);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-xl);
+        box-shadow: var(--shadow-ambient);
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease,
+          border-color 0.3s ease;
+      }
+      .cap:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-ambient-hover);
+        border-color: rgba(var(--primary-rgb), 0.3);
+      }
+      .cap .ic {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: var(--r-md);
+        margin-bottom: 14px;
+        color: var(--primary);
+        background: rgba(var(--primary-rgb), 0.12);
+        border: 1px solid rgba(var(--primary-rgb), 0.2);
+      }
+      .cap .ic svg {
+        width: 19px;
+        height: 19px;
+      }
+      .cap h4 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: -0.01em;
+      }
+      .cap p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--on-surface-variant);
+      }
+
+      /* Sections. */
       section {
-        margin-top: 44px;
-        scroll-margin-top: 64px;
+        padding-top: 64px;
+        scroll-margin-top: 20px;
       }
       section > h2 {
-        font-size: 13px;
+        font-size: 28px;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.16em;
-        color: var(--on-surface-variant, #475569);
-        margin: 0 0 4px;
+        margin: 0 0 14px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--outline-variant);
+      }
+      .sec-lede {
+        font-size: 15.5px;
+        color: var(--on-surface-variant);
+        line-height: 1.6;
+        margin: 0 0 10px;
+        max-width: 70ch;
       }
       h3 {
-        font-size: 19px;
-        margin: 30px 0 4px;
-        scroll-margin-top: 64px;
+        font-size: 15px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+        margin: 32px 0 8px;
+        scroll-margin-top: 20px;
       }
-      .intro {
-        color: var(--on-surface-variant, #475569);
-        margin: 0 0 14px;
+      h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 22px 0 6px;
+      }
+      p {
         max-width: 72ch;
       }
+      main ul,
+      main ol {
+        max-width: 72ch;
+      }
+      main li {
+        margin: 5px 0;
+      }
+      main li::marker {
+        color: var(--primary);
+      }
 
-      .card {
-        background: var(--surface, #fff);
-        border: 1px solid var(--outline-variant, #e2e8f0);
-        border-radius: var(--doc-radius);
+      p code,
+      li code,
+      td code,
+      h3 code,
+      h4 code {
+        font-size: 0.86em;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: var(--surface-container);
+        border: 1px solid var(--outline-variant);
+        color: var(--on-surface);
+      }
+      figure.code {
+        margin: 14px 0;
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-lg);
         overflow: hidden;
+        background: var(--surface-container-lowest);
+        box-shadow: var(--shadow-ambient);
+      }
+      figure.code figcaption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 12px 9px 14px;
+        border-bottom: 1px solid var(--outline-variant);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+      }
+      figure.code pre {
+        margin: 0;
+        padding: 16px;
+        overflow-x: auto;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--on-surface);
+      }
+      figure.code pre code {
+        white-space: pre;
+        background: none;
+        border: 0;
+        padding: 0;
+        font-size: inherit;
+        color: inherit;
+      }
+      .copy-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 9px;
+        font: 700 10px/1 var(--sans);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        background: var(--surface-container);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-sm);
+        cursor: pointer;
+        transition:
+          color 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .copy-btn:hover {
+        color: var(--primary);
+        border-color: rgba(var(--primary-rgb), 0.4);
+      }
+      .copy-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+      .callout {
+        display: flex;
+        gap: 14px;
+        padding: 15px 16px;
+        margin: 18px 0;
+        border-radius: var(--r-lg);
+        border: 1px solid;
+      }
+      .callout .ic {
+        flex: 0 0 auto;
+        margin-top: 1px;
+      }
+      .callout .ic svg {
+        width: 18px;
+        height: 18px;
+      }
+      .callout p {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.6;
+      }
+      .callout p + p {
+        margin-top: 6px;
+      }
+      .callout.note {
+        background: rgba(var(--c-info-rgb), 0.06);
+        border-color: rgba(var(--c-info-rgb), 0.25);
+      }
+      .callout.note .ic {
+        color: var(--c-info);
+      }
+      .callout.tip {
+        background: rgba(var(--c-ok-rgb), 0.06);
+        border-color: rgba(var(--c-ok-rgb), 0.25);
+      }
+      .callout.tip .ic {
+        color: var(--c-ok);
+      }
+      .callout.warn {
+        background: rgba(var(--c-warn-rgb), 0.07);
+        border-color: rgba(var(--c-warn-rgb), 0.25);
+      }
+      .callout.warn .ic {
+        color: var(--c-warn);
+      }
+      .callout.danger {
+        background: rgba(var(--c-err-rgb), 0.07);
+        border-color: rgba(var(--c-err-rgb), 0.25);
+      }
+      .callout.danger .ic {
+        color: var(--c-err);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-xl);
+        overflow: hidden;
+        margin: 16px 0;
+        box-shadow: var(--shadow-ambient);
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease,
+          border-color 0.3s ease;
+      }
+      .card:hover {
+        border-color: rgba(var(--primary-rgb), 0.22);
       }
       table {
         width: 100%;
         border-collapse: collapse;
+        font-size: 13.5px;
       }
       td,
       th {
         text-align: left;
-        padding: 9px 12px;
+        padding: 12px 14px;
         vertical-align: top;
-        border-top: 1px solid var(--outline-variant, #eef1f6);
+        border-top: 1px solid var(--outline-variant);
       }
-      tr:first-child td,
-      tr:first-child th {
+      thead th {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        background: var(--surface-container-low);
         border-top: 0;
       }
+      tbody tr:first-child td {
+        border-top: 0;
+      }
+      tbody tr {
+        transition: background 0.15s ease;
+      }
+      tbody tr:hover {
+        background: rgba(var(--primary-rgb), 0.04);
+      }
       td.method {
-        width: 78px;
+        width: 84px;
         white-space: nowrap;
       }
       td.path {
         white-space: nowrap;
       }
       td.path code {
-        font-size: 13px;
+        font-size: 12px;
+        background: none;
+        border: 0;
+        padding: 0;
+        color: var(--on-surface);
       }
       td.access {
-        width: 92px;
+        width: 96px;
       }
       .desc {
-        color: var(--on-surface-variant, #475569);
+        color: var(--on-surface-variant);
       }
-
       .m {
         display: inline-block;
-        min-width: 62px;
+        min-width: 60px;
         text-align: center;
-        padding: 1px 8px;
-        border-radius: 6px;
-        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: var(--r-sm);
+        font-family: var(--mono);
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: 0.03em;
-        background: var(--m-bg);
-        border: 1px solid transparent;
+        letter-spacing: 0.06em;
       }
       .m-get {
         color: var(--m-get);
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.22);
       }
       .m-post {
         color: var(--m-post);
+        background: rgba(52, 211, 153, 0.12);
+        border: 1px solid rgba(52, 211, 153, 0.22);
       }
       .m-patch {
         color: var(--m-patch);
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid rgba(251, 191, 36, 0.22);
       }
       .m-delete {
         color: var(--m-delete);
+        background: rgba(248, 113, 113, 0.12);
+        border: 1px solid rgba(248, 113, 113, 0.22);
       }
-
       .tag {
         display: inline-block;
-        padding: 1px 8px;
-        border-radius: 999px;
-        font-size: 11.5px;
-        color: var(--on-surface-variant, #475569);
-        background: var(--surface-container, #f0f2f7);
-        border: 1px solid var(--outline-variant, #e2e8f0);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        background: var(--surface-container);
+        border: 1px solid var(--outline-variant);
+        white-space: nowrap;
       }
       .tag.req {
-        color: #b91c1c;
-        border-color: color-mix(in srgb, #b91c1c 40%, transparent);
+        color: var(--c-err);
+        background: rgba(var(--c-err-rgb), 0.1);
+        border-color: rgba(var(--c-err-rgb), 0.2);
       }
       .tag.secret {
-        color: var(--m-patch);
-        border-color: color-mix(in srgb, var(--m-patch) 40%, transparent);
+        color: var(--c-warn);
+        background: rgba(var(--c-warn-rgb), 0.1);
+        border-color: rgba(var(--c-warn-rgb), 0.2);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin: 12px 0 4px;
+        font-size: 12.5px;
+        color: var(--on-surface-variant);
+      }
+      .legend b {
+        color: var(--on-surface);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.08em;
       }
 
       td.env-name {
         white-space: nowrap;
+        width: 1%;
       }
       td.env-name code {
-        font-weight: 600;
-      }
-      td.env-default {
-        white-space: nowrap;
+        font-weight: 700;
+        background: none;
+        border: 0;
+        padding: 0;
+        color: var(--on-surface);
       }
       .badges {
         display: inline-flex;
         gap: 6px;
-        margin-left: 8px;
+        margin-top: 7px;
+      }
+      td.env-default code {
+        font-size: 12px;
+        white-space: nowrap;
+        background: none;
+        border: 0;
+        padding: 0;
+        color: var(--on-surface-variant);
       }
       .muted {
-        color: var(--outline-variant, #94a3b8);
+        color: var(--on-surface-variant);
+        opacity: 0.5;
       }
-
-      .sys-grid {
-        display: grid;
-        gap: 14px;
-        grid-template-columns: 1fr;
+      .env-when {
+        display: block;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--outline-variant);
+        font-size: 12.5px;
+        color: var(--on-surface-variant);
       }
-      @media (min-width: 720px) {
-        .sys-grid {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      .sys {
-        background: var(--surface, #fff);
-        border: 1px solid var(--outline-variant, #e2e8f0);
-        border-radius: var(--doc-radius);
-        padding: 16px 18px;
-      }
-      .sys h4 {
-        margin: 0 0 4px;
-        font-size: 16px;
-      }
-      .sys p {
-        margin: 0 0 10px;
-        color: var(--on-surface-variant, #475569);
-      }
-      .sys ul {
-        margin: 0;
-        padding-left: 18px;
-      }
-      .sys li {
-        margin: 3px 0;
-      }
-
-      .prereq-label {
-        font-size: 12px;
+      .env-when b {
+        color: var(--primary);
         text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--on-surface-variant, #475569);
-        margin: 16px 0 4px;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+      }
+
+      /* Setup steps. */
+      .prereq-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        margin: 20px 0 8px;
       }
       ul.prereqs {
-        margin: 0 0 14px;
+        margin: 0 0 10px;
         padding-left: 18px;
-        color: var(--on-surface-variant, #475569);
-      }
-      ul.prereqs li {
-        margin: 2px 0;
+        color: var(--on-surface-variant);
       }
       ol.steps {
         list-style: none;
         counter-reset: step;
-        margin: 10px 0 0;
+        margin: 14px 0 0;
         padding: 0;
       }
       ol.steps > li.step {
         counter-increment: step;
         position: relative;
-        padding: 0 0 18px 40px;
+        padding: 0 0 26px 46px;
       }
       ol.steps > li.step::before {
-        content: counter(step);
+        content: counter(step, decimal-leading-zero);
         position: absolute;
         left: 0;
-        top: -2px;
-        width: 26px;
-        height: 26px;
-        border-radius: 999px;
+        top: -3px;
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r-md);
         display: grid;
         place-items: center;
-        font-size: 13px;
+        font-family: var(--mono);
+        font-size: 12px;
         font-weight: 700;
-        color: var(--on-primary, #fff);
-        background: var(--primary, #b3922d);
+        color: var(--on-primary);
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-container)
+        );
+        box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.35);
       }
       ol.steps > li.step::after {
         content: "";
         position: absolute;
-        left: 12px;
-        top: 28px;
+        left: 14px;
+        top: 32px;
         bottom: 0;
         width: 2px;
-        background: var(--outline-variant, #e2e8f0);
+        background: var(--outline-variant);
       }
       ol.steps > li.step:last-child::after {
         display: none;
       }
       .step-head {
-        font-weight: 600;
-        margin-bottom: 2px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 13px;
+        margin-bottom: 4px;
       }
       .step-body {
-        margin: 0 0 8px;
-        color: var(--on-surface-variant, #475569);
-        max-width: 74ch;
+        margin: 0 0 6px;
+        color: var(--on-surface-variant);
+        max-width: 70ch;
       }
-      pre.code {
-        margin: 8px 0 0;
-        padding: 12px 14px;
-        overflow-x: auto;
-        background: var(--surface-container-low, #f8f9fc);
-        border: 1px solid var(--outline-variant, #e2e8f0);
-        border-radius: 10px;
-        font-family:
-          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-        font-size: 12.5px;
-        line-height: 1.6;
-        color: var(--on-surface, #0f172a);
+      .sys-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr 1fr;
+        margin-top: 16px;
       }
-      pre.code code {
-        white-space: pre;
+      .sys {
+        background: var(--surface);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-xl);
+        padding: 20px;
+        box-shadow: var(--shadow-ambient);
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease,
+          border-color 0.3s ease;
       }
-
-      footer {
-        margin-top: 56px;
-        color: var(--on-surface-variant, #475569);
+      .sys:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-ambient-hover);
+        border-color: rgba(var(--primary-rgb), 0.3);
+      }
+      .sys h4 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: -0.01em;
+      }
+      .sys p {
+        margin: 0 0 12px;
+        font-size: 13px;
+        color: var(--on-surface-variant);
+      }
+      .sys ul {
+        margin: 0;
+        padding-left: 18px;
         font-size: 13px;
       }
-      hr.rule {
-        border: 0;
-        border-top: 1px solid var(--outline-variant, #e2e8f0);
-        margin: 28px 0;
+
+      pre.flow {
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.75;
+        white-space: pre;
+        overflow-x: auto;
+        margin: 16px 0;
+        padding: 18px;
+        color: var(--on-surface-variant);
+        background: var(--surface-container-lowest);
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-ambient);
+      }
+
+      .no-match {
+        display: none;
+        padding: 14px;
+        color: var(--on-surface-variant);
+        font-size: 14px;
+      }
+
+      .to-top {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 20;
+        display: none;
+        width: 44px;
+        height: 44px;
+        border-radius: var(--r-lg);
+        place-items: center;
+        background: var(--surface);
+        border: 1px solid var(--outline-variant);
+        color: var(--on-surface);
+        box-shadow: var(--shadow-ambient);
+        cursor: pointer;
+      }
+      .to-top.show {
+        display: grid;
+      }
+      .to-top:hover {
+        border-color: rgba(var(--primary-rgb), 0.4);
+        color: var(--primary);
+      }
+      .to-top svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      footer.docfoot {
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--outline-variant);
+        color: var(--on-surface-variant);
+        font-size: 12.5px;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .appbar {
+          display: flex;
+        }
+        .sidebar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: min(88vw, 330px);
+          z-index: 40;
+          transform: translateX(-100%);
+          transition: transform 0.22s ease;
+        }
+        html.nav-open .sidebar {
+          transform: translateX(0);
+        }
+        html.nav-open .scrim {
+          display: block;
+          position: fixed;
+          inset: 0;
+          z-index: 35;
+          background: rgba(0, 0, 0, 0.55);
+        }
+        main {
+          padding: 0 22px 100px;
+        }
+        .hero {
+          padding-top: 36px;
+        }
+        .glance,
+        .sys-grid {
+          grid-template-columns: 1fr;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .sidebar {
+            transition: none;
+          }
+        }
       }
     </style>
   </head>
 
   <body>
-    <header class="masthead">
-      <div class="wrap">
-        <a class="brand" href="/">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <span>IAM</span>
-        </a>
-        <h1>Documentation</h1>
-        <p class="lede">
-          Reference for this server's HTTP API, its environment variables, and
-          what each subsystem does.
-        </p>
-        <span class="pill-note"
-          >Static reference: does not reflect this instance's live
-          configuration!!</span
-        >
-      </div>
-    </header>
+    <div class="appbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open navigation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <span class="brand-text">IAM Server</span>
+    </div>
 
-    <nav class="toc">
-      <div class="wrap">
-        <a class="primary" href="#setup">Setup</a>
-        <a class="primary" href="#api">API</a>
-        <a class="primary" href="#environment">Environment</a>
-        <a class="primary" href="#systems">Systems</a>
-        <span class="sep">·</span>
-        {{ range .APIGroups }}<a href="#{{ slug .Title }}">{{ .Title }}</a>{{
-        end }}
-      </div>
-    </nav>
+    <div class="scrim" id="scrim"></div>
 
-    <main class="wrap">
-      <section id="setup">
-        <h2>Setup</h2>
-        <p class="intro">
-          Get the platform running for local development or in production. Steps
-          use the project's <code>make</code> targets and the files under
-          <code>deployments/</code>.
-        </p>
-        {{ range .Guides }}
-        <h3 id="{{ slug .Title }}">{{ .Title }}</h3>
-        {{ if .Intro }}
-        <p class="intro">{{ .Intro }}</p>
-        {{ end }} {{ if .Prereqs }}
-        <p class="prereq-label">Prerequisites</p>
-        <ul class="prereqs">
-          {{ range .Prereqs }}
-          <li>{{ . }}</li>
-          {{ end }}
-        </ul>
-        {{ end }}
-        <ol class="steps">
-          {{ range .Steps }}
-          <li class="step">
-            <div class="step-head">{{ .Title }}</div>
-            {{ if .Body }}
-            <p class="step-body">{{ .Body }}</p>
-            {{ end }} {{ if .Code }}
-            <pre class="code"><code>{{ .Code }}</code></pre>
-            {{ end }}
-          </li>
-          {{ end }}
-        </ol>
-        {{ end }}
-      </section>
-
-      <section id="api">
-        <h2>HTTP API</h2>
-        <p class="intro">
-          Every route the server exposes, grouped by area.
-          <br />
-          <br />
-          <strong>Access</strong> shows who may call it: Public (no auth),
-          Session (a signed-in user), Client (an OAuth2 client), Admin (admin
-          session or scope), or Spec (protocol validation endpoint).
-        </p>
-        {{ range .APIGroups }}
-        <h3 id="{{ slug .Title }}">{{ .Title }}</h3>
-        {{ if .Intro }}
-        <p class="intro">{{ .Intro }}</p>
-        {{ end }}
-        <div class="card">
-          <table>
-            {{ range .Items }}
-            <tr>
-              <td class="method">
-                <span class="m m-{{ lower .Method }}">{{ .Method }}</span>
-              </td>
-              <td class="path"><code>{{ .Path }}</code></td>
-              <td class="access"><span class="tag">{{ .Access }}</span></td>
-              <td class="desc">{{ .Desc }}</td>
-            </tr>
-            {{ end }}
-          </table>
-        </div>
-        {{ end }}
-      </section>
-
-      <section id="environment">
-        <h2>Environment variables</h2>
-        <p class="intro">
-          Configuration: environment variables, with an optional YAML overlay
-          via <code>CONFIG_FILE</code>. Secrets must come from the environment
-          (or mounted files), never from committed YAML!
-          <br />
-          <br />
-          <span class="tag req">required</span> must be set;
-          <br />
-          <span class="tag secret">secret</span> should never be logged or
-          committed.
-        </p>
-        {{ range .EnvGroups }}
-        <h3>{{ .Title }}</h3>
-        <div class="card">
-          <table>
-            {{ range .Vars }}
-            <tr>
-              <td class="env-name">
-                <code>{{ .Name }}</code>
-                <span class="badges">
-                  {{ if .Required }}<span class="tag req">required</span>{{ end
-                  }} {{ if .Secret }}<span class="tag secret">secret</span>{{
-                  end }}
-                </span>
-              </td>
-              <td class="env-default">
-                {{ if .Default }}<code>{{ .Default }}</code>{{ else }}<span
-                  class="muted"
-                  >-</span
-                >{{ end }}
-              </td>
-              <td class="desc">{{ .Desc }}</td>
-            </tr>
-            {{ end }}
-          </table>
-        </div>
-        {{ end }}
-      </section>
-
-      <section id="systems">
-        <h2>Systems &amp; features</h2>
-        <p class="intro">What each part of the server does.</p>
-        <div class="sys-grid">
-          {{ range .Systems }}
-          <div class="sys">
-            <h4>{{ .Name }}</h4>
-            <p>{{ .Summary }}</p>
-            <ul>
-              {{ range .Features }}
-              <li>{{ . }}</li>
-              {{ end }}
-            </ul>
+    <div class="shell" id="top">
+      <aside class="sidebar" id="sidebar">
+        <div class="side-head">
+          <a class="brand" href="#top">
+            <span class="logo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span>
+              <span class="title">IAM Server</span>
+              <span class="sub">Documentation</span>
+            </span>
+          </a>
+          <div class="filter">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="filterInput" type="search" placeholder="Filter reference" autocomplete="off" aria-label="Filter reference tables" />
           </div>
-          {{ end }}
         </div>
-      </section>
-    </main>
+
+        <nav class="toc" id="toc">
+          <div class="grp">Start</div>
+          <a href="#introduction"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="num">00</span> Introduction</a>
+          <a href="#installation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="num">01</span> Installation</a>
+          <a href="#development"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg><span class="num">02</span> Local dev</a>
+
+          <div class="grp">Build &amp; run</div>
+          <a href="#database"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="num">03</span> Database</a>
+          <a href="#scripts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg><span class="num">04</span> Scripts &amp; tests</a>
+          <a href="#environment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></svg><span class="num">05</span> Environment</a>
+          <a href="#contribution"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/><circle cx="18" cy="6" r="3"/></svg><span class="num">06</span> Contribution</a>
+          <a href="#production"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8a2 2 0 00-3 0zM12 15l-3-3a22 22 0 015-8 12.5 12.5 0 016-2 12.5 12.5 0 01-2 6 22 22 0 01-8 5zM9 12H4s.5-2.8 2-4c1.7-1.3 5-1 5-1M12 15v5s2.8-.5 4-2c1.3-1.3 1-5 1-5"/></svg><span class="num">07</span> Production</a>
+
+          <div class="grp">Reference</div>
+          <a href="#api"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 00-2 2v4a2 2 0 01-2 2 2 2 0 012 2v4a2 2 0 002 2h1M16 3h1a2 2 0 012 2v4a2 2 0 002 2 2 2 0 00-2 2v4a2 2 0 01-2 2h-1"/></svg><span class="num">08</span> API routes</a>
+          {{ range .APIGroups }}<a class="sub" href="#{{ slug .Title }}">{{ .Title }}</a>{{ end }}
+          <a href="#csrf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="num">09</span> CSRF</a>
+          <a href="#cas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L19 4M16 7l3-3M14 9l2 2"/></svg><span class="num">10</span> CAS</a>
+          <a href="#oidc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6z"/></svg><span class="num">11</span> OpenID Connect</a>
+          <a href="#mfa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="num">12</span> MFA</a>
+          <a href="#federation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg><span class="num">13</span> Federation</a>
+
+          <div class="grp">Operate</div>
+          <a href="#systems"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg><span class="num">14</span> Systems</a>
+          <a href="#security"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="num">15</span> Security</a>
+          <a href="#operations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg><span class="num">16</span> Operations</a>
+        </nav>
+
+        <div class="side-foot">
+          <div class="precision"><span class="dot"></span> Reference - Static</div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="main-inner">
+          <header class="hero">
+            <p class="ticker"><span class="dot"></span> Identity &amp; Access Management</p>
+            <h1>One binary for SSO, MFA, and OpenID&nbsp;Connect.</h1>
+            <p class="lede">
+              IAM Server gives your apps single sign-on, multi-factor
+              authentication, and standards-based OpenID Connect. It adds CAS
+              support and protects other apps behind a reverse proxy. You need
+              only the binary and a PostgreSQL database.
+            </p>
+            <div class="cta-row">
+              <a class="btn primary" href="#installation">
+                Get started
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </a>
+              <a class="btn ghost" href="#api">API reference</a>
+              <a class="btn ghost" href="#production">Deploy to production</a>
+            </div>
+
+            <div class="glance">
+              <div class="cap">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                <h4>OIDC &amp; OAuth 2.0</h4>
+                <p>Act as an authorization server for your apps, with PKCE, discovery, and JWKS.</p>
+              </div>
+              <div class="cap">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.2L4 17.2V4z"/></svg></span>
+                <h4>CAS 2.0 / 3.0</h4>
+                <p>Serve older apps that speak CAS. Bridge them to modern SSO providers.</p>
+              </div>
+              <div class="cap">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
+                <h4>MFA &amp; passkeys</h4>
+                <p>Enforce TOTP, WebAuthn/FIDO2, and single-use backup codes.</p>
+              </div>
+              <div class="cap">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span>
+                <h4>Reverse-proxy auth</h4>
+                <p>Protect any app behind Caddy or Traefik with a forward-auth endpoint.</p>
+              </div>
+            </div>
+          </header>
+
+          <section id="introduction">
+            <p class="ticker"><span class="dot"></span><span class="n">00</span> Introduction</p>
+            <h2>What IAM Server is</h2>
+            <p class="sec-lede">
+              IAM Server is a self-hosted identity server. It ships as one Go
+              binary with the admin UI built in.
+            </p>
+            <p>The server does five jobs:</p>
+            <ul>
+              <li>It acts as an <b>OIDC / OAuth 2.0</b> provider for your apps.</li>
+              <li>It acts as a <b>CAS</b> server for older apps.</li>
+              <li>It lets users <b>sign in with Google, GitHub, or any OIDC provider</b> (Microsoft, Okta, GitLab, or Keycloak).</li>
+              <li>It enforces <b>MFA</b> (authenticator apps and passkeys).</li>
+              <li>It protects other apps behind <b>Caddy or Traefik</b> with forward-auth.</li>
+            </ul>
+            <div class="callout note">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+              <p>This page is a static reference. It describes the server in
+              general. It does not read this instance's live configuration.</p>
+            </div>
+          </section>
+
+          <section id="installation">
+            <p class="ticker"><span class="dot"></span><span class="n">01</span> Installation</p>
+            <h2>Install &amp; run</h2>
+            <p class="sec-lede">
+              Choose one path. Use local development to work on the code. Use
+              production to run the server for real.
+            </p>
+
+            <h3>Requirements</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><b>Go</b></td><td class="desc">Version 1.26 or later. It builds the server.</td></tr>
+                  <tr><td class="env-name"><b>Node</b></td><td class="desc">Version 22 or later. It builds the web UI only.</td></tr>
+                  <tr><td class="env-name"><b>Docker</b></td><td class="desc">It runs PostgreSQL, and it runs the server in production.</td></tr>
+                  <tr><td class="env-name"><b>PostgreSQL</b></td><td class="desc">Version 16 or later. Docker provides it.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="callout tip">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10c.7.7 1 1.3 1 2h6c0-.7.3-1.3 1-2a6 6 0 00-4-10z"/></svg></span>
+              <p><b>Which path do I choose?</b> To change the code and see it
+              reload, follow <a href="#development">Local development</a>. To
+              run the server on a host, follow
+              <a href="#production">Production deploy</a>.</p>
+            </div>
+          </section>
+
+          <section id="development">
+            <p class="ticker"><span class="dot"></span><span class="n">02</span> Local development</p>
+            <h2>Run it locally</h2>
+            {{ template "guide" (index .Guides 0) }}
+            <div class="callout note">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+              <p>Open <code>http://localhost:8080</code> and sign in. Then set
+              <code>DOCS_ENABLED=true</code> to read this page at
+              <code>/docs</code>.</p>
+            </div>
+          </section>
+
+          <section id="database">
+            <p class="ticker"><span class="dot"></span><span class="n">03</span> Database</p>
+            <h2>Database &amp; migrations</h2>
+            <p class="sec-lede">
+              The server stores all state in PostgreSQL 16 or later. It applies
+              schema changes with versioned migrations.
+            </p>
+
+            <h3>How migrations run</h3>
+            <p>
+              The migration files live in
+              <code>internal/store/migrations</code>. Each change has an
+              <code>up</code> file and a <code>down</code> file. The server
+              applies pending migrations on start when
+              <code>AUTO_MIGRATE=true</code>. To run them by hand, use the make
+              targets.
+            </p>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>make migrate-up            # apply all pending migrations
+make migrate-down          # roll back the most recent migration
+make migrate-new name=add_foo   # create a new up/down pair</code></pre>
+            </figure>
+            <div class="callout warn">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <p>The make targets read <code>DATABASE_URL</code>. Load your
+              <code>.env</code> first with <code>set -a; source .env; set +a</code>,
+              or the targets use the local default.</p>
+            </div>
+
+            <h3>Schema conventions</h3>
+            <ul>
+              <li>Every table uses a <code>UUID v7</code> primary key. These keys sort by time.</li>
+              <li>Every timestamp is <code>TIMESTAMPTZ</code> in UTC.</li>
+              <li>A soft delete sets <code>deleted_at</code>; it does not remove the row.</li>
+              <li>Every migration has an <code>up</code> file and a <code>down</code> file.</li>
+              <li>Migration files use the name <code>NNNN_description.up.sql</code> and <code>.down.sql</code>.</li>
+            </ul>
+
+            <h3>Core tables</h3>
+            <div class="card">
+              <table>
+                <thead><tr><th>Table</th><th>Purpose</th></tr></thead>
+                <tbody>
+                  <tr><td class="env-name"><code>users</code></td><td class="desc">The canonical user record.</td></tr>
+                  <tr><td class="env-name"><code>user_credentials</code></td><td class="desc">Passwords (argon2id hash) and passkeys.</td></tr>
+                  <tr><td class="env-name"><code>user_mfa_methods</code></td><td class="desc">TOTP secrets and WebAuthn credentials.</td></tr>
+                  <tr><td class="env-name"><code>sessions</code></td><td class="desc">Browser sessions with a sliding expiry.</td></tr>
+                  <tr><td class="env-name"><code>clients</code></td><td class="desc">Registered OIDC/OAuth applications.</td></tr>
+                  <tr><td class="env-name"><code>authorization_codes</code></td><td class="desc">Short-lived OAuth authorization codes.</td></tr>
+                  <tr><td class="env-name"><code>access_tokens</code></td><td class="desc">Issued access tokens.</td></tr>
+                  <tr><td class="env-name"><code>refresh_tokens</code></td><td class="desc">Issued refresh tokens.</td></tr>
+                  <tr><td class="env-name"><code>cas_services</code></td><td class="desc">Registered CAS service URLs.</td></tr>
+                  <tr><td class="env-name"><code>upstream_providers</code></td><td class="desc">Federated IdP configuration.</td></tr>
+                  <tr><td class="env-name"><code>audit_log</code></td><td class="desc">The immutable, append-only event log.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Reset the database</h3>
+            <p>To delete all local data, remove the Docker volume. Then start
+            again from the development steps.</p>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>make compose-dev-clear   # stop Postgres and delete the volume</code></pre>
+            </figure>
+          </section>
+
+          <section id="scripts">
+            <p class="ticker"><span class="dot"></span><span class="n">04</span> Scripts &amp; tests</p>
+            <h2>Make targets &amp; tests</h2>
+            <p class="sec-lede">
+              The <code>Makefile</code> drives every task. Run
+              <code>make help</code> to list all targets.
+            </p>
+
+            <h3>Build &amp; run</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>make build</code></td><td class="desc">Compiles one binary with the web UI embedded into <code>./bin/iam-server</code>.</td></tr>
+                  <tr><td class="env-name"><code>make run</code></td><td class="desc">Builds, then runs the binary.</td></tr>
+                  <tr><td class="env-name"><code>make dev-server</code></td><td class="desc">Runs the server with <code>go run</code> for development.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Test</h3>
+            <p>The tests use a real Postgres through <code>testcontainers-go</code>.
+            Docker must be running.</p>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>make test</code></td><td class="desc">Runs all unit and integration tests with the race detector.</td></tr>
+                  <tr><td class="env-name"><code>make test-cover</code></td><td class="desc">Runs the tests and reports coverage.</td></tr>
+                  <tr><td class="env-name"><code>make smoke-test</code></td><td class="desc">Runs a black-box check against a running server (<code>BASE_URL=http://localhost:8080</code>).</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code># run the full suite
+make test
+
+# smoke-test a running server on another port
+BASE_URL=http://localhost:9000 make smoke-test</code></pre>
+            </figure>
+
+            <h3>Web UI</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>make web-dev</code></td><td class="desc">Starts the Vite dev server with hot reload on port 5173.</td></tr>
+                  <tr><td class="env-name"><code>make web-build</code></td><td class="desc">Builds the React admin UI into <code>web/dist</code>.</td></tr>
+                  <tr><td class="env-name"><code>make web-lint</code></td><td class="desc">Checks lint and format with Biome (no writes).</td></tr>
+                  <tr><td class="env-name"><code>make web-format</code></td><td class="desc">Fixes lint and format with Biome.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Keys &amp; users</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>make keygen</code></td><td class="desc">Generates an RSA signing key at <code>./signing.pem</code> (development).</td></tr>
+                  <tr><td class="env-name"><code>make rotate-key dir=/etc/iam/keys</code></td><td class="desc">Generates a new signing key in a keys directory.</td></tr>
+                  <tr><td class="env-name"><code>make seed-user email=… password=… admin=1</code></td><td class="desc">Creates a user account.</td></tr>
+                  <tr><td class="env-name"><code>make grant-admin email=…</code></td><td class="desc">Promotes an existing user to admin.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Security scans</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>make vuln</code></td><td class="desc">Scans Go dependencies for known vulnerabilities (<code>govulncheck</code>).</td></tr>
+                  <tr><td class="env-name"><code>make vuln-web</code></td><td class="desc">Scans the web UI's production dependencies (<code>npm audit</code>, high and up).</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="environment">
+            <p class="ticker"><span class="dot"></span><span class="n">05</span> Environment variables</p>
+            <h2>Configuration</h2>
+            <p class="sec-lede">
+              You configure the server with environment variables. An optional
+              YAML overlay (<code>CONFIG_FILE</code>) sets non-secret fields.
+              Secrets must come from the environment or mounted files, never
+              from committed YAML.
+            </p>
+            <div class="legend">
+              <span><span class="tag req">required</span> &nbsp;you must set it</span>
+              <span><span class="tag secret">secret</span> &nbsp;never log it or commit it</span>
+              <span>Each row shows <b>when to set</b> the variable.</span>
+            </div>
+
+            <div id="envList">
+              {{ range .EnvGroups }}
+              <h3 data-filterable-group="{{ .Title }}">{{ .Title }}</h3>
+              {{ if .Intro }}<p class="desc">{{ .Intro }}</p>{{ end }}
+              <div class="card">
+                <table>
+                  <tbody>
+                  {{ range .Vars }}
+                    <tr data-filter="{{ lower .Name }} {{ lower .Desc }}">
+                      <td class="env-name">
+                        <code>{{ .Name }}</code>
+                        <div class="badges">
+                          {{ if .Required }}<span class="tag req">required</span>{{ end }}
+                          {{ if .Secret }}<span class="tag secret">secret</span>{{ end }}
+                        </div>
+                      </td>
+                      <td class="env-default">
+                        {{ if .Default }}<code>{{ .Default }}</code>{{ else }}<span class="muted">-</span>{{ end }}
+                      </td>
+                      <td class="desc">
+                        {{ .Desc }}
+                        {{ if .When }}<span class="env-when"><b>When to set:</b> {{ .When }}</span>{{ end }}
+                      </td>
+                    </tr>
+                  {{ end }}
+                  </tbody>
+                </table>
+              </div>
+              {{ end }}
+            </div>
+            <p class="no-match" id="envNoMatch">No variable matches your filter.</p>
+          </section>
+
+          <section id="contribution">
+            <p class="ticker"><span class="dot"></span><span class="n">06</span> Contribution</p>
+            <h2>Contribution rules</h2>
+            <p class="sec-lede">
+              Follow these rules for every change. They keep the codebase small,
+              safe, and consistent.
+            </p>
+
+            <h3>The development loop</h3>
+            <p>Set up your machine with the
+            <a href="#development">Local development</a> steps. Then use this
+            loop for each change:</p>
+            <ol>
+              <li>Create a branch. Use a prefix: <code>feat/</code>, <code>fix/</code>, <code>chore/</code>, or <code>docs/</code>.</li>
+              <li>Write the code and a test for it.</li>
+              <li>Run <code>make test</code> and <code>make lint</code>.</li>
+              <li>Commit with a Conventional Commit message (for example, <code>feat: add WebAuthn enrollment</code>).</li>
+              <li>Open a pull request.</li>
+            </ol>
+
+            <h3>Pull request rules</h3>
+            <ul>
+              <li>The CI must pass.</li>
+              <li>One reviewer must approve.</li>
+              <li>The code must have no lint warnings.</li>
+            </ul>
+
+            <h3>Git conventions</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><b>Branches</b></td><td class="desc"><code>feat/</code>, <code>fix/</code>, <code>chore/</code>, <code>docs/</code></td></tr>
+                  <tr><td class="env-name"><b>Commits</b></td><td class="desc">Conventional Commits (<code>type: summary</code>).</td></tr>
+                  <tr><td class="env-name"><b>Releases</b></td><td class="desc">A semver tag (<code>v1.2.3</code>) triggers the release build.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Add a dependency</h3>
+            <p>Keep the runtime section of <code>go.mod</code> short. Before you
+            add a dependency, answer these questions. If a pull request adds a
+            <code>require</code> entry, justify it in the commit message.</p>
+            <div class="card">
+              <table>
+                <thead><tr><th>Question</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td>Is it a protocol or spec implementation? (WebAuthn, JWT, TOTP)</td><td class="desc">Keep it. Specs have sharp edges and a subtle attack surface.</td></tr>
+                  <tr><td>Is it glue or boilerplate? (routing, config, logging)</td><td class="desc">Replace it with a stdlib equivalent.</td></tr>
+                  <tr><td>Is it a dev-time code generator? (sqlc, migrate)</td><td class="desc">Keep it. It has zero runtime cost and prevents bugs.</td></tr>
+                  <tr><td>Would it take under 200 lines to write? (JWKS serialisation)</td><td class="desc">Write it in <code>internal/crypto</code>.</td></tr>
+                  <tr><td>Is it maintained by the Go team? (<code>golang.org/x/*</code>)</td><td class="desc">Treat it as an extended stdlib.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Code style</h3>
+            <ul>
+              <li>The dependency flow is <code>api → auth → store</code>. It never runs the other way.</li>
+              <li><code>internal/</code> packages are private. <code>pkg/</code> packages are public.</li>
+              <li>Define sentinel errors in each package. Wrap errors with context.</li>
+              <li>HTTP handlers return RFC 7807 Problem JSON on error.</li>
+              <li>Put unit tests next to the source file (<code>foo_test.go</code>).</li>
+            </ul>
+          </section>
+
+          <section id="production">
+            <p class="ticker"><span class="dot"></span><span class="n">07</span> Production deploy</p>
+            <h2>Deploy to production</h2>
+            {{ template "guide" (index .Guides 1) }}
+
+            <h3>Back up two things</h3>
+            <div class="callout danger">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <p><b>The <code>pgdata</code> volume</b> holds your whole database.
+              <b>The <code>signing/signing.pem</code> file</b> signs your tokens.
+              If you lose the signing key, every issued token stops working. Back
+              up both, off-host.</p>
+            </div>
+
+            <h3>Check before you go live</h3>
+            <ul>
+              <li><code>BASE_URL</code> matches what users type (scheme, host, no trailing slash).</li>
+              <li><code>&lt;BASE_URL&gt;/.well-known/openid-configuration</code> returns JSON.</li>
+              <li><code>&lt;BASE_URL&gt;/healthz</code> returns <code>ok</code>.</li>
+              <li>Your admin account has MFA enrolled.</li>
+            </ul>
+
+            <h3>Caddy example</h3>
+            <p>Caddy is the documented companion proxy. It handles TLS for you.</p>
+            <figure class="code">
+              <figcaption>Caddyfile</figcaption>
+              <pre><code>app.example.com {
+    forward_auth iam:8080 {
+        uri /proxy/verify
+        copy_headers X-Auth-User X-Auth-Email X-Auth-Groups
+    }
+    reverse_proxy backend:3000
+}</code></pre>
+            </figure>
+          </section>
+
+          <section id="api">
+            <p class="ticker"><span class="dot"></span><span class="n">08</span> API routes</p>
+            <h2>HTTP API reference</h2>
+            <p class="sec-lede">
+              Every route the server exposes, grouped by area. Use the filter in
+              the sidebar to find a route fast.
+            </p>
+            <div class="legend">
+              <span><b>Public</b> no auth</span>
+              <span><b>Session</b> a signed-in user</span>
+              <span><b>Client</b> an OAuth2 client</span>
+              <span><b>Admin</b> an admin session or scope</span>
+              <span><b>Spec</b> a protocol validation endpoint</span>
+            </div>
+
+            <div id="apiList">
+              {{ range .APIGroups }}
+              <h3 id="{{ slug .Title }}" data-filterable-group="{{ .Title }}">{{ .Title }}</h3>
+              {{ if .Intro }}<p class="desc">{{ .Intro }}</p>{{ end }}
+              <div class="card">
+                <table>
+                  <tbody>
+                  {{ range .Items }}
+                    <tr data-filter="{{ lower .Method }} {{ lower .Path }} {{ lower .Desc }}">
+                      <td class="method"><span class="m m-{{ lower .Method }}">{{ .Method }}</span></td>
+                      <td class="path"><code>{{ .Path }}</code></td>
+                      <td class="access"><span class="tag">{{ .Access }}</span></td>
+                      <td class="desc">{{ .Desc }}</td>
+                    </tr>
+                  {{ end }}
+                  </tbody>
+                </table>
+              </div>
+              {{ end }}
+            </div>
+            <p class="no-match" id="apiNoMatch">No route matches your filter.</p>
+          </section>
+
+          <section id="csrf">
+            <p class="ticker"><span class="dot"></span><span class="n">09</span> CSRF</p>
+            <h2>CSRF protection</h2>
+            <p class="sec-lede">
+              CSRF is cross-site request forgery. An attacker tricks a browser
+              into sending a request with the user's session cookie attached.
+              The server blocks this with a double-submit cookie.
+            </p>
+
+            <h3>How it works</h3>
+            <p>The server issues a random token in a cookie named
+            <code>iam_csrf</code>. The cookie is readable by JavaScript, so the
+            admin UI can echo it. On every state-changing request, the client
+            must present the same token. The server compares the two values.</p>
+            <ul>
+              <li>The admin UI sends the token in the <code>X-CSRF-Token</code> header.</li>
+              <li>A server-rendered form sends the token in the <code>_csrf</code> field.</li>
+            </ul>
+            <p>The server checks POST, PUT, PATCH, and DELETE requests. It does
+            not check GET, HEAD, or OPTIONS, because those requests are safe.</p>
+
+            <h3>Which routes are checked</h3>
+            <p>The server protects the browser flows:</p>
+            <ul>
+              <li><code>POST /cas/login</code></li>
+              <li><code>/password/forgot</code> and <code>POST /password/reset</code></li>
+              <li>The <code>/mfa/*</code> POST routes (verify and enroll)</li>
+              <li>The <code>/admin/v1/*</code> POST, PATCH, and DELETE routes</li>
+            </ul>
+
+            <h3>Which routes are exempt</h3>
+            <p>Machine-to-machine and read-only routes skip CSRF. A browser does
+            not drive them, so a forged request is not a risk.</p>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>/oauth2/token</code></td><td class="desc">A client authenticates with its credentials.</td></tr>
+                  <tr><td class="env-name"><code>/oauth2/userinfo</code></td><td class="desc">A bearer token authenticates the request.</td></tr>
+                  <tr><td class="env-name"><code>/oauth2/introspect</code></td><td class="desc">A client authenticates with its credentials.</td></tr>
+                  <tr><td class="env-name"><code>/oauth2/revoke</code></td><td class="desc">A client authenticates with its credentials.</td></tr>
+                  <tr><td class="env-name"><code>/federation/</code></td><td class="desc">The OAuth state parameter provides CSRF protection.</td></tr>
+                  <tr><td class="env-name"><code>/proxy/verify</code></td><td class="desc">Read-only. It changes no state.</td></tr>
+                  <tr><td class="env-name"><code>/metrics, /healthz, /readyz</code></td><td class="desc">Read-only operations endpoints.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <p>When you add a new state-changing route, review the exempt list.
+              A route added without review can silently weaken the protection.</p>
+            </div>
+
+            <h3>Send the token from a client</h3>
+            <p>Read the <code>iam_csrf</code> cookie. Send its value in the
+            <code>X-CSRF-Token</code> header.</p>
+            <figure class="code">
+              <figcaption>JavaScript</figcaption>
+              <pre><code>const token = document.cookie
+  .split("; ")
+  .find((c) =&gt; c.startsWith("iam_csrf="))
+  ?.split("=")[1];
+
+await fetch("/admin/v1/users", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
+  body: JSON.stringify({ email: "new@example.com" }),
+});</code></pre>
+            </figure>
+          </section>
+
+          <section id="cas">
+            <p class="ticker"><span class="dot"></span><span class="n">10</span> CAS</p>
+            <h2>CAS</h2>
+            <p class="sec-lede">
+              CAS is the Central Authentication Service protocol. The server
+              accepts CAS 2.0 and 3.0. Older apps use it for single sign-on.
+            </p>
+
+            <h3>The sign-in flow</h3>
+            <ol>
+              <li>An app sends the user to <code>/cas/login?service=&lt;app-url&gt;</code>.</li>
+              <li>The server signs the user in. It issues a service ticket (ST).</li>
+              <li>The server sends the user back to the app with the ticket.</li>
+              <li>The app calls a validate endpoint to check the ticket.</li>
+              <li>The server returns the user and, in CAS 3.0, the released attributes.</li>
+            </ol>
+
+            <h3>Endpoints</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/cas/login</code></td><td class="desc">Signs in and issues a service ticket.</td></tr>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/cas/serviceValidate</code></td><td class="desc">CAS 2.0 ticket validation.</td></tr>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/cas/p3/serviceValidate</code></td><td class="desc">CAS 3.0 ticket validation, with attributes.</td></tr>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/cas/logout</code></td><td class="desc">Ends the session (single logout).</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>The CAS-to-SSO bridge</h3>
+            <p>A CAS app can use a modern provider. When the user has no local
+            session, the server starts an upstream OIDC or OAuth flow (Google,
+            GitHub, and others). It maps the returned identity to a local user.
+            Then it issues the CAS ticket.</p>
+            <pre class="flow">Client App  --CAS login-->  IAM Server  --OIDC flow-->  Google / GitHub
+                &lt;-- ST --                   &lt;-- id_token --
+Client App  --validate ST--> IAM Server
+                &lt;-- user attrs --</pre>
+
+            <h3>Register a CAS service</h3>
+            <p>The server issues a ticket only for a registered service URL. Add
+            the service in the admin UI, or with the admin API.</p>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>curl -X POST https://auth.example.com/admin/v1/cas-services \
+  -H "X-CSRF-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  --cookie "iam_session=$SESSION" \
+  -d '{"name":"Wiki","service_url":"https://wiki.example.com/.*"}'</code></pre>
+            </figure>
+            <div class="callout note">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+              <p>To limit a service to some users, turn on
+              <code>require_allowlist</code> for that service. Then add the
+              allowed emails. The server checks the list at ticket issuance.</p>
+            </div>
+          </section>
+
+          <section id="oidc">
+            <p class="ticker"><span class="dot"></span><span class="n">11</span> OpenID Connect</p>
+            <h2>OpenID Connect &amp; OAuth 2.0</h2>
+            <p class="sec-lede">
+              The server is a standards-conformant authorization server. Modern
+              apps use it for sign-in and for API authorization.
+            </p>
+
+            <h3>Supported flows</h3>
+            <ul>
+              <li><b>Authorization Code with PKCE</b>: for web apps, single-page apps, and mobile apps.</li>
+              <li><b>Client Credentials</b>: for machine-to-machine access.</li>
+              <li><b>Refresh Token</b>: to get a new access token without a new sign-in.</li>
+            </ul>
+            <p>The Implicit flow and the Password flow are off by default.</p>
+
+            <h3>Discovery</h3>
+            <p>An app reads the server's metadata from the discovery document. It
+            finds every endpoint and the signing keys there.</p>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>curl https://auth.example.com/.well-known/openid-configuration
+curl https://auth.example.com/.well-known/jwks.json</code></pre>
+            </figure>
+
+            <h3>The Authorization Code flow with PKCE</h3>
+            <ol>
+              <li>The app creates a <code>code_verifier</code> and a <code>code_challenge</code>.</li>
+              <li>The app sends the user to <code>/oauth2/authorize</code> with the challenge.</li>
+              <li>The user signs in and grants consent.</li>
+              <li>The server returns an authorization code to the app.</li>
+              <li>The app calls <code>/oauth2/token</code> with the code and the verifier.</li>
+              <li>The server returns an <code>id_token</code> and an <code>access_token</code>.</li>
+            </ol>
+            <div class="callout note">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+              <p>PKCE is mandatory for public clients. The server accepts the
+              <code>S256</code> method only.</p>
+            </div>
+
+            <h3>Register a client</h3>
+            <p>Add a client in the admin UI, or with the admin API. Set the
+            redirect URIs and the scopes. A public client (a single-page app or a
+            mobile app) uses PKCE and holds no secret.</p>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>curl -X POST https://auth.example.com/admin/v1/clients \
+  -H "X-CSRF-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  --cookie "iam_session=$SESSION" \
+  -d '{
+    "name": "My SPA",
+    "redirect_uris": ["https://app.example.com/callback"],
+    "is_public": true,
+    "require_pkce": true
+  }'</code></pre>
+            </figure>
+
+            <h3>Exchange a code for tokens</h3>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>curl -X POST https://auth.example.com/oauth2/token \
+  -d grant_type=authorization_code \
+  -d code=$CODE \
+  -d redirect_uri=https://app.example.com/callback \
+  -d client_id=my-spa \
+  -d code_verifier=$VERIFIER</code></pre>
+            </figure>
+          </section>
+
+          <section id="mfa">
+            <p class="ticker"><span class="dot"></span><span class="n">12</span> MFA</p>
+            <h2>Multi-factor authentication</h2>
+            <p class="sec-lede">
+              MFA adds a second factor to sign-in. The server challenges the user
+              after the password step.
+            </p>
+
+            <h3>Methods</h3>
+            <div class="card">
+              <table>
+                <thead><tr><th>Method</th><th>Notes</th></tr></thead>
+                <tbody>
+                  <tr><td class="env-name"><b>TOTP</b></td><td class="desc">A 6-digit code from an authenticator app (RFC 6238). Enroll with a QR code.</td></tr>
+                  <tr><td class="env-name"><b>WebAuthn / passkey</b></td><td class="desc">A FIDO2 security key or a platform passkey. Supports passwordless sign-in.</td></tr>
+                  <tr><td class="env-name"><b>Backup codes</b></td><td class="desc">Ten single-use codes. Use one when you lose your other factor.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Enroll a factor</h3>
+            <p>A signed-in user enrolls a factor at <code>/mfa/enroll</code>.</p>
+            <ol>
+              <li>Open <code>/mfa/enroll</code>.</li>
+              <li>For TOTP, scan the QR code. Enter the 6-digit code to confirm.</li>
+              <li>For a passkey, follow the browser prompt.</li>
+              <li>Generate backup codes. Store them in a safe place.</li>
+            </ol>
+
+            <h3>Enforce MFA</h3>
+            <p>You control MFA at two levels:</p>
+            <ul>
+              <li><b>Per user</b>: a user enrolls a factor. The server then challenges that user.</li>
+              <li><b>Per client</b>: a client sends <code>acr_values</code> to require MFA for its sign-in.</li>
+              <li><b>Global</b>: set <code>FORCE_MFA=true</code> to require MFA for everyone.</li>
+            </ul>
+            <div class="callout danger">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <p>Enroll a second factor on your admin account right after the
+              first sign-in. Generate backup codes at the same time.</p>
+            </div>
+          </section>
+
+          <section id="federation">
+            <p class="ticker"><span class="dot"></span><span class="n">13</span> Federation</p>
+            <h2>Set up federation (upstream SSO)</h2>
+            <p class="sec-lede">
+              Federation lets users sign in with an external provider. The server
+              maps the external identity to a local user.
+            </p>
+
+            <h3>How linking works</h3>
+            <p>On the provider callback, the server does three checks in order:</p>
+            <ol>
+              <li>It looks for a user already linked to this provider and subject. If it finds one, it signs the user in.</li>
+              <li>It looks for a user with the same email. If it finds one, it prompts the user to link the accounts.</li>
+              <li>If it finds neither, it creates a new user and links the provider.</li>
+            </ol>
+
+            <h3>Set up Google</h3>
+            <ol>
+              <li>Create an OAuth client in the Google Cloud console.</li>
+              <li>Set the redirect URI to <code>&lt;BASE_URL&gt;/oauth/callback/google</code>.</li>
+              <li>Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>.</li>
+              <li>Restart the server. A Google button appears on the sign-in page.</li>
+            </ol>
+
+            <h3>Set up GitHub</h3>
+            <ol>
+              <li>Create an OAuth app in GitHub settings.</li>
+              <li>Set the callback URL to <code>&lt;BASE_URL&gt;/oauth/callback/github</code>.</li>
+              <li>Set <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code>.</li>
+              <li>Restart the server. A GitHub button appears on the sign-in page.</li>
+            </ol>
+
+            <h3>Set up any OIDC provider</h3>
+            <p>Use the generic OIDC connector for Microsoft, Okta, GitLab,
+            Keycloak, and others. List each provider by a slug. Then add its four
+            variables.</p>
+            <figure class="code">
+              <figcaption>.env</figcaption>
+              <pre><code>OIDC_PROVIDERS=microsoft,okta
+
+OIDC_MICROSOFT_ISSUER=https://login.microsoftonline.com/common/v2.0
+OIDC_MICROSOFT_CLIENT_ID=...
+OIDC_MICROSOFT_CLIENT_SECRET=...
+OIDC_MICROSOFT_DISPLAY_NAME=Microsoft
+
+OIDC_OKTA_ISSUER=https://acme.okta.com
+OIDC_OKTA_CLIENT_ID=...
+OIDC_OKTA_CLIENT_SECRET=...</code></pre>
+            </figure>
+            <p>Set the redirect URI at the provider to
+            <code>&lt;BASE_URL&gt;/oauth/callback/&lt;slug&gt;</code>. For the
+            example above, the slugs are <code>microsoft</code> and
+            <code>okta</code>.</p>
+            <div class="callout warn">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <p>In Docker Compose, the variables must reach the container. Add
+              each variable to the <code>iam.environment</code> block, or the
+              provider stays inactive.</p>
+            </div>
+          </section>
+
+          <section id="systems">
+            <p class="ticker"><span class="dot"></span><span class="n">14</span> Systems</p>
+            <h2>Systems &amp; features</h2>
+            <p class="sec-lede">What each part of the server does.</p>
+            <div class="sys-grid">
+              {{ range .Systems }}
+              <div class="sys">
+                <h4>{{ .Name }}</h4>
+                <p>{{ .Summary }}</p>
+                <ul>{{ range .Features }}<li>{{ . }}</li>{{ end }}</ul>
+              </div>
+              {{ end }}
+            </div>
+          </section>
+
+          <section id="security">
+            <p class="ticker"><span class="dot"></span><span class="n">15</span> Security</p>
+            <h2>Security defaults</h2>
+            <p class="sec-lede">
+              The server ships with safe defaults. This section lists them so you
+              know what protects your deployment.
+            </p>
+
+            <h3>Passwords &amp; sessions</h3>
+            <ul>
+              <li>The server hashes passwords with <b>Argon2id</b>.</li>
+              <li>Session cookies are <b>HMAC-SHA256</b> signed. They set <code>HttpOnly</code>, <code>Secure</code>, and <code>SameSite=Lax</code>.</li>
+              <li>A https <code>BASE_URL</code> turns on the <code>Secure</code> flag automatically.</li>
+            </ul>
+
+            <h3>Response headers</h3>
+            <p>The server sets these headers on every response:</p>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="env-name"><code>Content-Security-Policy</code></td><td class="desc">Restricts sources to same-origin. It blocks external requests.</td></tr>
+                  <tr><td class="env-name"><code>Strict-Transport-Security</code></td><td class="desc">Pins HTTPS for one year (only when <code>BASE_URL</code> is https).</td></tr>
+                  <tr><td class="env-name"><code>X-Frame-Options: DENY</code></td><td class="desc">Blocks embedding in an iframe (anti-clickjacking).</td></tr>
+                  <tr><td class="env-name"><code>X-Content-Type-Options</code></td><td class="desc">Blocks MIME-type sniffing.</td></tr>
+                  <tr><td class="env-name"><code>Referrer-Policy</code></td><td class="desc">Sends the origin only across sites, not the full URL.</td></tr>
+                  <tr><td class="env-name"><code>Permissions-Policy</code></td><td class="desc">Disables APIs the server does not use.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Rate limits</h3>
+            <ul>
+              <li>The login endpoint accepts 5 requests per minute per IP.</li>
+              <li>The token endpoint accepts 20 requests per minute per client.</li>
+            </ul>
+
+            <h3>Report a vulnerability</h3>
+            <p>Do not open a public issue for a security problem. Report it
+            privately. See <code>SECURITY.md</code> in the repository.</p>
+          </section>
+
+          <section id="operations">
+            <p class="ticker"><span class="dot"></span><span class="n">16</span> Operations</p>
+            <h2>Operations</h2>
+            <p class="sec-lede">Run and maintain the server after it is live.</p>
+
+            <h3>Health endpoints</h3>
+            <div class="card">
+              <table>
+                <tbody>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/healthz</code></td><td class="desc">Liveness. Returns 200 whenever the process is up.</td></tr>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/readyz</code></td><td class="desc">Readiness. Returns 200 only when the database is reachable.</td></tr>
+                  <tr><td class="method"><span class="m m-get">GET</span></td><td class="path"><code>/metrics</code></td><td class="desc">Prometheus metrics.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Rotate the signing key</h3>
+            <p>Rotate the key with no downtime. Old tokens stay valid until they
+            expire.</p>
+            <ol>
+              <li>Generate a new key. Add it to the JWKS as a second key.</li>
+              <li>Deploy. The server signs new tokens with the new key. It verifies old tokens against both keys.</li>
+              <li>Wait for the maximum token lifetime to pass.</li>
+              <li>Remove the old key from the JWKS.</li>
+            </ol>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>make rotate-key dir=/etc/iam/keys</code></pre>
+            </figure>
+
+            <h3>Update &amp; logs</h3>
+            <figure class="code">
+              <figcaption>terminal</figcaption>
+              <pre><code>docker compose up -d --build   # update to a new build
+docker compose logs -f iam     # follow the logs</code></pre>
+            </figure>
+
+            <footer class="docfoot">
+              <p>IAM Server documentation. This reference is served at
+              <code>/docs</code> when <code>DOCS_ENABLED</code> is set. It does
+              not read this instance's live configuration.</p>
+            </footer>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <button class="to-top" id="toTop" aria-label="Back to top">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+    </button>
+
+    <script>
+      (() => {
+        "use strict";
+        let doc = document;
+
+        // Formatter-proofing: strip indentation a code formatter may inject into
+        // <pre>. Removes leading/trailing blank lines and the common leading
+        // indent. Applied to every code sample and the flow diagram.
+        const dedent = (text) => {
+          let lines = text.replace(/\t/g, "  ").replace(/\r/g, "").split("\n");
+          while (lines.length && lines[0].trim() === "") lines.shift();
+          while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+          let indent = Infinity;
+          lines.forEach((l) => {
+            if (l.trim() !== "") {
+              let m = l.match(/^ */)[0].length;
+              if (m < indent) indent = m;
+            }
+          });
+          if (!isFinite(indent)) indent = 0;
+          return lines
+            .map((l) => l.slice(indent))
+            .join("\n");
+        }
+        doc.querySelectorAll("figure.code pre code, pre.flow").forEach((el) => {
+          el.textContent = dedent(el.textContent);
+        });
+
+        let COPY_SVG =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>';
+        doc.querySelectorAll("figure.code").forEach((fig) => {
+          let code = fig.querySelector("pre code");
+          let cap = fig.querySelector("figcaption");
+          if (!code || !cap) return;
+          let btn = doc.createElement("button");
+          btn.className = "copy-btn";
+          btn.type = "button";
+          btn.innerHTML = COPY_SVG + "<span>Copy</span>";
+          btn.addEventListener("click",() => {
+            let text = code.innerText;
+            let label = btn.querySelector("span");
+            let done = () => {
+              if (label) label.textContent = "Copied";
+              setTimeout(() => {
+                if (label) label.textContent = "Copy";
+              }, 1400);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done,() => {});
+            } else {
+              try {
+                let ta = doc.createElement("textarea");
+                ta.value = text;
+                doc.body.appendChild(ta);
+                ta.select();
+                doc.execCommand("copy");
+                doc.body.removeChild(ta);
+                done();
+              } catch (e) {}
+            }
+          });
+          cap.appendChild(btn);
+        });
+
+        // Mobile drawer.
+        let menuBtn = doc.getElementById("menuBtn");
+        let scrim = doc.getElementById("scrim");
+        const closeNav = () => {
+          doc.documentElement.classList.remove("nav-open");
+        }
+        if (menuBtn) {
+          menuBtn.addEventListener("click", () => {
+            doc.documentElement.classList.toggle("nav-open");
+          });
+        }
+        if (scrim) scrim.addEventListener("click", closeNav);
+        doc.querySelectorAll("nav.toc a").forEach((a) => {
+          a.addEventListener("click", closeNav);
+        });
+
+        // Scrollspy.
+        let links = Array.prototype.slice.call(
+          doc.querySelectorAll('nav.toc a[href^="#"]')
+        );
+        let byId = {};
+        links.forEach((a) => {
+          byId[a.getAttribute("href").slice(1)] = a;
+        });
+        let spied = Array.prototype.slice.call(
+          doc.querySelectorAll("section[id], h3[id]")
+        );
+        if ("IntersectionObserver" in window && spied.length) {
+          let active = null;
+          let io = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (entry.isIntersecting && byId[entry.target.id]) {
+                  if (active) active.classList.remove("active");
+                  active = byId[entry.target.id];
+                  active.classList.add("active");
+                }
+              });
+            },
+            { rootMargin: "0px 0px -75% 0px", threshold: 0 }
+          );
+          spied.forEach((s) => io.observe(s));
+        }
+
+        // Reference filter (API + env tables).
+        let input = doc.getElementById("filterInput");
+        const runFilter = (q) => {
+          q = (q || "").trim().toLowerCase();
+          ["apiList", "envList"].forEach((listId) => {
+            let list = doc.getElementById(listId);
+            if (!list) return;
+            let anyVisible = false;
+            list.querySelectorAll("tr[data-filter]").forEach((tr) => {
+              let hit = !q || tr.getAttribute("data-filter").indexOf(q) !== -1;
+              tr.style.display = hit ? "" : "none";
+              if (hit) anyVisible = true;
+            });
+            list.querySelectorAll("h3[data-filterable-group]").forEach((h3) => {
+              let nodes = [];
+              let n = h3.nextElementSibling;
+              while (n && n.tagName !== "H3") {
+                nodes.push(n);
+                n = n.nextElementSibling;
+              }
+              let card = nodes.filter(x => x.classList && x.classList.contains("card"))[0];
+              let visibleRow =
+                card &&
+                card.querySelector('tr[data-filter]:not([style*="display: none"])');
+              let show = !q || !!visibleRow;
+              h3.style.display = show ? "" : "none";
+              nodes.forEach((x) => {
+                x.style.display = show ? "" : "none";
+              });
+            });
+            let note = doc.getElementById(
+              listId === "apiList" ? "apiNoMatch" : "envNoMatch"
+            );
+            if (note) note.style.display = q && !anyVisible ? "block" : "none";
+          });
+        }
+        if (input) {
+          input.addEventListener("input", () => {
+            runFilter(input.value);
+          });
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+              input.value = "";
+              runFilter("");
+            }
+          });
+        }
+
+        let toTop = doc.getElementById("toTop");
+        if (toTop) {
+          window.addEventListener(
+            "scroll",
+            () => {
+              if (window.scrollY > 600) toTop.classList.add("show");
+              else toTop.classList.remove("show");
+            },
+            { passive: true }
+          );
+          toTop.addEventListener("click",() => window.scrollTo(0, 0));
+        }
+      })();
+    </script>
   </body>
 </html>
+
+{{ define "guide" }}
+  {{ if .Intro }}<p class="sec-lede">{{ .Intro }}</p>{{ end }}
+  {{ if .Prereqs }}
+  <p class="prereq-label">Prerequisites</p>
+  <ul class="prereqs">{{ range .Prereqs }}<li>{{ . }}</li>{{ end }}</ul>
+  {{ end }}
+  <ol class="steps">
+    {{ range .Steps }}
+    <li class="step">
+      <div class="step-head">{{ .Title }}</div>
+      {{ if .Body }}<p class="step-body">{{ .Body }}</p>{{ end }}
+      {{ if .Code }}<figure class="code"><figcaption>terminal</figcaption><pre><code>{{ .Code }}</code></pre></figure>{{ end }}
+    </li>
+    {{ end }}
+  </ol>
+{{ end }}
