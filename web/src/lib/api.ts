@@ -62,14 +62,14 @@ const request = async <T>(path: string, opts: RequestOpts = {}): Promise<T> => {
     signal: opts.signal,
   })
 
-  // 204 No Content common for DELETE / lock / unlock.
+  // 204 No Content common for DELETE / lock / unlock
   if (res.status === 204) {
     return undefined as T
   }
 
-  // Both success and failure bodies are JSON. For non-OK responses, try
+  // both success and failure bodies are JSON, for non-OK responses, try
   // to surface the Problem envelope; fall back to a synthetic one if the
-  // body wasn't valid JSON.
+  // body wasn't valid JSON
   const text = await res.text()
   let parsed: unknown
   try {
@@ -92,7 +92,7 @@ const request = async <T>(path: string, opts: RequestOpts = {}): Promise<T> => {
   return parsed as T
 }
 
-function buildURL(path: string, query?: RequestOpts['query']): string {
+const buildURL = (path: string, query?: RequestOpts['query']): string => {
   const full = path.startsWith('http') ? path : `${ADMIN_BASE}${path}`
   if (!query) return full
   const search = new URLSearchParams()
@@ -104,7 +104,7 @@ function buildURL(path: string, query?: RequestOpts['query']): string {
   return qs ? `${full}?${qs}` : full
 }
 
-function isProblem(v: unknown): v is ApiProblem {
+const isProblem = (v: unknown): v is ApiProblem => {
   return typeof v === 'object' && v !== null && 'status' in v && 'title' in v
 }
 
@@ -117,7 +117,7 @@ function isProblem(v: unknown): v is ApiProblem {
  * can contain "=" (base64url tokens may end with padding, though ours
  * don't) and the simple split-on-"=" approach is wrong in general.
  */
-function readCSRFCookie(): string {
+const readCSRFCookie = (): string => {
   const name = 'iam_csrf='
   const cookies = document.cookie.split(';')
   for (const c of cookies) {
@@ -142,10 +142,12 @@ import type {
   CreateClientResponse,
   CASService,
   CreateCASServiceRequest,
+  AllowlistResponse,
+  AllowlistMutateResponse,
   AdminSession,
   ListAuditResponse,
   SigningKey,
-} from './types'
+} from './types.ts'
 
 export const api = {
   me: (signal?: AbortSignal) => request<{ user: AdminUser }>('/me', { signal }),
@@ -232,6 +234,35 @@ export const api = {
     request<CASService>(`/cas-services/${id}`, { method: 'PATCH', body }),
   deleteCASService: (id: string) =>
     request<void>(`/cas-services/${id}`, { method: 'DELETE' }),
+
+  // per-service email allow-lists, the `emails` arrays are validated and
+  // de-duplicated server-side, the mutate response reports how many were
+  // actually added/deleted plus any addresses rejected as invalid
+  listClientAllowlist: (id: string, signal?: AbortSignal) =>
+    request<AllowlistResponse>(`/clients/${id}/allowlist`, { signal }),
+  addClientAllowlist: (id: string, emails: string[]) =>
+    request<AllowlistMutateResponse>(`/clients/${id}/allowlist`, {
+      method: 'POST',
+      body: { emails },
+    }),
+  deleteClientAllowlist: (id: string, emails: string[]) =>
+    request<AllowlistMutateResponse>(`/clients/${id}/allowlist`, {
+      method: 'DELETE',
+      body: { emails },
+    }),
+
+  listCASServiceAllowlist: (id: string, signal?: AbortSignal) =>
+    request<AllowlistResponse>(`/cas-services/${id}/allowlist`, { signal }),
+  addCASServiceAllowlist: (id: string, emails: string[]) =>
+    request<AllowlistMutateResponse>(`/cas-services/${id}/allowlist`, {
+      method: 'POST',
+      body: { emails },
+    }),
+  deleteCASServiceAllowlist: (id: string, emails: string[]) =>
+    request<AllowlistMutateResponse>(`/cas-services/${id}/allowlist`, {
+      method: 'DELETE',
+      body: { emails },
+    }),
 
   // Audit log
   listAudit: (

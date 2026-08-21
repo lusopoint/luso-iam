@@ -3,6 +3,8 @@ export interface AdminUser {
   email?: string
   username?: string
   display_name?: string
+  first_name?: string
+  last_name?: string
   status: 'active' | 'disabled' | 'pending'
   is_admin: boolean
   email_verified: boolean
@@ -11,7 +13,7 @@ export interface AdminUser {
   updated_at: string
 }
 
-// one enrolled MFA method on a user account. We never receive the
+// one enrolled MFA method on a user account, we never receive the
 // TOTP secret or WebAuthn credential bytes, admin only sees metadata
 export interface MFAMethod {
   id: string
@@ -68,10 +70,10 @@ export interface ListUsersResponse {
 // returns it in `generated_password` (shown once, like a client secret)
 export interface CreateUserRequest {
   email: string
-  username: string
-  first_name: string
-  last_name: string
+  username?: string
   display_name?: string
+  first_name?: string
+  last_name?: string
   password?: string
   is_admin?: boolean
   email_verified?: boolean
@@ -92,6 +94,7 @@ export interface OIDCClient {
   is_public: boolean
   require_pkce: boolean
   require_consent: boolean
+  require_allowlist: boolean
   access_token_ttl: string
   refresh_token_ttl: string
   id_token_ttl: string
@@ -128,9 +131,31 @@ export interface CASService {
   match_pattern: string
   description?: string
   released_attributes: string[]
+  require_allowlist: boolean
   enabled: boolean
   created_at: string
   updated_at: string
+}
+
+// one email on a services allow-list
+export interface AllowlistEntry {
+  email: string
+  created_at: string
+}
+
+export interface AllowlistResponse {
+  service_type: 'oidc' | 'cas'
+  service_id: string
+  entries: AllowlistEntry[]
+  total: number
+}
+
+// outcome of an add/delete/import against an allow-list
+export interface AllowlistMutateResponse {
+  added: number
+  deleted: number
+  invalid?: string[]
+  total: number
 }
 
 export interface CreateCASServiceRequest {

@@ -1,22 +1,18 @@
+import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 import { useToast } from '@lusopoint/luso-ui'
-import { useEffect } from 'react'
 
-/*
- * PwaUpdater: mounts once near the app root, registers the service
- * worker, and surfaces two lifecycle events:
- * - "Available offline" toast (one-shot) once the SW has cached the
- *   shell on first install.
- * - A persistent reload banner at the bottom of the screen when a
- *   new version is detected. The user keeps editing safely until
- *   they tap Reload; the toast system isn't right for this — it
- *   auto-dismisses, and refusing it shouldn't lose the prompt.
- *
- * Auto-reload is intentionally avoided. An admin tool that silently
- * reloads mid-edit would lose state and confuse anyone watching the
- * audit log fill up with phantom sessions.
- */
+// PwaUpdater: mounts once near the app root, registers the service
+// worker, and surfaces two lifecycle events:
+// - "available offline" toast (one-shot) once the SW has cached the shell on first install
+// - a persistent reload banner at the bottom of the screen when a new version is detected
+//   - the user keeps editing safely until they tap reload, the toast system is not right
+//     for this it auto-dismisses, and refusing it shouldn't lose the prompt
+//
+// auto reload is intentionally avoided, an admin tool that silently
+// reloads mid-edit would lose state and confuse anyone watching the
+// audit log fill up with phantom sessions
 const PwaUpdater = () => {
   const toast = useToast()
   const {
@@ -32,7 +28,7 @@ const PwaUpdater = () => {
         setInterval(
           () => {
             registration.update().catch(() => {
-              // network blip or auth challenge
+              // TODO: network blip or auth challenge
             })
           },
           15 * 60 * 1000,
@@ -47,7 +43,7 @@ const PwaUpdater = () => {
         'Ready to use offline.',
         'The admin shell loads without a network.',
       )
-      // one shot, flip the flag so we don't re toast
+      // one shot, flip the flag so we do not re toast
       setOfflineReady(false)
     }
   }, [offlineReady, setOfflineReady, toast])
@@ -92,10 +88,10 @@ const UpdateBanner = ({
           className="rounded-full p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         >
           <svg
-            aria-hidden="true"
             viewBox="0 0 20 20"
             className="h-4 w-4"
             fill="currentColor"
+            aria-hidden="true"
           >
             <path d="M5.7 5.7a1 1 0 0 1 1.4 0L10 8.6l2.9-2.9a1 1 0 1 1 1.4 1.4L11.4 10l2.9 2.9a1 1 0 0 1-1.4 1.4L10 11.4l-2.9 2.9a1 1 0 0 1-1.4-1.4L8.6 10 5.7 7.1a1 1 0 0 1 0-1.4Z" />
           </svg>
