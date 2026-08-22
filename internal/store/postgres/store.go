@@ -98,10 +98,22 @@ type CASService struct {
 	MatchPattern       string `db:"match_pattern"`
 	Description        *string
 	ReleasedAttributes []string `db:"released_attributes"`
+	RequireAllowlist   bool     `db:"require_allowlist"`
 	Enabled            bool
 	CreatedAt          time.Time  `db:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at"`
 	DeletedAt          *time.Time `db:"deleted_at"`
+}
+
+// AllowlistEntry is a row from service_email_allowlist
+// a service (an OIDC client or a CAS service) with require_allowlist=true only admits
+// users whose email appears here
+type AllowlistEntry struct {
+	ID          pgtype.UUID
+	ServiceType string `db:"service_type"` // "oidc" | "cas"
+	ServiceID   string `db:"service_id"`
+	Email       string
+	CreatedAt   time.Time `db:"created_at"`
 }
 
 type UserIdentity struct {
@@ -137,6 +149,7 @@ type OIDCClient struct {
 	IsPublic          bool     `db:"is_public"`
 	RequirePKCE       bool     `db:"require_pkce"`
 	RequireConsent    bool     `db:"require_consent"`
+	RequireAllowlist  bool     `db:"require_allowlist"`
 	AccessTokenTTL    Duration `db:"access_token_ttl"`
 	RefreshTokenTTL   Duration `db:"refresh_token_ttl"`
 	IDTokenTTL        Duration `db:"id_token_ttl"`

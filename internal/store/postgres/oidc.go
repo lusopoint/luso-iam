@@ -14,6 +14,7 @@ const oidcClientColumns = `
 	id, secret_hash, name, redirect_uris,
 	allowed_scopes, allowed_grant_types,
 	is_public, require_pkce, require_consent,
+	require_allowlist,
 	access_token_ttl, refresh_token_ttl, id_token_ttl,
 	enabled, created_at, updated_at, deleted_at
 `

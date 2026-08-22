@@ -22,6 +22,7 @@ type clientDTO struct {
 	IsPublic          bool     `json:"is_public"`
 	RequirePKCE       bool     `json:"require_pkce"`
 	RequireConsent    bool     `json:"require_consent"`
+	RequireAllowlist  bool     `json:"require_allowlist"`
 	// go duration string, ex "1h"
 	AccessTokenTTL  string `json:"access_token_ttl"`
 	RefreshTokenTTL string `json:"refresh_token_ttl"`
@@ -42,6 +43,7 @@ func toClientDTO(c *postgres.OIDCClient) clientDTO {
 		IsPublic:          c.IsPublic,
 		RequirePKCE:       c.RequirePKCE,
 		RequireConsent:    c.RequireConsent,
+		RequireAllowlist:  c.RequireAllowlist,
 		AccessTokenTTL:    c.AccessTokenTTL.String(),
 		RefreshTokenTTL:   c.RefreshTokenTTL.String(),
 		IDTokenTTL:        c.IDTokenTTL.String(),
@@ -214,6 +216,7 @@ type updateClientRequest struct {
 	AllowedGrantTypes *[]string `json:"allowed_grant_types,omitempty"`
 	RequirePKCE       *bool     `json:"require_pkce,omitempty"`
 	RequireConsent    *bool     `json:"require_consent,omitempty"`
+	RequireAllowlist  *bool     `json:"require_allowlist,omitempty"`
 	Enabled           *bool     `json:"enabled,omitempty"`
 }
 
@@ -234,6 +237,7 @@ func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request) {
 		AllowedGrantTypes: req.AllowedGrantTypes,
 		RequirePKCE:       req.RequirePKCE,
 		RequireConsent:    req.RequireConsent,
+		RequireAllowlist:  req.RequireAllowlist,
 		Enabled:           req.Enabled,
 	})
 	if err != nil {

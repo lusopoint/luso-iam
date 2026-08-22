@@ -7,6 +7,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Checkbox,
   EmptyState,
   Input,
   Loading,
@@ -24,6 +25,7 @@ import {
 import { Plus } from 'lucide-react'
 
 import { ErrorState } from '../components/States'
+import { AllowlistPanel } from '../components/AllowlistPanel'
 import { ApiError, api } from '../lib/api'
 import type { CASService, CreateCASServiceRequest } from '../lib/types'
 import { formatDateTime } from '../lib/util'
@@ -35,6 +37,7 @@ const CASServices = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
   const [adding, setAdding] = useState(false)
+  const [managingId, setManagingId] = useState<string | null>(null)
 
   useEffect(() => {
     refresh()
@@ -79,6 +82,25 @@ const CASServices = () => {
     }
   }
 
+  const toggleAllowlist = async (s: CASService, on: boolean) => {
+    try {
+      const updated = await api.updateCASService(s.id, {
+        require_allowlist: on,
+      })
+      setServices(list => list.map(x => (x.id === s.id ? updated : x)))
+      toast.success(
+        on
+          ? `Allow-list enforced for "${s.name}".`
+          : `Allow-list no longer enforced for "${s.name}".`,
+      )
+    } catch (err) {
+      toast.error(
+        'Could not update service.',
+        err instanceof ApiError ? err.message : String(err),
+      )
+    }
+  }
+
   const remove = async (s: CASService) => {
     const ok = await confirm({
       title: `Delete "${s.name}"?`,
@@ -99,6 +121,10 @@ const CASServices = () => {
       )
     }
   }
+
+  const managed = managingId
+    ? (services.find(s => s.id === managingId) ?? null)
+    : null
 
   const registerButton = (
     <Button onClick={() => setAdding(true)} className="gap-2">
@@ -123,6 +149,41 @@ const CASServices = () => {
             refresh()
           }}
         />
+      )}
+
+      {managed && (
+        <Card noHover variant="low" className="mb-6 max-w-3xl">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle>Allow-list · {managed.name}</CardTitle>
+                <code className="mt-1 block break-all font-mono text-xs text-on-surface-variant">
+                  {managed.service_url_pattern}
+                </code>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setManagingId(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <Checkbox
+              label="Require allow-list"
+              description="Only listed emails may obtain a ticket for this service."
+              checked={managed.require_allowlist}
+              onChange={e => toggleAllowlist(managed, e.target.checked)}
+            />
+            <AllowlistPanel
+              kind="cas"
+              id={managed.id}
+              enforced={managed.require_allowlist}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {loading && <Loading label="Loading services…" />}
@@ -159,6 +220,12 @@ const CASServices = () => {
                     />
                   </div>
 
+                  {s.require_allowlist && (
+                    <div className="mt-2">
+                      <Badge status="pending" label="allow-list enforced" />
+                    </div>
+                  )}
+
                   <code className="mt-3 block break-all rounded-lg bg-surface-container-lowest px-3 py-2 font-mono text-xs text-on-surface">
                     {s.service_url_pattern}
                   </code>
@@ -176,6 +243,13 @@ const CASServices = () => {
                       {formatDateTime(s.created_at)}
                     </span>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setManagingId(s.id)}
+                      >
+                        Allow-list
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -245,10 +319,22 @@ const CASServices = () => {
                         status={s.enabled ? 'operational' : 'critical'}
                         label={s.enabled ? 'enabled' : 'disabled'}
                       />
+                      {s.require_allowlist && (
+                        <div className="mt-1">
+                          <Badge status="pending" label="allow-list" />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{formatDateTime(s.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setManagingId(s.id)}
+                        >
+                          Allow-list
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
