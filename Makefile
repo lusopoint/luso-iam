@@ -1,4 +1,4 @@
-.PHONY: help build run dev-server smoke-test test test-cover tidy \
+.PHONY: help build run dev-server smoke-test test test-cover lint tidy \
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new \
         web-install web-build web-dev web-clean web-lint web-format sync-tokens \
@@ -35,6 +35,15 @@ test: ## run all unit tests
 
 test-cover: ## run test only with -cover
 	go test -cover ./...
+
+lint: web-lint ## gofmt + go vet (Go) and Biome (web) - mirrors CI's format checks
+	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "These files are not gofmt-clean:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+	go vet ./...
 
 smoke-test: ## black-box test against the running application (BASE_URL=http://localhost:8080)
 	@BASE_URL="$${BASE_URL:-http://localhost:8080}" ./scripts/smoke-test.sh
