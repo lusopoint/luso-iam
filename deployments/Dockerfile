@@ -51,7 +51,7 @@ FROM alpine:3.20 AS final
 LABEL org.opencontainers.image.title="iam-server" \
       org.opencontainers.image.description="OpenID Connect provider + CAS server with MFA and federation" \
       org.opencontainers.image.source="https://github.com/lusopoint/lusoiam" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 RUN adduser -D -u 65532 nonroot
 
@@ -62,4 +62,7 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
 USER nonroot
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD wget -q -O- --tries=1 http://127.0.0.1:8080/healthz || exit 1
+
 ENTRYPOINT ["/entrypoint.sh"]

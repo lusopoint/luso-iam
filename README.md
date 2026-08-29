@@ -180,7 +180,7 @@ The server ships a full [reference page](https://auth.lusopoint.com/docs). Set `
 - A pull request needs passing CI, one approval, and no lint warnings
 - Keep the runtime section of `go.mod` short; justify any new `require` entry
 
-Run `make test` and `make lint` before you open a pull request. The full contribution guide is in the `/docs` page under **Contribution**.
+Run `make test` and `make lint` before you open a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local setup + PR checklist, or the `/docs` page under **Contribution**.
 
 ---
 
