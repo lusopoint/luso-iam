@@ -1,10 +1,3 @@
-// Package google implements the federation.Provider interface for
-// Google Sign-In (OpenID Connect on top of OAuth 2.0).
-//
-// Authorization: https://accounts.google.com/o/oauth2/v2/auth
-// Token:         https://oauth2.googleapis.com/token
-// JWKS:          https://www.googleapis.com/oauth2/v3/certs
-// Issuer:        https://accounts.google.com
 package google
 
 import (
@@ -19,6 +12,14 @@ import (
 	"github.com/lusopoint/lusoiam/internal/crypto"
 	"github.com/lusopoint/lusoiam/internal/federation"
 )
+
+// google implements the federation.Provider interface for
+// Google Sign-In (OpenID Connect on top of OAuth 2.0)
+//
+// Authorization: https://accounts.google.com/o/oauth2/v2/auth
+// Token:         https://oauth2.googleapis.com/token
+// JWKS:          https://www.googleapis.com/oauth2/v3/certs
+// Issuer:        https://accounts.google.com
 
 const (
 	authEndpoint  = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -99,11 +100,12 @@ func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (*fe
 	}
 
 	return &federation.Identity{
-		Sub:       claims.Subject,
-		Email:     strings.ToLower(claims.Email),
-		Name:      claims.Name,
-		Picture:   claims.Picture,
-		RawClaims: claims.RawClaims,
+		Sub:           claims.Subject,
+		Email:         strings.ToLower(claims.Email),
+		EmailVerified: claims.EmailVerified,
+		Name:          claims.Name,
+		Picture:       claims.Picture,
+		RawClaims:     claims.RawClaims,
 	}, nil
 }
 
