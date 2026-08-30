@@ -7,7 +7,7 @@ This is the main IAM server. It runs no business logic of its own. Its job is to
 ## Responsibilities
 
 1. Load the configuration and build the logger.
-2. Connect to Postgres. If `AUTO_MIGRATE` is enabled, apply the migrations.
+2. Connect to Postgres. If `AUTO_MIGRATE` is enabled, apply the migrations. (For multi-instance deployments, set `AUTO_MIGRATE=false` and run `cmd/migrate` as a discrete one-shot step instead see `internal/store/README.md`.)
 3. Load or generate the token signing key.
 4. Build all core services (sessions, password auth, CAS, OIDC, MFA, federation, email, password reset, audit).
 5. Register all HTTP routes.

@@ -451,4 +451,4 @@ The schema tunes the indexes for the common access patterns: reverse-chronologic
 | 0008 | `0008_password_reset.up.sql`           | `password_reset_tokens`                                                                    |
 | 0009 | `0009_email_verification.up.sql`       | `email_verification_tokens`                                                                |
 
-`AUTO_MIGRATE=true` applies any pending migration on boot. For production rollbacks, prefer `make migrate-up` and `make migrate-down`.
+`AUTO_MIGRATE=true` applies any pending migration on boot — fine for a single instance, but a footgun once you run more than one: a bad migration takes down every replica at once, and concurrent replicas can race applying it. For that case, set `AUTO_MIGRATE=false` and run the `/migrate` binary (built from `cmd/migrate`, shipped in the container image) as a one-shot step before rolling out the new server version. For local dev rollbacks, `make migrate-up` and `make migrate-down` (the external `golang-migrate` CLI) still work as before.

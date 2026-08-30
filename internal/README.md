@@ -61,7 +61,7 @@ flowchart TD
 | `ENV`                            | `dev` or `production`. Affects cookie Secure flag and log defaults.                             |
 | `LOG_LEVEL`                      | `debug`, `info`, `warn`, `error`.                                                               |
 | `LOG_FORMAT`                     | `text` (default in dev) or `json` (production).                                                 |
-| `AUTO_MIGRATE`                   | When `true`, apply pending migrations at startup.                                               |
+| `AUTO_MIGRATE`                   | When `true`, apply pending migrations at startup. Set `false` for multi-instance deployments and run `cmd/migrate` as a discrete one-shot step instead. |
 | `CONFIG_FILE`                    | Optional path to a YAML overlay (non-secret fields).                                            |
 | `TRUSTED_PROXIES`                | CIDR allowlist of proxy IP ranges for X-Forwarded-For.                                          |
 | `SESSION_COOKIE_DOMAIN`          | Optional explicit Domain attribute on session cookie.                                           |
