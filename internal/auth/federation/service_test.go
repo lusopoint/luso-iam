@@ -108,6 +108,11 @@ func TestLinkOrCreate_UnverifiedEmailDoesNotAutoLink(t *testing.T) {
 	if got.ID == victim.ID {
 		t.Fatal("attacker's unverified-email identity was linked to the victim's account")
 	}
+	// users.email is unique among active accounts, so the new account can't
+	// carry the colliding email either — it must be created without one.
+	if got.Email != nil {
+		t.Errorf("expected the new account to have no email (it collides with the victim's), got %v", *got.Email)
+	}
 
 	// The victim's own account must still have no identity linked to it.
 	if _, err := sharedStore.GetUserByProviderSub(context.Background(), "generic_oidc", attacker.Sub); err != nil {
@@ -147,6 +152,33 @@ func TestLinkOrCreate_KnownIdentityLogsInRegardlessOfVerification(t *testing.T) 
 	}
 	if second.ID != first.ID {
 		t.Errorf("second login resolved to %v, want %v", second.ID, first.ID)
+	}
+}
+
+// TestLinkOrCreate_UnverifiedEmailNoCollisionIsKept covers the common case:
+// an unverified email is fine to attach to a brand new account as long as
+// it doesn't collide with anyone else's — there's nothing to protect
+// against when no existing account owns that address yet.
+func TestLinkOrCreate_UnverifiedEmailNoCollisionIsKept(t *testing.T) {
+	svc := New(sharedStore)
+	email := uniqueName("newperson") + "@example.com"
+
+	identity := &federation.Identity{
+		Sub:           uniqueName("sub"),
+		Email:         email,
+		EmailVerified: false,
+		Name:          "New Person",
+	}
+
+	got, isNew, err := svc.LinkOrCreate(context.Background(), "generic_oidc", identity)
+	if err != nil {
+		t.Fatalf("LinkOrCreate: %v", err)
+	}
+	if !isNew {
+		t.Error("expected isNew=true")
+	}
+	if got.Email == nil || *got.Email != email {
+		t.Errorf("expected the new account to keep the non-colliding email %q, got %v", email, got.Email)
 	}
 }
 

@@ -360,6 +360,28 @@ func run() error {
 					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"signup rate limit exceeded"}`))
 					return
 				}
+			case r.Method == "POST" && r.URL.Path == "/mfa/totp":
+				// TOTP codes are 6 digits this is the
+				// "aggressive per-challenge attempt limit higher up the stack"
+				// internal/auth/mfa/totp.go VerifyTOTP assumes exists, since it
+				// deliberately does no attempt tracking of its own
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("mfa-totp:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"mfa challenge rate limit exceeded; wait and try again"}`))
+					return
+				}
+			case r.Method == "POST" && r.URL.Path == "/mfa/backup":
+				ip := trustedProxies.ClientIP(r)
+				if ok, retry := loginLimiter.Allow("mfa-backup:" + ip); !ok {
+					w.Header().Set("Retry-After", strconv.Itoa(retry))
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"mfa challenge rate limit exceeded; wait and try again"}`))
+					return
+				}
 			case r.Method == "POST" && r.URL.Path == "/oauth2/token":
 				key := tokenLimitKey(r, trustedProxies)
 				if ok, retry := tokenLimiter.Allow(key); !ok {

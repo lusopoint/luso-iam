@@ -1,7 +1,7 @@
 .PHONY: help build run dev-server smoke-test test test-cover lint tidy \
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new migrate-container \
-        web-install web-build web-dev web-clean web-lint web-format sync-tokens \
+        web-install web-ci-install web-build web-dev web-clean web-lint web-format sync-tokens \
         keygen rotate-key seed-client grant-admin seed-user \
         prod-build prod-run prod-push vuln vuln-web
 
@@ -87,6 +87,15 @@ migrate-container: ## apply pending migrations via the same /migrate binary ship
 web-install: ## Install react dependencies (npm handles its own caching)
 	cd $(WEB_DIR) && npm install --no-audit --no-fund
 
+# npm ci, not install: matches CI's own install step exactly, so a
+# package-lock.json that's out of sync with package.json fails loudly here
+# too, instead of `npm install` silently rewriting it into whatever shape
+# the local npm happens to produce. (This is how a lockfile that passed
+# local `make lint` still failed CI's `npm ci` — a Tailwind v4 optional
+# dependency that different npm patch versions resolve differently.)
+web-ci-install: ## Install react dependencies exactly as CI does (npm ci)
+	cd $(WEB_DIR) && npm ci --no-audit --no-fund
+
 web-build: web-install sync-tokens ## Build the React admin SPA into web/dist
 	cd $(WEB_DIR) && npm run build
 
@@ -109,7 +118,7 @@ sync-tokens: web-install ## Copy LusoUI design tokens into the Go-embedded stati
 web-dev: web-install ## Start the Vite dev server (with API proxy to :8080)
 	cd $(WEB_DIR) && npm run dev
 
-web-lint: web-install ## Lint + format-check the SPA with Biome (no writes)
+web-lint: web-ci-install ## Lint + format-check the SPA with Biome (no writes) - mirrors CI's install step too
 	cd $(WEB_DIR) && npm run check
 
 web-format: web-install ## Auto-fix Biome lint + formatting in the SPA
