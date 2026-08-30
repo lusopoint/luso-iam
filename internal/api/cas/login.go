@@ -34,17 +34,19 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 			if serviceURL != "" {
 				if _, regErr := h.cas.ResolveService(r.Context(), serviceURL); regErr != nil {
 					renderError(w, http.StatusForbidden, errorPageData{
-						Title:   "Service not authorized",
-						Message: "This application is not registered with the IAM server.",
-						Detail:  serviceURL,
+						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+						Title:    "Service not authorized",
+						Message:  "This application is not registered with the IAM server.",
+						Detail:   serviceURL,
 					})
 					return
 				}
 				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, false)
 				if err != nil {
 					renderError(w, http.StatusInternalServerError, errorPageData{
-						Title:   "Login error",
-						Message: "Could not create a service ticket. Please try again.",
+						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+						Title:    "Login error",
+						Message:  "Could not create a service ticket. Please try again.",
 					})
 					return
 				}
@@ -73,6 +75,7 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 	// show the login form
 	renderLogin(w, http.StatusOK, loginPageData{
 		CSRFToken:     middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:      middleware.CSPNonceFromContext(r.Context()),
 		Service:       serviceURL,
 		Next:          nextURL,
 		Redirect:      redirectURL,
@@ -88,8 +91,9 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderError(w, http.StatusBadRequest, errorPageData{
-			Title:   "Bad request",
-			Message: "Could not parse form data.",
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Bad request",
+			Message:  "Could not parse form data.",
 		})
 		return
 	}
@@ -129,6 +133,7 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		}
 		renderLogin(w, http.StatusUnauthorized, loginPageData{
 			CSRFToken:     middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:      middleware.CSPNonceFromContext(r.Context()),
 			Email:         email,
 			Service:       serviceURL,
 			Next:          nextURL,
@@ -146,15 +151,17 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		if _, err := h.cas.ResolveService(r.Context(), serviceURL); err != nil {
 			if errors.Is(err, authcas.ErrUnauthorizedService) {
 				renderError(w, http.StatusForbidden, errorPageData{
-					Title:   "Service not authorized",
-					Message: "This application is not registered with the IAM server.",
-					Detail:  serviceURL,
+					CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+					Title:    "Service not authorized",
+					Message:  "This application is not registered with the IAM server.",
+					Detail:   serviceURL,
 				})
 				return
 			}
 			renderError(w, http.StatusInternalServerError, errorPageData{
-				Title:   "Login error",
-				Message: "Could not verify the requesting service.",
+				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+				Title:    "Login error",
+				Message:  "Could not verify the requesting service.",
 			})
 			return
 		}
@@ -168,8 +175,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("cas: load mfa status", "err", err)
 			renderError(w, http.StatusInternalServerError, errorPageData{
-				Title:   "Login error",
-				Message: "Could not verify your security settings. Please try again.",
+				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+				Title:    "Login error",
+				Message:  "Could not verify your security settings. Please try again.",
 			})
 			return
 		}
@@ -185,8 +193,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 			if err := authmfa.IssueChallenge(w, h.signer, h.cookieSecure, ch); err != nil {
 				slog.Error("cas: issue mfa challenge", "err", err)
 				renderError(w, http.StatusInternalServerError, errorPageData{
-					Title:   "Login error",
-					Message: "Could not start two-factor verification.",
+					CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+					Title:    "Login error",
+					Message:  "Could not start two-factor verification.",
 				})
 				return
 			}
@@ -203,8 +212,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		renderError(w, http.StatusInternalServerError, errorPageData{
-			Title:   "Login error",
-			Message: "Could not create a login session. Please try again.",
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Login error",
+			Message:  "Could not create a login session. Please try again.",
 		})
 		return
 	}
@@ -231,8 +241,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, renew)
 		if err != nil {
 			renderError(w, http.StatusInternalServerError, errorPageData{
-				Title:   "Login error",
-				Message: "Could not issue a service ticket. Please try again.",
+				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+				Title:    "Login error",
+				Message:  "Could not issue a service ticket. Please try again.",
 			})
 			return
 		}

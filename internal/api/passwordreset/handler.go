@@ -19,6 +19,7 @@ var templates = web.MustPages(templatesFS, "templates/*.html")
 // forgotPageData drives forgot.html
 type forgotPageData struct {
 	CSRFToken string // double-submit value
+	CSPNonce  string
 	Submitted bool   // true after POST → swaps the form for the "check your inbox" copy
 	Error     string // non-empty when client-side validation fails (rare; the form is one field)
 }
@@ -26,9 +27,15 @@ type forgotPageData struct {
 // resetPageData drives reset.html
 type resetPageData struct {
 	CSRFToken         string
+	CSPNonce          string
 	Token             string // re-emit so the POST form preserves it
 	MinPasswordLength int    // surfaced in the form's help text
 	Error             string
+}
+
+// resetInvalidData drives reset_invalid.html
+type resetInvalidData struct {
+	CSPNonce string
 }
 
 type Handler struct {
@@ -53,7 +60,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 // GET /password/forgot render the email-entry form
 func (h *Handler) forgotGET(w http.ResponseWriter, r *http.Request) {
-	renderForgot(w, http.StatusOK, forgotPageData{CSRFToken: middleware.CSRFTokenFromContext(r.Context())})
+	renderForgot(w, http.StatusOK, forgotPageData{
+		CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:  middleware.CSPNonceFromContext(r.Context()),
+	})
 }
 
 // POST /password/forgot accept the email, fire the reset email
@@ -62,7 +72,11 @@ func (h *Handler) forgotGET(w http.ResponseWriter, r *http.Request) {
 // defence depends on this being indistinguishable from success
 func (h *Handler) forgotPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		renderForgot(w, http.StatusBadRequest, forgotPageData{CSRFToken: middleware.CSRFTokenFromContext(r.Context()), Error: "Invalid form submission."})
+		renderForgot(w, http.StatusBadRequest, forgotPageData{
+			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:  middleware.CSPNonceFromContext(r.Context()),
+			Error:     "Invalid form submission.",
+		})
 		return
 	}
 	email := r.PostFormValue("email")
@@ -76,7 +90,11 @@ func (h *Handler) forgotPOST(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(r.Context(), "password-reset: request failed",
 			"err", err, "email_present", email != "")
 	}
-	renderForgot(w, http.StatusOK, forgotPageData{CSRFToken: middleware.CSRFTokenFromContext(r.Context()), Submitted: true})
+	renderForgot(w, http.StatusOK, forgotPageData{
+		CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:  middleware.CSPNonceFromContext(r.Context()),
+		Submitted: true,
+	})
 }
 
 // GET /password/reset?token=... validate token, render new-password form
@@ -84,7 +102,7 @@ func (h *Handler) resetGET(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if _, err := h.svc.Verify(r.Context(), token); err != nil {
 		if errors.Is(err, authpr.ErrInvalidToken) {
-			renderResetInvalid(w)
+			renderResetInvalid(w, r)
 			return
 		}
 		slog.ErrorContext(r.Context(), "password-reset: verify failed", "err", err)
@@ -93,6 +111,7 @@ func (h *Handler) resetGET(w http.ResponseWriter, r *http.Request) {
 	}
 	renderReset(w, http.StatusOK, resetPageData{
 		CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 		Token:             token,
 		MinPasswordLength: h.svc.MinPasswordLength(),
 	})
@@ -101,7 +120,7 @@ func (h *Handler) resetGET(w http.ResponseWriter, r *http.Request) {
 // POST /password/reset consume the token and update the password
 func (h *Handler) resetPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		renderResetInvalid(w)
+		renderResetInvalid(w, r)
 		return
 	}
 	token := r.PostFormValue("token")
@@ -112,6 +131,7 @@ func (h *Handler) resetPOST(w http.ResponseWriter, r *http.Request) {
 	if pwd != confirm {
 		renderReset(w, http.StatusBadRequest, resetPageData{
 			CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 			Token:             token,
 			MinPasswordLength: minLen,
 			Error:             "Passwords don't match.",
@@ -121,6 +141,7 @@ func (h *Handler) resetPOST(w http.ResponseWriter, r *http.Request) {
 	if len(pwd) < minLen {
 		renderReset(w, http.StatusBadRequest, resetPageData{
 			CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 			Token:             token,
 			MinPasswordLength: minLen,
 			Error:             "Password must be at least " + itoa(minLen) + " characters.",
@@ -130,13 +151,14 @@ func (h *Handler) resetPOST(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Reset(r.Context(), token, pwd); err != nil {
 		switch {
 		case errors.Is(err, authpr.ErrInvalidToken):
-			renderResetInvalid(w)
+			renderResetInvalid(w, r)
 		case errors.Is(err, authpr.ErrWeakPassword):
 			// race against the length check above (different minLen
 			// could be configured between requests). Fall through to a
 			// generic error
 			renderReset(w, http.StatusBadRequest, resetPageData{
 				CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+				CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 				Token:             token,
 				MinPasswordLength: minLen,
 				Error:             "Password doesn't meet requirements.",
@@ -161,8 +183,10 @@ func renderReset(w http.ResponseWriter, status int, data resetPageData) {
 	web.Render(w, templates, "reset.html", status, data)
 }
 
-func renderResetInvalid(w http.ResponseWriter) {
-	web.Render(w, templates, "reset_invalid.html", http.StatusBadRequest, nil)
+func renderResetInvalid(w http.ResponseWriter, r *http.Request) {
+	web.Render(w, templates, "reset_invalid.html", http.StatusBadRequest, resetInvalidData{
+		CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+	})
 }
 
 // clientIP pulls the client IP from the request

@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+
+	"github.com/lusopoint/lusoiam/internal/middleware"
 )
 
 //go:embed templates/docs.html
@@ -55,6 +57,14 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /docs", h.serve)
 }
 
+// pageData wraps Content with the per-request CSP nonce (docs.html's
+// inline <style>/<script> need it). Content is embedded so template
+// field access (.Guides, .APIGroups, ...) is unaffected by the wrapper.
+type pageData struct {
+	Content
+	CSPNonce string
+}
+
 func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	if !h.enabled {
 		http.NotFound(w, r)
@@ -63,7 +73,11 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
-	if err := page.Execute(w, h.content); err != nil {
+	data := pageData{
+		Content:  h.content,
+		CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+	}
+	if err := page.Execute(w, data); err != nil {
 		// avoid leaking template internals to the client
 		return
 	}

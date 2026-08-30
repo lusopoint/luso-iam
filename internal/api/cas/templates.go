@@ -18,6 +18,7 @@ var templates = web.MustPages(templatesFS, "templates/*.html")
 // loginPageData drives the login.html template
 type loginPageData struct {
 	CSRFToken     string // double-submit cookie value; rendered into a hidden field
+	CSPNonce      string
 	Email         string
 	Service       string
 	Next          string // post-login destination for first-party redirects (no CAS ticket)
@@ -38,9 +39,10 @@ type providerInfo struct {
 
 // errorPageData drives the error.html template
 type errorPageData struct {
-	Title   string
-	Message string
-	Detail  string
+	CSPNonce string
+	Title    string
+	Message  string
+	Detail   string
 }
 
 func renderLogin(w http.ResponseWriter, status int, data loginPageData) {
