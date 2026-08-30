@@ -57,6 +57,7 @@ If your PR adds a new runtime dependency, justify it in the commit message again
 
 - Unit tests live alongside the code (`foo_test.go`).
 - Changes to `internal/oidc`, `internal/auth/*`, or `internal/crypto`(anything on the authentication or token path) should come with tests covering the new behavior, not just the happy path, these are the packages where a silent regression has the highest impact.
+- `internal/oidc` and `internal/auth/cas` have integration tests (auth-code replay, PKCE, refresh-token rotation, CAS ticket single-use, etc.) that run against a real Postgres via `internal/store/postgrestest`, not a mock. They need `make compose-dev-up` running first; without it they skip (not fail) with a message telling you so. Each package gets its own database (`iam_test_oidc`, `iam_test_cas`, ...) created on demand on that same server, wiped clean on every run, so they never touch your `iam` dev database. CI provides its own Postgres service, so they always run there. Point `TEST_DATABASE_URL` at a different server if you'd rather they not use your local one at all.
 
 ## Docs
 
