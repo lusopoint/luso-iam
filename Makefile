@@ -1,6 +1,6 @@
 .PHONY: help build run dev-server smoke-test test test-cover lint tidy \
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
-        migrate-up migrate-down migrate-new \
+        migrate-up migrate-down migrate-new migrate-container \
         web-install web-build web-dev web-clean web-lint web-format sync-tokens \
         keygen rotate-key seed-client grant-admin seed-user \
         prod-build prod-run prod-push vuln vuln-web
@@ -76,6 +76,9 @@ migrate-down: ## roll back the most recent migration
 migrate-new: ## create a new migration pair: - make migrate-new name=add_foo
 	@[ -n "$(name)" ] || (echo "usage: make migrate-new name=add_foo" && exit 1)
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
+
+migrate-container: ## apply pending migrations via the same /migrate binary shipped in the container image (cmd/migrate) - the AUTO_MIGRATE=false deploy step, no external `migrate` CLI needed
+	@DATABASE_URL="$(DATABASE_URL)" go run ./cmd/migrate
 
 # Web react front end
 # `make build` depends on web-build so a single command produces a binary

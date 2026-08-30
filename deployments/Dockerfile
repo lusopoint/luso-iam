@@ -46,6 +46,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/seed-user \
         ./cmd/seed-user
 
+# one-shot migration runner, the discrete alternative to AUTO_MIGRATE=true
+# for multi-replica deployments (see cmd/migrate)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/migrate \
+        ./cmd/migrate
+
 FROM alpine:3.20 AS final
 
 LABEL org.opencontainers.image.title="iam-server" \
@@ -57,6 +68,7 @@ RUN adduser -D -u 65532 nonroot
 
 COPY --from=server-build --chown=nonroot:nonroot /out/iam-server /iam-server
 COPY --from=server-build --chown=nonroot:nonroot /out/seed-user /seed-user
+COPY --from=server-build --chown=nonroot:nonroot /out/migrate /migrate
 COPY --chown=nonroot:nonroot deployments/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
