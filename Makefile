@@ -2,7 +2,7 @@
         compose-dev-up compose-dev-down compose-dev-logs compose-dev-clear \
         migrate-up migrate-down migrate-new migrate-container \
         web-install web-ci-install web-build web-dev web-clean web-lint web-format sync-tokens \
-        keygen rotate-key seed-client grant-admin seed-user \
+        keygen rotate-key seed-client grant-admin seed-user audit-prune \
         prod-build prod-run prod-push vuln vuln-web
 
 # TODO: should we just trust the one on the .env?
@@ -162,6 +162,10 @@ seed-user: ## create a user: make seed-user email=l@main.com password=password12
 	  -password "$(password)" \
 	  $(if $(name),-name "$(name)") \
 	  $(if $(admin),-admin)
+
+audit-prune: ## drop audit_log partitions strictly before a month: make audit-prune before=2025-01 [dry_run=1]
+	@[ -n "$(before)" ] || (echo "usage: make audit-prune before=YYYY-MM [dry_run=1]" && exit 1)
+	@DATABASE_URL="$(DATABASE_URL)" go run ./cmd/audit-prune -before "$(before)" $(if $(dry_run),-dry-run)
 
 # Build a production-ready container image
 DOCKER_FILE ?= deployments/Dockerfile

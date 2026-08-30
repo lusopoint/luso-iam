@@ -57,6 +57,18 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/migrate \
         ./cmd/migrate
 
+# audit_log retention: drops old monthly partitions
+# deliberately never run by iam-server itself (see cmd/audit-prune)
+# shipped so an operator can run it manually against the container's own image
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/audit-prune \
+        ./cmd/audit-prune
+
 FROM alpine:3.20 AS final
 
 LABEL org.opencontainers.image.title="iam-server" \
@@ -69,6 +81,7 @@ RUN adduser -D -u 65532 nonroot
 COPY --from=server-build --chown=nonroot:nonroot /out/iam-server /iam-server
 COPY --from=server-build --chown=nonroot:nonroot /out/seed-user /seed-user
 COPY --from=server-build --chown=nonroot:nonroot /out/migrate /migrate
+COPY --from=server-build --chown=nonroot:nonroot /out/audit-prune /audit-prune
 COPY --chown=nonroot:nonroot deployments/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
