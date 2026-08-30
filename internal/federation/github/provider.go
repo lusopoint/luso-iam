@@ -1,12 +1,3 @@
-// Package github implements the federation.Provider interface for GitHub.
-//
-// GitHub uses OAuth 2.0 but not OIDC — there's no id_token. Instead we
-// call the GitHub REST API to fetch the user object and email list.
-//
-// Authorization: https://github.com/login/oauth/authorize
-// Token:         https://github.com/login/oauth/access_token
-// User API:      https://api.github.com/user
-// Emails API:    https://api.github.com/user/emails
 package github
 
 import (
@@ -21,6 +12,16 @@ import (
 
 	"github.com/lusopoint/lusoiam/internal/federation"
 )
+
+// github implements the federation.Provider interface for GitHub
+//
+// GitHub uses OAuth 2.0 but not OIDC there's no id_token
+// instead we call the GitHub REST API to fetch the user object and email list
+//
+// Authorization: https://github.com/login/oauth/authorize
+// Token:         https://github.com/login/oauth/access_token
+// User API:      https://api.github.com/user
+// Emails API:    https://api.github.com/user/emails
 
 const (
 	authEndpoint  = "https://github.com/login/oauth/authorize"
@@ -65,7 +66,7 @@ func New(cfg Config) *Provider {
 func (p *Provider) Name() string { return "github" }
 
 // AuthURL builds the GitHub authorization URL.
-// Note: GitHub OAuth does not support PKCE — we still include PKCE in our
+// Note: GitHub OAuth does not support PKCE we still include PKCE in our
 // state management for defence-in-depth on our side, but GitHub ignores
 // code_challenge/code_challenge_method parameters.
 func (p *Provider) AuthURL(state, _ string) string {
@@ -90,7 +91,7 @@ func (p *Provider) Exchange(ctx context.Context, code, _ string) (*federation.Id
 		return nil, fmt.Errorf("github: fetch user: %w", err)
 	}
 
-	// GitHub users can have a private primary email — fetch the email
+	// GitHub users can have a private primary email fetch the email
 	// list and take the verified primary if the profile email is empty.
 	email := user.Email
 	if email == "" {
@@ -111,12 +112,16 @@ func (p *Provider) Exchange(ctx context.Context, code, _ string) (*federation.Id
 	}
 
 	return &federation.Identity{
-		// GitHub's integer user ID is the stable sub — logins can change.
-		Sub:       strconv.FormatInt(user.ID, 10),
-		Email:     strings.ToLower(email),
-		Name:      coalesce(user.Name, user.Login),
-		Picture:   user.AvatarURL,
-		RawClaims: rawClaims,
+		// GitHub's integer user ID is the stable sub logins can change
+		Sub:   strconv.FormatInt(user.ID, 10),
+		Email: strings.ToLower(email),
+		// safe to report verified whenever we have an email at all:
+		// the profile email is only ever set to one of the account's own
+		// confirmed addresses, and fetchPrimaryEmail above already filters for Verified
+		EmailVerified: email != "",
+		Name:          coalesce(user.Name, user.Login),
+		Picture:       user.AvatarURL,
+		RawClaims:     rawClaims,
 	}, nil
 }
 

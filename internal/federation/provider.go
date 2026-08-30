@@ -24,6 +24,15 @@ type Identity struct {
 	// GitHub users who have made their email private.
 	Email string
 
+	// EmailVerified reports whether the provider itself verified that email
+	// is confirmed to belong to this identity (ex. the OIDC `email_verified`
+	// claim, or GitHub's own verified-email flag)
+	// it must be true before email can be used to auto-link this identity to
+	// an existing local account by address, an unverified claim is not proof
+	// of ownership, and trusting it would let anyone who can get a provider
+	// to assert an arbitrary email take over the matching local account
+	EmailVerified bool
+
 	// Name is the user's display name (full name or username).
 	Name string
 

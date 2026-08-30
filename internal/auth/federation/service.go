@@ -53,11 +53,15 @@ func (s *Service) LinkOrCreate(
 		return nil, false, fmt.Errorf("look up identity: %w", err)
 	}
 
-	if identity.Email != "" {
+	// only trust email for auto linking when the provider itself already verified
+	// an unverified claim is not proof of ownership, and linking on it would let
+	// anyone who can get a provider to assert a victims email take over that victims account
+	if identity.Email != "" && identity.EmailVerified {
 		existing, emailErr := s.store.GetUserByEmail(ctx, identity.Email)
 		if emailErr == nil {
-			// auto-link: the email is already registered locally. We
-			// create the identity row to avoid the lookup next time.
+			// auto-link: the email is already registered locally and the
+			// provider verified it. We create the identity row to avoid
+			// the lookup next time.
 			if linkErr := s.createIdentity(ctx, existing, providerName, identity); linkErr != nil {
 				slog.Warn("federation: auto-link identity", "err", linkErr)
 				// non-fatal: the login still works; we'll retry next time.

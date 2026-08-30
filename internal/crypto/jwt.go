@@ -19,15 +19,16 @@ import (
 // JWTClaims is the minimal set of claims we extract from an OIDC id_token
 // Providers may include additional claims in RawClaims
 type JWTClaims struct {
-	Issuer    string         `json:"iss"`
-	Subject   string         `json:"sub"`
-	Audience  audience       `json:"aud"` // string or []string
-	ExpiresAt int64          `json:"exp"`
-	IssuedAt  int64          `json:"iat"`
-	Email     string         `json:"email"`
-	Name      string         `json:"name"`
-	Picture   string         `json:"picture"`
-	RawClaims map[string]any // populated separately from the full payload
+	Issuer        string         `json:"iss"`
+	Subject       string         `json:"sub"`
+	Audience      audience       `json:"aud"` // string or []string
+	ExpiresAt     int64          `json:"exp"`
+	IssuedAt      int64          `json:"iat"`
+	Email         string         `json:"email"`
+	EmailVerified bool           `json:"email_verified"`
+	Name          string         `json:"name"`
+	Picture       string         `json:"picture"`
+	RawClaims     map[string]any // populated separately from the full payload
 }
 
 // audience handles the CAS where aud is either a string or []string

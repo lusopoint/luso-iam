@@ -1,10 +1,3 @@
-// Package generic_oidc implements a config-driven OIDC provider that
-// works with any OpenID Connect-compliant identity provider: Microsoft
-// Entra, GitLab, Auth0, Okta, Keycloak, etc.
-//
-// It fetches the provider's discovery document at startup to resolve
-// the authorization, token, and JWKS endpoints, then behaves like the
-// Google provider for the token exchange flow.
 package generic_oidc
 
 import (
@@ -19,6 +12,14 @@ import (
 	"github.com/lusopoint/lusoiam/internal/crypto"
 	"github.com/lusopoint/lusoiam/internal/federation"
 )
+
+// generic_oidc implements a config-driven OIDC provider that
+// works with any OpenID Connect-compliant identity provider: Microsoft
+// Entra, GitLab, Auth0, Okta, Keycloak, etc
+//
+// it fetches the provider's discovery document at startup to resolve
+// the authorization, token, and JWKS endpoints, then behaves like the
+// Google provider for the token exchange flow
 
 // Provider is a fully configurable OIDC provider.
 type Provider struct {
@@ -45,7 +46,7 @@ type Config struct {
 
 	ClientID     string
 	ClientSecret string
-	// IssuerURL is the OIDC Issuer — the discovery document is fetched
+	// IssuerURL is the OIDC Issuer the discovery document is fetched
 	// from <IssuerURL>/.well-known/openid-configuration.
 	IssuerURL string
 	// RedirectURL: <BASE_URL>/oauth/callback/<Name>
@@ -126,11 +127,12 @@ func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (*fe
 	}
 
 	return &federation.Identity{
-		Sub:       claims.Subject,
-		Email:     strings.ToLower(claims.Email),
-		Name:      claims.Name,
-		Picture:   claims.Picture,
-		RawClaims: claims.RawClaims,
+		Sub:           claims.Subject,
+		Email:         strings.ToLower(claims.Email),
+		EmailVerified: claims.EmailVerified,
+		Name:          claims.Name,
+		Picture:       claims.Picture,
+		RawClaims:     claims.RawClaims,
 	}, nil
 }
 
