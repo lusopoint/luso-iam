@@ -32,7 +32,7 @@
       fail-open: wrapped in try/catch, and if it doesn't run at all the page
       simply renders in the light palette. Nothing about signing in depends on it.
     */}}
-    <script>
+    <script nonce="{{.CSPNonce}}">
       (function () {
         try {
           if (

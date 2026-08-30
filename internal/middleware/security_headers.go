@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"strings"
 )
@@ -42,13 +45,21 @@ import (
 //
 //   - default-src 'self', by default, only same-origin assets
 //
-//   - script-src 'self' 'unsafe-inline', needed for the inline
-//     <script> blocks in MFA enrollment pages. CSP nonces would
-//     be the next iteration; deferred because every template
-//     would need a nonce-aware change
+//   - script-src 'self' 'nonce-<per-request>', a fresh random nonce is
+//     generated for every response (see newCSPNonce below) and handlers
+//     rendering an inline <script> (the shared base layout's dark-mode
+//     detector, the MFA pages, the docs page) inject it via
+//     CSPNonceFromContext into a nonce="" attribute. The browser only
+//     runs an inline script whose nonce matches the one in THIS
+//     response's header, so a script an attacker manages to inject via
+//     XSS has no way to know it and doesn't execute. This replaces a
+//     prior 'unsafe-inline', which allowed any inline script through
+//     indiscriminately, ours or an attacker's
 //
-//   - style-src 'self' 'unsafe-inline', needed for React's
-//     style={{}} prop and inline <style> blocks in templates
+//   - style-src 'self' 'nonce-<per-request>', same mechanism. The admin
+//     SPA doesn't need it at all (no inline style={{}} usage, Tailwind
+//     compiles to a static stylesheet loaded via <link>); only the docs
+//     page's inline <style> block uses it
 //
 //   - img-src 'self' data, data covers the QR codes we generate for TOTP enrollment
 //     (rendered as data: URIs)
@@ -66,26 +77,15 @@ import (
 //     redirecting relative URLs to attacker-controlled hosts
 //
 // On performance: this middleware runs on every request and just
-// writes ~6 header pairs so not that costly
+// writes ~6 header pairs plus one crypto/rand call, so not that costly
 //
 // On compatibility: a few of these (Permissions-Policy, CSP frame-ancestors)
 // are ignored by very old browsers but degrade gracefully
-// the older browsers fall back to X-Frame-Options
+// the older browsers fall back to X-Frame-Options. CSP nonces need
+// CSP Level 2 (every browser in support today; IE11 does not, and
+// falls back to having no script-src/style-src restriction at all
+// same as if this middleware didn't exist, not worse)
 func SecurityHeaders(secure bool) Middleware {
-	// build CSP once at construction; same for every response
-	csp := strings.Join([]string{
-		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline'",
-		"style-src 'self' 'unsafe-inline'",
-		"img-src 'self' data:",
-		"font-src 'self' data:",
-		"connect-src 'self'",
-		"frame-ancestors 'none'",
-		"form-action 'self'",
-		"base-uri 'self'",
-		"object-src 'none'",
-	}, "; ")
-
 	// Permissions-Policy lists capabilities we explicitly disable
 	// Empty () means "no origin is allowed", i.e. fully disabled
 	permissions := strings.Join([]string{
@@ -104,6 +104,15 @@ func SecurityHeaders(secure bool) Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nonce, err := newCSPNonce()
+			if err != nil {
+				// crypto/rand failing is catastrophic (same treatment
+				// NewCSRF gives a rand.Read failure) fail closed rather
+				// than serve a page with no CSP or a predictable nonce
+				http.Error(w, "security headers: nonce generation failed", http.StatusInternalServerError)
+				return
+			}
+
 			h := w.Header()
 
 			// HSTS only when we're actually serving over https. Setting
@@ -121,9 +130,56 @@ func SecurityHeaders(secure bool) Middleware {
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			h.Set("Permissions-Policy", permissions)
-			h.Set("Content-Security-Policy", csp)
+			h.Set("Content-Security-Policy", buildCSP(nonce))
 
-			next.ServeHTTP(w, r)
+			ctx := context.WithValue(r.Context(), ctxCSPNonceKey{}, nonce)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// buildCSP assembles the policy string for one request's nonce
+func buildCSP(nonce string) string {
+	return strings.Join([]string{
+		"default-src 'self'",
+		"script-src 'self' 'nonce-" + nonce + "'",
+		"style-src 'self' 'nonce-" + nonce + "'",
+		"img-src 'self' data:",
+		"font-src 'self' data:",
+		"connect-src 'self'",
+		"frame-ancestors 'none'",
+		"form-action 'self'",
+		"base-uri 'self'",
+		"object-src 'none'",
+	}, "; ")
+}
+
+// ctxCSPNonceKey keys the per-request CSP nonce in context. Handlers
+// rendering an inline <script> or <style> pull this out via
+// CSPNonceFromContext and inject it into the tag's nonce="" attribute.
+type ctxCSPNonceKey struct{}
+
+// CSPNonceFromContext returns the CSP nonce to embed in inline
+// <script nonce="..."> / <style nonce="..."> tags for this request.
+// Empty if SecurityHeaders isn't in the middleware chain (it always is
+// in production; only relevant to tests that call a handler directly).
+func CSPNonceFromContext(ctx context.Context) string {
+	if v := ctx.Value(ctxCSPNonceKey{}); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// newCSPNonce generates a fresh random nonce. Unlike the CSRF token,
+// this must never be reused across requests, its entire security
+// property is that an attacker can't predict it, so it's generated
+// fresh every time rather than cached in a cookie or anywhere else.
+func newCSPNonce() (string, error) {
+	raw := make([]byte, 16) // 128 bits, the widely-recommended minimum for CSP nonces
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }

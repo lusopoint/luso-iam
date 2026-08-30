@@ -21,6 +21,7 @@ var templates = web.MustPages(templatesFS, "templates/*.html")
 // signupPageData drives signup.html.
 type signupPageData struct {
 	CSRFToken         string
+	CSPNonce          string
 	Email             string // re-emit on failure so the user doesn't have to retype
 	FirstName         string //re-emit on failure
 	LastName          string //re-emit on failure
@@ -30,8 +31,14 @@ type signupPageData struct {
 
 // signupDoneData drives signup_done.html (the "check your inbox" page).
 type signupDoneData struct {
+	CSPNonce    string
 	Email       string
 	ExpiryHours int
+}
+
+// verifyInvalidData drives verify_invalid.html
+type verifyInvalidData struct {
+	CSPNonce string
 }
 
 // Handler is the HTTP-level orchestrator. main.go constructs one only
@@ -63,6 +70,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 func (h *Handler) signupGET(w http.ResponseWriter, r *http.Request) {
 	renderSignup(w, http.StatusOK, signupPageData{
 		CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 		MinPasswordLength: h.svc.MinPasswordLength(),
 	})
 }
@@ -77,6 +85,7 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderSignup(w, http.StatusBadRequest, signupPageData{
 			CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 			MinPasswordLength: h.svc.MinPasswordLength(),
 			Error:             "Invalid form submission.",
 		})
@@ -118,6 +127,7 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 		}
 		renderSignup(w, http.StatusBadRequest, signupPageData{
 			CSRFToken:         middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:          middleware.CSPNonceFromContext(r.Context()),
 			Email:             email,
 			FirstName:         firstName,
 			LastName:          lastName,
@@ -144,6 +154,7 @@ func (h *Handler) signupPOST(w http.ResponseWriter, r *http.Request) {
 		hours = 1
 	}
 	renderSignupDone(w, http.StatusOK, signupDoneData{
+		CSPNonce:    middleware.CSPNonceFromContext(r.Context()),
 		Email:       email,
 		ExpiryHours: hours,
 	})
@@ -161,7 +172,7 @@ func (h *Handler) verifyGET(w http.ResponseWriter, r *http.Request) {
 	user, err := h.svc.Verify(r.Context(), token)
 	if err != nil {
 		if errors.Is(err, authsignup.ErrInvalidToken) {
-			renderVerifyInvalid(w)
+			renderVerifyInvalid(w, r)
 			return
 		}
 		slog.ErrorContext(r.Context(), "signup: verify failed", "err", err)
@@ -194,8 +205,10 @@ func renderSignupDone(w http.ResponseWriter, status int, data signupDoneData) {
 	web.Render(w, templates, "signup_done.html", status, data)
 }
 
-func renderVerifyInvalid(w http.ResponseWriter) {
-	web.Render(w, templates, "verify_invalid.html", http.StatusBadRequest, nil)
+func renderVerifyInvalid(w http.ResponseWriter, r *http.Request) {
+	web.Render(w, templates, "verify_invalid.html", http.StatusBadRequest, verifyInvalidData{
+		CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+	})
 }
 
 // itoa avoids pulling in strconv for one trivial use.

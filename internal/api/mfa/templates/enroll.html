@@ -90,7 +90,7 @@
 </main>
 {{end}} {{define "scripts"}} {{ if .WebAuthnEnabled }}
 <script src="/static/webauthn.js"></script>
-<script>
+<script nonce="{{.CSPNonce}}">
   (function () {
     // CSRF token, required on every state-mutating fetch. The server's CSRF
     // middleware accepts it via the X-CSRF-Token header.

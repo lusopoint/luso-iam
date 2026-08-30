@@ -18,6 +18,7 @@ var oidcTemplates = web.MustPages(oidcTemplatesFS, "templates/*.html")
 // has everything it needs without a server-side session lookup
 type consentData struct {
 	CSRFToken   string
+	CSPNonce    string
 	ClientName  string
 	Scopes      []string
 	ClientID    string

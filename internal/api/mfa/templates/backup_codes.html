@@ -21,7 +21,7 @@
   </div>
 </main>
 {{end}} {{define "scripts"}}
-<script>
+<script nonce="{{.CSPNonce}}">
   // Codes are already in the DOM; this just saves the user transcribing them.
   // If the clipboard API is unavailable (insecure origin, denied permission)
   // the button quietly does nothing and the codes remain readable on screen.

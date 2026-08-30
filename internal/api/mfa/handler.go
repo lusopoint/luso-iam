@@ -85,6 +85,7 @@ func (h *Handler) challengeGET(w http.ResponseWriter, r *http.Request) {
 
 	data := challengeData{
 		CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:    middleware.CSPNonceFromContext(r.Context()),
 		HasTOTP:     contains(ch.Methods, "totp"),
 		HasWebAuthn: contains(ch.Methods, "webauthn") && h.mfa.WebAuthnEnabled(),
 		HasBackup:   ch.HasBackup,
@@ -135,6 +136,7 @@ func (h *Handler) backupGET(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "backup.html", http.StatusOK, simpleData{
 		CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:  middleware.CSPNonceFromContext(r.Context()),
 		Error:     r.URL.Query().Get("error"),
 	})
 }
@@ -258,6 +260,7 @@ func (h *Handler) enrollGET(w http.ResponseWriter, r *http.Request) {
 
 	data := enrollData{
 		CSRFToken:            middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:             middleware.CSPNonceFromContext(r.Context()),
 		WebAuthnEnabled:      h.mfa.WebAuthnEnabled(),
 		HasBackupCodes:       remaining > 0,
 		BackupCodesRemaining: remaining,
@@ -307,6 +310,7 @@ func (h *Handler) enrollTOTPGET(w http.ResponseWriter, r *http.Request) {
 
 	renderTemplate(w, "totp_enroll.html", http.StatusOK, totpEnrollData{
 		CSRFToken:  middleware.CSRFTokenFromContext(r.Context()),
+		CSPNonce:   middleware.CSPNonceFromContext(r.Context()),
 		MethodID:   uuidToString(secret.MethodID),
 		Secret:     secret.Base32,
 		QRCodeData: template.URL(secret.QRCodeData),
@@ -372,7 +376,10 @@ func (h *Handler) enrollBackup(w http.ResponseWriter, r *http.Request) {
 			Metadata: map[string]any{"count": len(codes)},
 		}))
 	}
-	renderTemplate(w, "backup_codes.html", http.StatusOK, backupCodesData{Codes: codes})
+	renderTemplate(w, "backup_codes.html", http.StatusOK, backupCodesData{
+		CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+		Codes:    codes,
+	})
 }
 
 func (h *Handler) enrollWebAuthnBegin(w http.ResponseWriter, r *http.Request) {
@@ -540,11 +547,13 @@ func (h *Handler) redirectToChallenge(w http.ResponseWriter, r *http.Request, ms
 
 type simpleData struct {
 	CSRFToken string
+	CSPNonce  string
 	Error     string
 }
 
 type challengeData struct {
 	CSRFToken   string
+	CSPNonce    string
 	HasTOTP     bool
 	HasWebAuthn bool
 	HasBackup   bool
@@ -553,6 +562,7 @@ type challengeData struct {
 
 type totpEnrollData struct {
 	CSRFToken  string
+	CSPNonce   string
 	MethodID   string
 	Secret     string
 	QRCodeData template.URL
@@ -560,7 +570,8 @@ type totpEnrollData struct {
 }
 
 type backupCodesData struct {
-	Codes []string
+	CSPNonce string
+	Codes    []string
 }
 
 type methodView struct {
@@ -572,6 +583,7 @@ type methodView struct {
 
 type enrollData struct {
 	CSRFToken            string
+	CSPNonce             string
 	TOTPMethods          []methodView
 	WebAuthnMethods      []methodView
 	WebAuthnEnabled      bool

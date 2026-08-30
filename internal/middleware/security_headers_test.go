@@ -89,16 +89,15 @@ func TestSecurityHeaders_AntiClickjacking(t *testing.T) {
 	}
 }
 
-// TestSecurityHeaders_CSPAllowsRequiredInlines: this is a regression
-// guard. The SPA uses React's style={{}} prop and several
-// server-rendered templates have inline <style>/<script> blocks. A
-// strict CSP without 'unsafe-inline' would break those pages, and
-// since we don't have automated browser tests, a CSP regression here
-// would manifest as "the login page looks broken" only in production.
-//
-// Pin the inline carve-outs explicitly so anyone tightening the CSP
-// in the future has to consciously revisit this test.
-func TestSecurityHeaders_CSPAllowsRequiredInlines(t *testing.T) {
+// TestSecurityHeaders_CSPUsesNoncesNotUnsafeInline: this is a regression
+// guard for the thing that makes the CSP worth having at all. Several
+// server-rendered templates (the shared base layout's dark-mode
+// detector, the MFA pages, the docs page) have inline <script>/<style>
+// blocks that need to keep working, but 'unsafe-inline' would let ANY
+// inline script run, including one an attacker injected via XSS the
+// whole point of this policy is that only OUR inline content, carrying
+// the exact nonce minted for that response, is allowed to run.
+func TestSecurityHeaders_CSPUsesNoncesNotUnsafeInline(t *testing.T) {
 	t.Parallel()
 
 	mw := SecurityHeaders(true)
@@ -106,14 +105,50 @@ func TestSecurityHeaders_CSPAllowsRequiredInlines(t *testing.T) {
 	mw(http.HandlerFunc(hello)).ServeHTTP(rr, httptest.NewRequest("GET", "/", nil))
 
 	csp := rr.Header().Get("Content-Security-Policy")
-	for _, want := range []string{
-		"script-src 'self' 'unsafe-inline'", // MFA enroll/challenge inline JS
-		"style-src 'self' 'unsafe-inline'",  // React inline style props + template <style>
-		"img-src 'self' data:",              // TOTP QR codes are data: URIs
-	} {
-		if !strings.Contains(csp, want) {
-			t.Errorf("CSP missing required directive %q\nfull CSP: %s", want, csp)
+	if strings.Contains(csp, "unsafe-inline") {
+		t.Errorf("CSP still allows unsafe-inline, defeating the point of nonces: %q", csp)
+	}
+	if !strings.Contains(csp, "script-src 'self' 'nonce-") {
+		t.Errorf("CSP missing a nonce-based script-src\nfull CSP: %s", csp)
+	}
+	if !strings.Contains(csp, "style-src 'self' 'nonce-") {
+		t.Errorf("CSP missing a nonce-based style-src\nfull CSP: %s", csp)
+	}
+	if !strings.Contains(csp, "img-src 'self' data:") { // TOTP QR codes are data: URIs
+		t.Errorf("CSP missing img-src data: carve-out\nfull CSP: %s", csp)
+	}
+}
+
+// TestSecurityHeaders_NonceIsFreshPerRequestAndMatchesHeader: the nonce
+// exposed to handlers via CSPNonceFromContext must be exactly the one
+// in that response's CSP header (otherwise the inline tag it's stamped
+// onto would get blocked by the browser), and it must differ across
+// requests a reused or predictable nonce is no better than
+// 'unsafe-inline' for an attacker who can observe one response.
+func TestSecurityHeaders_NonceIsFreshPerRequestAndMatchesHeader(t *testing.T) {
+	t.Parallel()
+
+	var seen []string
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, CSPNonceFromContext(r.Context()))
+	})
+	mw := SecurityHeaders(true)
+	srv := mw(inner)
+
+	var nonces [2]string
+	for i := range nonces {
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, httptest.NewRequest("GET", "/", nil))
+		nonces[i] = rr.Header().Get("Content-Security-Policy")
+		if !strings.Contains(nonces[i], "'nonce-"+seen[i]+"'") {
+			t.Errorf("request %d: context nonce %q not present in CSP header %q", i, seen[i], nonces[i])
 		}
+	}
+	if seen[0] == "" || seen[1] == "" {
+		t.Fatal("expected a non-empty nonce on every request")
+	}
+	if seen[0] == seen[1] {
+		t.Error("nonce was reused across two separate requests; it must be fresh every time")
 	}
 }
 

@@ -24,7 +24,13 @@ func TestRenderWrapsPageInBaseLayout(t *testing.T) {
 	pages := MustPages(fixture, "templates/*.html")
 
 	rec := httptest.NewRecorder()
-	Render(rec, pages, "hello.html", http.StatusOK, struct{ Greeting string }{"Sign in"})
+	// base.html's inline dark-mode script has a nonce="{{.CSPNonce}}"
+	// attribute, so every page's data struct must carry that field -
+	// same contract every real caller under internal/api/* follows.
+	Render(rec, pages, "hello.html", http.StatusOK, struct {
+		Greeting string
+		CSPNonce string
+	}{"Sign in", "test-nonce"})
 
 	body := rec.Body.String()
 
@@ -34,6 +40,7 @@ func TestRenderWrapsPageInBaseLayout(t *testing.T) {
 		`href="/static/auth.css"`,    // shared stylesheet
 		"<title>Hello - IAM</title>", // page overrode the default title
 		"Sign in",                    // page content, with its data
+		`nonce="test-nonce"`,         // base layout's inline script carries the caller's CSPNonce
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("rendered page is missing %q", want)

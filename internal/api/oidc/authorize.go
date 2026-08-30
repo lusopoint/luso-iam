@@ -72,6 +72,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		}
 		renderConsent(w, http.StatusOK, consentData{
 			CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
+			CSPNonce:    middleware.CSPNonceFromContext(r.Context()),
 			ClientName:  client.Name,
 			Scopes:      req.Scopes,
 			ClientID:    req.ClientID,
