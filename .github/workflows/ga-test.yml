@@ -13,6 +13,23 @@ jobs:
   go-test:
     name: go test
     runs-on: ubuntu-latest
+    # this is for the backend internal/oidc and internal/auth/cas tests
+    # so no extra env vars are needed - postgres test's default matches this exactly
+    # if unreachable, those tests skip instead of failing, so that we do not get stuck
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: iam
+          POSTGRES_PASSWORD: iam
+          POSTGRES_DB: iam
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iam -d iam"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
