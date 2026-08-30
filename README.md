@@ -161,6 +161,7 @@ make help                                         # list every target
 make seed-user email=... password=... admin=1     # create a user
 make grant-admin email=...                         # make an existing user an admin
 make migrate-up                                    # apply database migrations
+make migrate-container                             # same, via the /migrate binary the container image ships (AUTO_MIGRATE=false deploy step)
 make rotate-key dir=/etc/iam/keys                  # generate a new signing key
 make compose-dev-up / -down / -clear               # manage the dev Postgres container
 ```

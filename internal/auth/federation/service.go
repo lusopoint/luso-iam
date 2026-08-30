@@ -78,12 +78,25 @@ func (s *Service) LinkOrCreate(
 		}
 	}
 
-	email := emailPtr(identity.Email)
-	name := namePtr(identity.Name)
+	// users.email is unique among active accounts, so an unverified email
+	// that collides with an existing user can't be attached to a new one
+	// either — creating it as-is would fail the constraint. Drop it from
+	// the new account (it's still cached on the identity row below, so
+	// it's not lost — just not trusted as this account's contact email).
+	newEmail := identity.Email
+	if newEmail != "" && !identity.EmailVerified {
+		if _, err := s.store.GetUserByEmail(ctx, newEmail); err == nil {
+			slog.Warn("federation: email collides with an existing account but provider did not verify it; creating account without an email",
+				"provider", providerName)
+			newEmail = ""
+		} else if !errors.Is(err, postgres.ErrNotFound) {
+			return nil, false, fmt.Errorf("look up user by email: %w", err)
+		}
+	}
 
 	newUser, createErr := s.store.CreateUser(ctx, postgres.CreateUserParams{
-		Email:       email,
-		DisplayName: name,
+		Email:       emailPtr(newEmail),
+		DisplayName: namePtr(identity.Name),
 	})
 	if createErr != nil {
 		return nil, false, fmt.Errorf("create user: %w", createErr)
