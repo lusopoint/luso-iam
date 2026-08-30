@@ -85,7 +85,7 @@ func New(store *postgres.Store, keys *crypto.KeyManager, baseURL string) *Servic
 // returns the matching client, call before showing the consent screen
 func (s *Service) ValidateAuthRequest(ctx context.Context, req AuthRequest) (*postgres.OIDCClient, error) {
 	if req.ResponseType != "code" {
-		return nil, fmt.Errorf("%w: only response_type=code is supported", ErrInvalidGrant)
+		return nil, fmt.Errorf("%w: only response_type=code is supported", ErrUnsupportedResponseType)
 	}
 
 	client, err := s.store.GetOIDCClient(ctx, req.ClientID)
