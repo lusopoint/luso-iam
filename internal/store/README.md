@@ -452,3 +452,9 @@ The schema tunes the indexes for the common access patterns: reverse-chronologic
 | 0009 | `0009_email_verification.up.sql`       | `email_verification_tokens`                                                                |
 
 `AUTO_MIGRATE=true` applies any pending migration on boot — fine for a single instance, but a footgun once you run more than one: a bad migration takes down every replica at once, and concurrent replicas can race applying it. For that case, set `AUTO_MIGRATE=false` and run the `/migrate` binary (built from `cmd/migrate`, shipped in the container image) as a one-shot step before rolling out the new server version. For local dev rollbacks, `make migrate-up` and `make migrate-down` (the external `golang-migrate` CLI) still work as before.
+
+### `audit_log` retention
+
+`audit_log` (added in 0007) is a monthly-partitioned, append-only table — the server's own DB role can insert into it but never delete from it, on purpose: an attacker who compromises the running process shouldn't also gain a path to erase evidence of that compromise. `EnsureAuditLogPartitions` (`internal/store/postgres/audit_partitions.go`) keeps the next few months' partitions created ahead of time — called once at server startup and again on every cleanup sweep, so a missed run is self-healing. Any row that somehow lands outside all created partitions falls into `audit_log_default` rather than failing the insert.
+
+Pruning old data is a deliberately separate, manually-run command: `cmd/audit-prune` (`make audit-prune before=2025-01`, or `/audit-prune -before 2025-01` in the container) drops partitions strictly before the given month — instant, since dropping a partition is a metadata operation, not a row-by-row `DELETE`. Add `-dry-run` (`dry_run=1` via `make`) to see what would be dropped first. There's no scheduled/automatic pruning — that's intentional, for the same compromise-blast-radius reason `iam-server` itself never deletes audit rows.

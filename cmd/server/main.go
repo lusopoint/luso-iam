@@ -108,6 +108,13 @@ func run() error {
 
 	// core services
 	store := postgres.NewStore(pool)
+
+	// keep the next few months of audit_log partitions ready ahead of
+	// time so inserts never rely on the DEFAULT partition
+	if err := store.EnsureAuditLogPartitions(ctx, time.Now(), 3); err != nil {
+		return fmt.Errorf("ensure audit_log partitions: %w", err)
+	}
+
 	signer := crypto.NewCookieSigner(cfg.SessionSecret)
 	passwordSvc := password.New(store)
 	sessionSvc := session.New(session.Config{
@@ -126,7 +133,7 @@ func run() error {
 	oidcSvc := oidcsvc.New(store, keys, cfg.BaseURL)
 	// audit logger, basically used by admin handlers
 	auditSvc := audit.New(store)
-	// MFA service — TOTP always on; WebAuthn enabled only when BASE_URL
+	// MFA service TOTP always on; WebAuthn enabled only when BASE_URL
 	// is parseable into an RPID and origin (essentially always, in practice).
 	rpID, origins := authmfa.DeriveWebAuthnConfig(cfg.BaseURL)
 	mfaSvc, err := authmfa.New(authmfa.Config{
@@ -517,6 +524,13 @@ func startCleanupService(ctx context.Context, store *postgres.Store, logger *slo
 				logger.Error("cleanup: session sweep failed", "err", err)
 			} else if n > 0 {
 				logger.Info("cleanup: swept expired sessions", "rows", n)
+			}
+
+			// audit_log partitions not a deletion, just makes sure the
+			// next few months exist ahead of time so inserts don't fall
+			// back to the DEFAULT partition
+			if err := store.EnsureAuditLogPartitions(sweepCtx, time.Now(), 3); err != nil {
+				logger.Error("cleanup: ensure audit_log partitions failed", "err", err)
 			}
 		}
 
