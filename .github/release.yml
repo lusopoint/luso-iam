@@ -1,0 +1,21 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: "🛠 Breaking Changes"
+      labels: [breaking-change]
+    - title: "✨ Features"
+      labels: [feat, feature, enhancement]
+    - title: "🐛 Bug Fixes"
+      labels: [fix, bug]
+    - title: "🔒 Security"
+      labels: [security]
+    - title: "♻️ Refactors"
+      labels: [refactor]
+    - title: "🧹 Maintenance"
+      labels: [chore, dependencies]
+    - title: "📝 Documentation"
+      labels: [docs, documentation]
+    - title: "Other Changes"
+      labels: ["*"]

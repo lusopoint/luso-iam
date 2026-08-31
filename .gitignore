@@ -1,4 +1,4 @@
-# Go
+# go
 /bin/
 /iam-server
 *.exe
@@ -7,12 +7,12 @@
 go.work
 go.work.sum
 
-# Coverage
+# coverage
 *.cover
 coverage.txt
 coverage.html
 
-# Env / secrets
+# env / secrets
 # Anything matching .env.local, .env.production.local, etc.
 .env
 .env.*.local
@@ -20,15 +20,11 @@ coverage.html
 *.key
 /etc/iam/keys/
 
-# Frontend
-# Source assets (web/public) ARE committed — that's where icons live.
-# Vite's package install + cache:
+# frontend
 web/node_modules/
 web/.vite/
 
-# Built React assets — produced by `make web-build`. Each fresh build
-# overwrites these; the stub web/dist/index.html IS tracked so the Go
-# binary always has something to embed via //go:embed.
+# built React assets produced by `make web-build`
 web/dist/assets/
 web/dist/sw.js
 web/dist/icon-180.png
@@ -46,6 +42,10 @@ web/tsconfig.tsbuildinfo
 web/vite.config.d.ts
 web/vite.config.js
 
+# releases
+# GoReleasers output dir (binaries, archives, checksums) - see .goreleaser.yml
+/dist/
+
 # IDE
 .idea/
 .vscode/
@@ -55,5 +55,5 @@ web/vite.config.js
 .DS_Store
 Thumbs.db
 
-# Logs
+# logs
 *.log

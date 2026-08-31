@@ -1,0 +1,70 @@
+version: 2
+
+before:
+  hooks:
+    # cmd/server embeds web/dist via //go:embed; GoReleasers own build step
+    # is a plain `go build`, so the SPA has to exist before any go build runs
+    # or every binary ships the stub index.html instead of the real admin ui
+    - make web-build
+
+builds:
+  - id: iam-server
+    main: ./cmd/server
+    binary: iam-server
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+
+  - id: migrate
+    main: ./cmd/migrate
+    binary: migrate
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+  - id: seed-user
+    main: ./cmd/seed-user
+    binary: seed-user
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+  - id: rotate-key
+    main: ./cmd/rotate-key
+    binary: rotate-key
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+  - id: audit-prune
+    main: ./cmd/audit-prune
+    binary: audit-prune
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+# one archive per platform bundling all five binaries together, so a
+# no-docker user gets the same toolset that rides inside the container image
+archives:
+  - id: default
+    ids: [iam-server, migrate, seed-user, rotate-key, audit-prune]
+    name_template: >-
+      lusoiam_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
+
+checksum:
+  name_template: "checksums.txt"
+
+# PR title based release notes
+changelog:
+  use: github
