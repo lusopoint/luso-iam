@@ -6,9 +6,9 @@ changelog:
     - title: "🛠 Breaking Changes"
       labels: [breaking-change]
     - title: "✨ Features"
-      labels: [feat, feature, enhancement]
+      labels: [feat]
     - title: "🐛 Bug Fixes"
-      labels: [fix, bug]
+      labels: [fix]
     - title: "🔒 Security"
       labels: [security]
     - title: "♻️ Refactors"
@@ -16,6 +16,6 @@ changelog:
     - title: "🧹 Maintenance"
       labels: [chore, dependencies]
     - title: "📝 Documentation"
-      labels: [docs, documentation]
+      labels: [docs]
     - title: "Other Changes"
       labels: ["*"]
