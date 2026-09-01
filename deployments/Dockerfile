@@ -1,5 +1,6 @@
-# Multi-stage build for the IAM server. Three stages:
-FROM node:22-alpine AS web-build
+# --platform=$BUILDPLATFORM: run the builder stages natively on the build host instead of emulated
+# this is an optimization for the github action
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web-build
 
 WORKDIR /src/web
 
@@ -8,7 +9,7 @@ RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.26-alpine AS server-build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS server-build
 
 RUN apk add --no-cache git
 

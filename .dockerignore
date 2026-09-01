@@ -1,0 +1,36 @@
+# Never let local secrets into the build context, even though they end up
+# in a discarded intermediate stage (COPY . . in server-build) - the build
+# context itself still gets uploaded to the builder as-is.
+*.pem
+*.key
+.env
+.env.*
+
+.git/
+.github/
+
+# Go
+/bin/
+/iam-server
+*.exe
+*.test
+*.out
+
+# GoReleaser output
+/dist/
+
+# Frontend - each builder stage does its own npm ci, doesn't need these
+web/node_modules/
+web/.vite/
+web/dist/assets/
+
+# Docs / local-only, not needed inside the image
+*.md
+scripts/
+
+# IDE / OS cruft
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

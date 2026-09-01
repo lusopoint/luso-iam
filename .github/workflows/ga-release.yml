@@ -61,6 +61,13 @@ jobs:
           tags: |
             ghcr.io/lusopoint/lusoiam:${{ steps.version.outputs.value }}
             ghcr.io/lusopoint/lusoiam:latest
+          # go mod download/npm ci/go build all start cold on every tag even
+          # when go.sum/package-lock.json didn't change since the last release
+          # mode=max caches every stages layers, not just the final image's
+          # needed here since web-build/server-build never end up in the final
+          # stage directly, only their COPY --from outputs do
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
