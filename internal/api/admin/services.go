@@ -17,6 +17,7 @@ type casServiceDTO struct {
 	MatchPattern       string   `json:"match_pattern"`
 	Description        *string  `json:"description,omitempty"`
 	ReleasedAttributes []string `json:"released_attributes"`
+	RequireAllowlist   bool     `json:"require_allowlist"`
 	Enabled            bool     `json:"enabled"`
 	CreatedAt          string   `json:"created_at"`
 	UpdatedAt          string   `json:"updated_at"`
@@ -30,6 +31,7 @@ func toCASServiceDTO(s *postgres.CASService) casServiceDTO {
 		MatchPattern:       s.MatchPattern,
 		Description:        s.Description,
 		ReleasedAttributes: s.ReleasedAttributes,
+		RequireAllowlist:   s.RequireAllowlist,
 		Enabled:            s.Enabled,
 		CreatedAt:          s.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:          s.UpdatedAt.UTC().Format(time.RFC3339),
@@ -143,6 +145,7 @@ type updateCASServiceRequest struct {
 	ServiceURLPattern  *string   `json:"service_url_pattern,omitempty"`
 	Description        *string   `json:"description,omitempty"`
 	ReleasedAttributes *[]string `json:"released_attributes,omitempty"`
+	RequireAllowlist   *bool     `json:"require_allowlist,omitempty"`
 	Enabled            *bool     `json:"enabled,omitempty"`
 }
 
@@ -166,6 +169,7 @@ func (h *Handler) updateCASService(w http.ResponseWriter, r *http.Request) {
 		ServiceURLPattern:  req.ServiceURLPattern,
 		Description:        req.Description,
 		ReleasedAttributes: req.ReleasedAttributes,
+		RequireAllowlist:   req.RequireAllowlist,
 		Enabled:            req.Enabled,
 	}
 	// re-derive the match pattern if the URL pattern changed

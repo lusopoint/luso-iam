@@ -1,4 +1,4 @@
-// cx joins truthy class names into one string. Cheaper than pulling in
+// cx joins truthy class names into one string, cheaper than pulling in
 // clsx, we have one call site per render at most
 export const cx = (
   ...parts: Array<string | false | null | undefined>
@@ -62,4 +62,31 @@ export const validRedirectURI = (candidate: string): string | null => {
     return 'Must not contain a fragment (#).'
   }
   return null
+}
+
+// validEmail is the UI-side check for allow-list entries
+// its a nicety mirroring the server (net/mail): the server remains the boundary and
+// re-validates + normalises. Returns an error string or null when valid
+export const validEmail = (candidate: string): string | null => {
+  const v = candidate.trim()
+  if (v === '') return 'Enter an email address.'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Not a valid email address.'
+  return null
+}
+
+// parseEmailList splits a pasted/uploaded blob (CSV or newline/space separated)
+// into candidate emails, ,irrors the servers import tokeniser:
+// splits on commas, semicolons, and whitespace, drops an "email" header
+// cell, lower-cases, and de-duplicates. Validation happens separately
+export const parseEmailList = (blob: string): string[] => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of blob.split(/[\s,;"']+/)) {
+    const t = raw.trim().toLowerCase()
+    if (t === '' || t === 'email') continue
+    if (seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  return out
 }

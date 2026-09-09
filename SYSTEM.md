@@ -362,14 +362,14 @@ MFA enforcement policy is per-client (OIDC `acr_values`) and per-user.
 
 Expose a REST admin API (`/admin/v1/`) and a React-based admin UI:
 
-| Resource           | Operations                                             |
-| ------------------ | ------------------------------------------------------ |
-| Users              | CRUD, force password reset, lock/unlock, view sessions |
-| Clients            | Register, rotate secrets, manage redirect URIs, scopes |
-| CAS Services       | Register service URLs, attribute release policy        |
-| Upstream providers | Add/edit/delete federated IdPs                         |
-| Audit log          | Search, filter, export                                 |
-| Keys               | View active JWKS, trigger rotation                     |
+| Resource           | Operations                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| Users              | CRUD, force password reset, lock/unlock, view sessions                              |
+| Clients            | Register, rotate secrets, manage redirect URIs, scopes, per-client email allow-list |
+| CAS Services       | Register service URLs, attribute release policy, per-service email allow-list       |
+| Upstream providers | Add/edit/delete federated IdPs                                                      |
+| Audit log          | Search, filter, export                                                              |
+| Keys               | View active JWKS, trigger rotation                                                  |
 
 Admin API requires a separate admin session or a machine-to-machine client with `admin` scope.
 

@@ -1,8 +1,8 @@
 module github.com/lusopoint/lusoiam
 
-go 1.26
+go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	github.com/go-webauthn/webauthn v0.10.2
@@ -10,7 +10,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pquerna/otp v1.4.0
-	golang.org/x/crypto v0.52.0
+	golang.org/x/crypto v0.56.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -36,5 +36,5 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )

@@ -266,6 +266,7 @@ type UpdateOIDCClientParams struct {
 	AllowedGrantTypes *[]string
 	RequirePKCE       *bool
 	RequireConsent    *bool
+	RequireAllowlist  *bool
 	Enabled           *bool
 }
 
@@ -294,6 +295,9 @@ func (s *Store) UpdateOIDCClient(ctx context.Context, p UpdateOIDCClientParams) 
 	}
 	if p.RequireConsent != nil {
 		add("require_consent", *p.RequireConsent)
+	}
+	if p.RequireAllowlist != nil {
+		add("require_allowlist", *p.RequireAllowlist)
 	}
 	if p.Enabled != nil {
 		add("enabled", *p.Enabled)
@@ -411,6 +415,7 @@ type UpdateCASServiceParams struct {
 	MatchPattern       *string
 	Description        *string
 	ReleasedAttributes *[]string
+	RequireAllowlist   *bool
 	Enabled            *bool
 }
 
@@ -440,6 +445,9 @@ func (s *Store) UpdateCASService(ctx context.Context, p UpdateCASServiceParams) 
 	}
 	if p.ReleasedAttributes != nil {
 		add("released_attributes", *p.ReleasedAttributes)
+	}
+	if p.RequireAllowlist != nil {
+		add("require_allowlist", *p.RequireAllowlist)
 	}
 	if p.Enabled != nil {
 		add("enabled", *p.Enabled)

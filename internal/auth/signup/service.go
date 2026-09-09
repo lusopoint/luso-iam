@@ -27,11 +27,11 @@ var (
 	// ErrWeakPassword submitted password is shorter than the configured minimum
 	ErrWeakPassword = errors.New("signup: password does not meet requirements")
 
-	// ErrInvalidToken verification token is unknown, expired, already used, OR points to an email that no longer matches
-	ErrInvalidToken = errors.New("signup: token is unknown, expired, already used, or stale")
-
 	// ErrMissingName first name and/or last name was blank
 	ErrMissingName = errors.New("signup: first and last name are required")
+
+	// ErrInvalidToken verification token is unknown, expired, already used, OR points to an email that no longer matches
+	ErrInvalidToken = errors.New("signup: token is unknown, expired, already used, or stale")
 )
 
 type Config struct {
@@ -76,7 +76,7 @@ func New(c Config) (*Service, error) {
 	from := c.From
 	if from == "" {
 		// TODO: default should be re-thinked
-		from = "IAM <noreply@localhost>"
+		from = "IAM <noreply@lusopoint.com>"
 	}
 
 	return &Service{
@@ -122,7 +122,9 @@ func (s *Service) Register(ctx context.Context, p RegisterParams) (*postgres.Use
 		return nil, ErrWeakPassword
 	}
 
-	// first + last name are required at self signup
+	// first + last name are required at self-signup
+	// trim surrounding whitespace and reject blanks, cap the length to keep obviously
+	// abusive input out of the table
 	firstName := strings.TrimSpace(p.FirstName)
 	lastName := strings.TrimSpace(p.LastName)
 	if firstName == "" || lastName == "" {
@@ -151,8 +153,9 @@ func (s *Service) Register(ctx context.Context, p RegisterParams) (*postgres.Use
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	// derive a display name from the two parts so the existing displayName-based surfaces
-	// (CAS principal fallback, admin list, OIDC profile) have something sensible without a separate field
+	// derive a display name from the two parts so the existing
+	// displayName-based surfaces (CAS principal fallback, admin list,
+	// OIDC profile) have something sensible without a separate field
 	displayName := firstName + " " + lastName
 
 	user, err := s.store.CreateUser(ctx, postgres.CreateUserParams{

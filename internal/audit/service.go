@@ -56,6 +56,10 @@ const (
 	EventCASServiceCreated   = "cas_service_created"
 	EventCASServiceUpdated   = "cas_service_updated"
 	EventCASServiceDeleted   = "cas_service_deleted"
+
+	// per service email allowlist
+	EventAllowlistUpdated = "allowlist_updated"      // admin added/removed entries
+	EventAuthzDenied      = "authz_denied_allowlist" // a user was refused a service
 )
 
 // Event is the input to Log. Fields are optional except EventType

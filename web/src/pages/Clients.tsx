@@ -175,6 +175,9 @@ const Clients = () => {
                     {c.require_pkce && (
                       <Badge status="operational" label="PKCE" />
                     )}
+                    {c.require_allowlist && (
+                      <Badge status="pending" label="allow-list enforced" />
+                    )}
                     <span>
                       {c.redirect_uris.length} redirect
                       {c.redirect_uris.length === 1 ? '' : 's'}
@@ -271,6 +274,11 @@ const Clients = () => {
                         status={c.enabled ? 'operational' : 'critical'}
                         label={c.enabled ? 'enabled' : 'disabled'}
                       />
+                      {c.require_allowlist && (
+                        <div className="mt-1">
+                          <Badge status="pending" label="allow-list" />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{formatDateTime(c.created_at)}</TableCell>
                     <TableCell className="text-right">

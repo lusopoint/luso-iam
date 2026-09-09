@@ -237,20 +237,32 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		}))
 	}
 
-	// issue CAS ticket if service was set
+	// issue CAS ticket if service was set. IssueServiceTicket resolves the
+	// service and enforces its email allow-list internally, so a federated
+	// login is gated the same way a password login is
 	destination := "/"
 	if st.Service != "" {
-		if _, regErr := h.casSvc.ResolveService(r.Context(), st.Service); regErr == nil {
-			ticket, ticketErr := h.casSvc.IssueServiceTicket(
-				r.Context(), sess.ID, st.Service, false)
-			if ticketErr != nil {
-				slog.Error("federation: issue service ticket", "err", ticketErr)
-				h.callbackError(w, r, "Could not issue a service ticket. Please try again.")
-				return
-			}
+		ticket, err := h.casSvc.IssueServiceTicket(r.Context(), sess.ID, user.ID, st.Service, false)
+		switch {
+		case err == nil:
 			destination = appendTicket(st.Service, ticket)
-		} else if !errors.Is(regErr, authcas.ErrUnauthorizedService) {
-			slog.Error("federation: resolve service", "err", regErr)
+		case errors.Is(err, authcas.ErrUnauthorizedService):
+			// stale/removed service param: fall through to the portal
+			// home rather than hard-failing an otherwise-successful login
+		case errors.Is(err, authcas.ErrAccessDenied):
+			if h.audit != nil {
+				h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
+					Type:     audit.EventAuthzDenied,
+					Actor:    &user.ID,
+					Metadata: map[string]any{"service": st.Service, "protocol": "cas"},
+				}))
+			}
+			h.callbackError(w, r, "You are not authorized to access this application.")
+			return
+		default:
+			slog.Error("federation: issue service ticket", "err", err)
+			h.callbackError(w, r, "Could not issue a service ticket. Please try again.")
+			return
 		}
 	}
 

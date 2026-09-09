@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/lusopoint/lusoiam/internal/audit"
 	authcas "github.com/lusopoint/lusoiam/internal/auth/cas"
 	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
@@ -32,22 +34,9 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 			//   3. rd=<URL>       -> cross-origin redirect (proxy companion)
 			//   4. nothing        -> fall back to /
 			if serviceURL != "" {
-				if _, regErr := h.cas.ResolveService(r.Context(), serviceURL); regErr != nil {
-					renderError(w, http.StatusForbidden, errorPageData{
-						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-						Title:    "Service not authorized",
-						Message:  "This application is not registered with the IAM server.",
-						Detail:   serviceURL,
-					})
-					return
-				}
-				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, false)
+				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, sess.UserID, serviceURL, false)
 				if err != nil {
-					renderError(w, http.StatusInternalServerError, errorPageData{
-						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-						Title:    "Login error",
-						Message:  "Could not create a service ticket. Please try again.",
-					})
+					h.renderTicketError(w, r, err, serviceURL, &sess.UserID)
 					return
 				}
 				http.Redirect(w, r, appendTicket(serviceURL, ticket), http.StatusFound)
@@ -145,24 +134,19 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// verify the service before creating a session
-	// we check early so we don't create a session that leads nowhere
+	// verify the service (registered + allow-list) before creating a
+	// session or prompting for MFA: we check early so we don't put the
+	// user through a second-factor challenge for a service they'll be
+	// denied anyway. IssueServiceTicket re-checks both at the end
+	// regardless, this is purely a UX shortcut, not the enforcement point.
 	if serviceURL != "" {
-		if _, err := h.cas.ResolveService(r.Context(), serviceURL); err != nil {
-			if errors.Is(err, authcas.ErrUnauthorizedService) {
-				renderError(w, http.StatusForbidden, errorPageData{
-					CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-					Title:    "Service not authorized",
-					Message:  "This application is not registered with the IAM server.",
-					Detail:   serviceURL,
-				})
-				return
-			}
-			renderError(w, http.StatusInternalServerError, errorPageData{
-				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-				Title:    "Login error",
-				Message:  "Could not verify the requesting service.",
-			})
+		svc, err := h.cas.ResolveService(r.Context(), serviceURL)
+		if err != nil {
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
+			return
+		}
+		if err := h.cas.CheckServiceAccess(r.Context(), svc, user.ID); err != nil {
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
 			return
 		}
 	}
@@ -238,13 +222,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 
 	// issue service ticket and redirect
 	if serviceURL != "" {
-		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, renew)
+		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, user.ID, serviceURL, renew)
 		if err != nil {
-			renderError(w, http.StatusInternalServerError, errorPageData{
-				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-				Title:    "Login error",
-				Message:  "Could not issue a service ticket. Please try again.",
-			})
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
 			return
 		}
 		http.Redirect(w, r, appendTicket(serviceURL, ticket), http.StatusFound)
@@ -277,4 +257,43 @@ func safeNext(s string) string {
 		}
 	}
 	return s
+}
+
+// renderTicketError renders the appropriate error page for a failure from
+// ResolveService, CheckServiceAccess, or IssueServiceTicket (which wraps
+// both) — the three ways obtaining a CAS ticket for serviceURL can fail.
+// ErrAccessDenied is audited; anything else is an unexpected condition and
+// renders a generic 500.
+func (h *Handler) renderTicketError(w http.ResponseWriter, r *http.Request, err error, serviceURL string, actor *pgtype.UUID) {
+	switch {
+	case errors.Is(err, authcas.ErrUnauthorizedService):
+		renderError(w, http.StatusForbidden, errorPageData{
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Service not authorized",
+			Message:  "This application is not registered with the IAM server.",
+			Detail:   serviceURL,
+		})
+	case errors.Is(err, authcas.ErrAccessDenied):
+		if h.audit != nil {
+			h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
+				Type:     audit.EventAuthzDenied,
+				Actor:    actor,
+				Metadata: map[string]any{"service": serviceURL, "protocol": "cas"},
+			}))
+		}
+		renderError(w, http.StatusForbidden, errorPageData{
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Access denied",
+			Message:  "You are not authorized to access this application.",
+			Detail:   serviceURL,
+		})
+	default:
+		slog.ErrorContext(r.Context(), "cas: could not issue service ticket",
+			"err", err, "service", serviceURL)
+		renderError(w, http.StatusInternalServerError, errorPageData{
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Login error",
+			Message:  "Could not issue a service ticket. Please try again.",
+		})
+	}
 }

@@ -14,7 +14,7 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@lusopoint/luso-ui": "^1.1.0",
+    "@lusopoint/luso-ui": "^1.2.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^0.477.0",
     "react": "^19.2.0",

@@ -153,7 +153,7 @@ func TestIssueAndValidate_HappyPath(t *testing.T) {
 	sess := newTestSession(t, user.ID)
 
 	serviceURL := "https://" + host + "/callback"
-	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, serviceURL, false)
+	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, user.ID, serviceURL, false)
 	if err != nil {
 		t.Fatalf("IssueServiceTicket: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestValidate_TicketIsSingleUse(t *testing.T) {
 	sess := newTestSession(t, user.ID)
 
 	serviceURL := "https://" + host + "/callback"
-	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, serviceURL, false)
+	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, user.ID, serviceURL, false)
 	if err != nil {
 		t.Fatalf("IssueServiceTicket: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestValidate_ServiceURLMismatchRejected(t *testing.T) {
 	sess := newTestSession(t, user.ID)
 
 	issuedFor := "https://" + host + "/callback-a"
-	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, issuedFor, false)
+	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, user.ID, issuedFor, false)
 	if err != nil {
 		t.Fatalf("IssueServiceTicket: %v", err)
 	}
@@ -252,6 +252,140 @@ func TestValidate_ExpiredTicketRejected(t *testing.T) {
 	_, err = svc.Validate(context.Background(), ticketID, serviceURL)
 	if !errors.Is(err, ErrInvalidTicket) {
 		t.Errorf("got %v, want ErrInvalidTicket for an expired ticket", err)
+	}
+}
+
+// --- CheckServiceAccess (allow-list enforcement) -------------------------
+
+func enableAllowlist(t *testing.T, svc *postgres.CASService) {
+	t.Helper()
+	on := true
+	if _, err := sharedStore.UpdateCASService(context.Background(), postgres.UpdateCASServiceParams{
+		ID:               svc.ID,
+		RequireAllowlist: &on,
+	}); err != nil {
+		t.Fatalf("enable require_allowlist: %v", err)
+	}
+	svc.RequireAllowlist = true
+}
+
+func allowEmail(t *testing.T, serviceID pgtype.UUID, email string) {
+	t.Helper()
+	if _, err := sharedStore.AddServiceAllowlistEmails(context.Background(), postgres.AllowlistServiceCAS, postgres.UUIDString(serviceID), []string{email}); err != nil {
+		t.Fatalf("add to allow-list: %v", err)
+	}
+}
+
+func TestCheckServiceAccess_NotEnforcedByDefault(t *testing.T) {
+	svc := New(sharedStore)
+	casSvc := newTestCASService(t, "https://"+uniqueName("app")+".example.com/*")
+	user := newTestUser(t) // not on any allow-list
+
+	if err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID); err != nil {
+		t.Errorf("unexpected error with require_allowlist=false: %v", err)
+	}
+}
+
+func TestCheckServiceAccess_DeniesUnlistedUser(t *testing.T) {
+	svc := New(sharedStore)
+	casSvc := newTestCASService(t, "https://"+uniqueName("app")+".example.com/*")
+	enableAllowlist(t, casSvc)
+	user := newTestUser(t) // deliberately not added to the allow-list
+
+	err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID)
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestCheckServiceAccess_DeniesUserWithNoEmail(t *testing.T) {
+	svc := New(sharedStore)
+	casSvc := newTestCASService(t, "https://"+uniqueName("app")+".example.com/*")
+	enableAllowlist(t, casSvc)
+	user, err := sharedStore.CreateUser(context.Background(), postgres.CreateUserParams{})
+	if err != nil {
+		t.Fatalf("create emailless user: %v", err)
+	}
+
+	if err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID); !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestCheckServiceAccess_AllowsListedUser(t *testing.T) {
+	svc := New(sharedStore)
+	casSvc := newTestCASService(t, "https://"+uniqueName("app")+".example.com/*")
+	enableAllowlist(t, casSvc)
+	user := newTestUser(t)
+	allowEmail(t, casSvc.ID, *user.Email)
+
+	if err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID); err != nil {
+		t.Errorf("unexpected error for allow-listed user: %v", err)
+	}
+}
+
+func TestCheckServiceAccess_RevocationCutsOffAccessImmediately(t *testing.T) {
+	// unlike an OIDC refresh token, CAS re-runs CheckServiceAccess on
+	// every ticket request (fresh login and SSO reuse alike), so removal
+	// takes effect on the very next request, this pins that behaviour
+	svc := New(sharedStore)
+	casSvc := newTestCASService(t, "https://"+uniqueName("app")+".example.com/*")
+	enableAllowlist(t, casSvc)
+	user := newTestUser(t)
+	allowEmail(t, casSvc.ID, *user.Email)
+
+	if err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID); err != nil {
+		t.Fatalf("expected access while allow-listed: %v", err)
+	}
+
+	if _, err := sharedStore.DeleteServiceAllowlistEmails(context.Background(), postgres.AllowlistServiceCAS, postgres.UUIDString(casSvc.ID), []string{*user.Email}); err != nil {
+		t.Fatalf("remove from allow-list: %v", err)
+	}
+
+	if err := svc.CheckServiceAccess(context.Background(), casSvc, user.ID); !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied after allow-list removal", err)
+	}
+}
+
+// TestIssueServiceTicket_EnforcesAllowlist pins the actual guarantee the
+// CheckServiceAccess tests above don't: IssueServiceTicket itself refuses to
+// mint a ticket for a denied user, rather than trusting the caller to have
+// checked separately. Every login-completing HTTP handler (password login,
+// federation callback, post-MFA) calls this one function to get a ticket,
+// so hardening it here is what actually closes the allow-list off for all
+// of them at once — a caller that forgot to check first (as the federation
+// and MFA handlers once did) can no longer mint a ticket for a denied user.
+func TestIssueServiceTicket_EnforcesAllowlist(t *testing.T) {
+	svc := New(sharedStore)
+	host := uniqueName("app") + ".example.com"
+	casSvc := newTestCASService(t, "https://"+host+"/*")
+	enableAllowlist(t, casSvc)
+	user := newTestUser(t) // deliberately not added to the allow-list
+	sess := newTestSession(t, user.ID)
+
+	serviceURL := "https://" + host + "/callback"
+	_, err := svc.IssueServiceTicket(context.Background(), sess.ID, user.ID, serviceURL, false)
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestIssueServiceTicket_AllowsListedUser(t *testing.T) {
+	svc := New(sharedStore)
+	host := uniqueName("app") + ".example.com"
+	casSvc := newTestCASService(t, "https://"+host+"/*")
+	enableAllowlist(t, casSvc)
+	user := newTestUser(t)
+	allowEmail(t, casSvc.ID, *user.Email)
+	sess := newTestSession(t, user.ID)
+
+	serviceURL := "https://" + host + "/callback"
+	ticket, err := svc.IssueServiceTicket(context.Background(), sess.ID, user.ID, serviceURL, false)
+	if err != nil {
+		t.Fatalf("IssueServiceTicket: %v", err)
+	}
+	if ticket == "" {
+		t.Fatal("expected a non-empty ticket")
 	}
 }
 

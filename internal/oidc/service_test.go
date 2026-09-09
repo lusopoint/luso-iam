@@ -666,6 +666,167 @@ func TestUserInfo_ScopesGateClaims(t *testing.T) {
 	}
 }
 
+// --- Allow-list enforcement -------------------------------------------------
+
+func enableAllowlist(t *testing.T, client *postgres.OIDCClient) {
+	t.Helper()
+	on := true
+	if _, err := sharedStore.UpdateOIDCClient(context.Background(), postgres.UpdateOIDCClientParams{
+		ID:               client.ID,
+		RequireAllowlist: &on,
+	}); err != nil {
+		t.Fatalf("enable require_allowlist: %v", err)
+	}
+}
+
+func allowEmail(t *testing.T, clientID, email string) {
+	t.Helper()
+	if _, err := sharedStore.AddServiceAllowlistEmails(context.Background(), postgres.AllowlistServiceOIDC, clientID, []string{email}); err != nil {
+		t.Fatalf("add to allow-list: %v", err)
+	}
+}
+
+func authRequestFor(client *postgres.OIDCClient) AuthRequest {
+	_, challenge, _ := crypto.NewPKCE()
+	return AuthRequest{
+		ClientID:      client.ID,
+		ResponseType:  "code",
+		RedirectURI:   client.RedirectURIs[0],
+		Scopes:        client.AllowedScopes,
+		PKCEChallenge: challenge,
+		PKCEMethod:    "S256",
+	}
+}
+
+func TestAuthorize_AllowlistNotEnforcedByDefault(t *testing.T) {
+	// require_allowlist defaults to false: an empty allow-list must not
+	// block anyone until an admin explicitly turns enforcement on
+	svc := newTestService(t)
+	client, secret := newTestClient(t, clientOpts{})
+	user := newTestUser(t)
+	sess := newTestSession(t, user.ID)
+
+	code, verifier := issueCode(t, svc, client, user, sess, nil)
+	if _, err := svc.ExchangeCode(context.Background(), client.ID, secret, code, client.RedirectURIs[0], verifier); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthorize_AllowlistDeniesUnlistedUser(t *testing.T) {
+	svc := newTestService(t)
+	client, _ := newTestClient(t, clientOpts{})
+	enableAllowlist(t, client)
+	user := newTestUser(t) // deliberately not added to the allow-list
+	sess := newTestSession(t, user.ID)
+
+	req := authRequestFor(client)
+	if _, err := svc.ValidateAuthRequest(context.Background(), req); err != nil {
+		t.Fatalf("ValidateAuthRequest: %v", err)
+	}
+	_, err := svc.Authorize(context.Background(), AuthorizeParams{
+		AuthRequest: req, UserID: user.ID, SessionID: sess.ID, AuthTime: sess.CreatedAt,
+	})
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestAuthorize_AllowlistDeniesUserWithNoEmail(t *testing.T) {
+	// a user with no email address can never satisfy an email allow-list
+	svc := newTestService(t)
+	client, _ := newTestClient(t, clientOpts{})
+	enableAllowlist(t, client)
+	user, err := sharedStore.CreateUser(context.Background(), postgres.CreateUserParams{})
+	if err != nil {
+		t.Fatalf("create emailless user: %v", err)
+	}
+	sess := newTestSession(t, user.ID)
+
+	req := authRequestFor(client)
+	if _, err := svc.ValidateAuthRequest(context.Background(), req); err != nil {
+		t.Fatalf("ValidateAuthRequest: %v", err)
+	}
+	_, err = svc.Authorize(context.Background(), AuthorizeParams{
+		AuthRequest: req, UserID: user.ID, SessionID: sess.ID, AuthTime: sess.CreatedAt,
+	})
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestAuthorize_AllowlistAllowsListedUser(t *testing.T) {
+	svc := newTestService(t)
+	client, secret := newTestClient(t, clientOpts{})
+	enableAllowlist(t, client)
+	user := newTestUser(t)
+	allowEmail(t, client.ID, *user.Email)
+	sess := newTestSession(t, user.ID)
+
+	code, verifier := issueCode(t, svc, client, user, sess, nil)
+	if _, err := svc.ExchangeCode(context.Background(), client.ID, secret, code, client.RedirectURIs[0], verifier); err != nil {
+		t.Fatalf("ExchangeCode: %v", err)
+	}
+}
+
+func TestExchangeCode_AllowlistRecheckedAtExchange(t *testing.T) {
+	// removing someone from the allow-list between /authorize and the
+	// token exchange must still block them, exchange isn't allowed to
+	// trust a decision made minutes earlier at the authorize step
+	svc := newTestService(t)
+	client, secret := newTestClient(t, clientOpts{})
+	enableAllowlist(t, client)
+	user := newTestUser(t)
+	allowEmail(t, client.ID, *user.Email)
+	sess := newTestSession(t, user.ID)
+
+	code, verifier := issueCode(t, svc, client, user, sess, nil)
+
+	if _, err := sharedStore.DeleteServiceAllowlistEmails(context.Background(), postgres.AllowlistServiceOIDC, client.ID, []string{*user.Email}); err != nil {
+		t.Fatalf("remove from allow-list: %v", err)
+	}
+
+	_, err := svc.ExchangeCode(context.Background(), client.ID, secret, code, client.RedirectURIs[0], verifier)
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied", err)
+	}
+}
+
+func TestRefreshTokens_AllowlistRevocationCutsOffExistingRefreshToken(t *testing.T) {
+	// the allow-list gate must be re-checked on every refresh, not just at
+	// initial code issuance, otherwise removing a user from a client's
+	// allow-list wouldn't actually revoke access already granted
+	svc := newTestService(t)
+	client, secret := newTestClient(t, clientOpts{})
+	enableAllowlist(t, client)
+	user := newTestUser(t)
+	allowEmail(t, client.ID, *user.Email)
+	sess := newTestSession(t, user.ID)
+
+	code, verifier := issueCode(t, svc, client, user, sess, nil)
+	tok, err := svc.ExchangeCode(context.Background(), client.ID, secret, code, client.RedirectURIs[0], verifier)
+	if err != nil {
+		t.Fatalf("ExchangeCode: %v", err)
+	}
+	if tok.RefreshToken == "" {
+		t.Fatal("expected a refresh token (offline_access was granted)")
+	}
+
+	// still allowed: refresh succeeds
+	refreshed, err := svc.RefreshTokens(context.Background(), client.ID, secret, tok.RefreshToken, nil)
+	if err != nil {
+		t.Fatalf("refresh while still allow-listed: %v", err)
+	}
+
+	if _, err := sharedStore.DeleteServiceAllowlistEmails(context.Background(), postgres.AllowlistServiceOIDC, client.ID, []string{*user.Email}); err != nil {
+		t.Fatalf("remove from allow-list: %v", err)
+	}
+
+	// no longer allowed: the same (rotated) refresh token must now be refused
+	if _, err := svc.RefreshTokens(context.Background(), client.ID, secret, refreshed.RefreshToken, nil); !errors.Is(err, ErrAccessDenied) {
+		t.Errorf("got %v, want ErrAccessDenied after allow-list removal", err)
+	}
+}
+
 func TestUserInfo_ClientCredentialsTokenRejected(t *testing.T) {
 	// A machine-to-machine token has no associated user; UserInfo must
 	// reject it rather than return empty/zero-value user claims.
