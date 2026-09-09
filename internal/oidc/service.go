@@ -184,17 +184,26 @@ func (s *Service) checkClientAllowlist(ctx context.Context, clientID string, use
 	if err != nil {
 		return fmt.Errorf("allowlist: load client: %w", err)
 	}
-	if !client.RequireAllowlist {
-		return nil
-	}
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("allowlist: load user: %w", err)
 	}
+	return s.enforceAllowlist(ctx, client, user)
+}
+
+// enforceAllowlist is the allowlist gate for callers that already have the
+// client and user loaded (ExchangeCode, RefreshTokens): re-checking here,
+// not just at /authorize, means removing someone from a client's allow-list
+// also cuts off tokens they already hold, mirroring how a disabled client
+// is re-checked on every call via authenticateClient/GetOIDCClient
+func (s *Service) enforceAllowlist(ctx context.Context, client *postgres.OIDCClient, user *postgres.User) error {
+	if !client.RequireAllowlist {
+		return nil
+	}
 	if user.Email == nil {
 		return ErrAccessDenied
 	}
-	allowed, err := s.store.IsOIDCClientEmailAllowed(ctx, clientID, *user.Email)
+	allowed, err := s.store.IsOIDCClientEmailAllowed(ctx, client.ID, *user.Email)
 	if err != nil {
 		return fmt.Errorf("allowlist: check email: %w", err)
 	}
@@ -244,6 +253,9 @@ func (s *Service) ExchangeCode(
 	if err != nil {
 		return nil, fmt.Errorf("load user: %w", err)
 	}
+	if err := s.enforceAllowlist(ctx, client, user); err != nil {
+		return nil, err
+	}
 
 	return s.issueTokens(ctx, client, user, &authCode.SessionID, authCode)
 }
@@ -289,6 +301,9 @@ func (s *Service) RefreshTokens(
 	user, err := s.store.GetUserByID(ctx, rt.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("load user: %w", err)
+	}
+	if err := s.enforceAllowlist(ctx, client, user); err != nil {
+		return nil, err
 	}
 
 	// rotate the refresh token
