@@ -19,6 +19,7 @@
 | `password_reset_tokens`     | Hashed forgot-password tokens (~30 min).                         | Consumed-once.                              |
 | `email_verification_tokens` | Hashed signup-verification tokens (~24h).                        | Consumed-once.                              |
 | `audit_log`                 | Append-only event log.                                           | Never modified. Pruning is operator policy. |
+| `service_email_allowlist`   | Per-service permitted emails (CAS services and OIDC clients).    | Deleted explicitly via the admin API.       |
 
 ## Master ERD — all tables, all relationships
 
@@ -45,7 +46,7 @@ erDiagram
     oidc_clients ||--o{ oidc_refresh_tokens : "owns token"
 ```
 
-`cas_services` and `audit_log` are also present. `cas_services` is standalone. `audit_log` is one-to-many from `users` only. Every edge would clutter the diagram, so they appear in their per-table sections below.
+`cas_services` and `audit_log` are also present. `cas_services` is standalone. `audit_log` is one-to-many from `users` only. Every edge would clutter the diagram, so they appear in their per-table sections below. `service_email_allowlist` is polymorphic over `cas_services`/`oidc_clients` (see its own section) so it has no FK to draw here either.
 
 ## Conventions used everywhere
 
@@ -219,6 +220,7 @@ erDiagram
         text match_pattern
         text description
         text_array released_attributes
+        boolean require_allowlist
         boolean enabled
         timestamptz created_at
         timestamptz updated_at
@@ -226,7 +228,7 @@ erDiagram
     }
 ```
 
-Matching uses SQL `LIKE`. The operator writes a human-readable pattern (`https://app.example.com/*`). At write time, the application stores the SQL-LIKE form (`https://app.example.com/%`) in `match_pattern`, so a lookup is a single indexed predicate. `released_attributes` controls which user fields the server releases in CAS 3.0 and SAML 1.1 validation responses. An empty value means username only.
+Matching uses SQL `LIKE`. The operator writes a human-readable pattern (`https://app.example.com/*`). At write time, the application stores the SQL-LIKE form (`https://app.example.com/%`) in `match_pattern`, so a lookup is a single indexed predicate. `released_attributes` controls which user fields the server releases in CAS 3.0 and SAML 1.1 validation responses. An empty value means username only. `require_allowlist` gates access through `service_email_allowlist` (see that section) — it defaults to `false`, so registering a service never accidentally locks everyone out.
 
 ### `cas_tickets`
 
@@ -271,6 +273,7 @@ erDiagram
         boolean is_public
         boolean require_pkce
         boolean require_consent
+        boolean require_allowlist
         interval access_token_ttl
         interval refresh_token_ttl
         interval id_token_ttl
@@ -281,7 +284,7 @@ erDiagram
     }
 ```
 
-`id` is the client_id (a short string, human-friendly when possible). `secret_hash` is argon2id. It is NULL for public clients. `redirect_uris` is an exact-match allowlist. The spec does not allow wildcards. A per-client TTL overrides the server defaults. Public clients ALWAYS require PKCE, regardless of the flag.
+`id` is the client_id (a short string, human-friendly when possible). `secret_hash` is argon2id. It is NULL for public clients. `redirect_uris` is an exact-match allowlist. The spec does not allow wildcards ("allowlist" here just means "the registered set" — unrelated to `require_allowlist`/`service_email_allowlist` below). A per-client TTL overrides the server defaults. Public clients ALWAYS require PKCE, regardless of the flag. `require_allowlist` gates access through `service_email_allowlist`; it defaults to `false`.
 
 ### `oidc_auth_codes`
 
@@ -362,6 +365,36 @@ Format: `rt_<32 hex chars>`. Reuse of a rotated token (that is, `rotated_at IS N
 
 ---
 
+## Access control
+
+### `service_email_allowlist`
+
+Per-service email allow-lists. A CAS service or an OIDC client with `require_allowlist = true` only admits users whose email appears here; when the flag is `false` (the default) the table is simply not consulted.
+
+```mermaid
+erDiagram
+    service_email_allowlist {
+        uuid id PK
+        text service_type
+        text service_id
+        citext email
+        timestamptz created_at
+    }
+```
+
+The table is polymorphic over the two service kinds because their ids have different types — an OIDC client id is a short text string, a CAS service id is a UUID. Both are stored as `service_id text`, disambiguated by `service_type` (`CHECK ... IN ('oidc', 'cas')`), rather than having two near-identical tables or two nullable FK columns. A CAS `service_id` is the service's UUID rendered as lowercase-hyphenated text (`postgres.UUIDString`) — the admin (write) and enforcement (read) paths must agree on exactly that representation, since the column itself is untyped text. `email` is `citext`, matching `users.email`, so membership checks are case-insensitive without `lower()`. `UNIQUE (service_type, service_id, email)` makes adding an already-present address a no-op (`ON CONFLICT DO NOTHING`) rather than an error, so bulk CSV imports don't need to pre-filter duplicates.
+
+There is no FK to `cas_services`/`oidc_clients`: deleting a service does not cascade-delete its allow-list rows (they're simply orphaned and unreachable through the API, since lookups always go through the still-existing service). This is a soft-delete-friendly tradeoff. It means recreating a service with a coincidentally reused id would see stale entries, which cannot happen in practice since CAS service ids are freshly generated UUIDs and OIDC client ids are chosen at registration time.
+
+Enforcement happens at two different points in each protocol, both routed through the same `service_email_allowlist` lookup:
+
+- **CAS** (`auth/cas.Service.IssueServiceTicket`, which calls `CheckServiceAccess` internally): every CAS ticket is minted by this one function, so the check applies uniformly regardless of how the session was established — fresh password login, SSO-reuse, an upstream federation (Google/GitHub/OIDC) callback, or the ticket issued right after an MFA challenge completes. Because CAS tickets are short-lived and re-minted on every visit, removing someone from the allow-list takes effect on their very next request.
+- **OIDC** (`internal/oidc.Service`): checked in `Authorize` (the single chokepoint both the no-consent redirect and the consent POST funnel through, so there's no path that mints a code without the check), and re-checked in `ExchangeCode` and `RefreshTokens`. The re-check on every grant — not just at `/authorize` — matters because access/refresh tokens are long-lived: without it, removing someone from a client's allow-list would leave their existing refresh token minting new access tokens indefinitely. This mirrors how a disabled client is already re-validated on every call via `authenticateClient`/`GetOIDCClient`.
+
+In both protocols a user with no email address can never satisfy an allow-list and is always denied when `require_allowlist` is on.
+
+---
+
 ## Self-service flows
 
 ### `password_reset_tokens`
@@ -431,7 +464,7 @@ erDiagram
 
 There are two user references with different meanings. `actor_id` is who CAUSED the event, either an admin or the subject. `target_id` is who the event is ABOUT. The target differs from the actor when an admin acts on someone else. Both use `ON DELETE SET NULL`, so a user deletion does not lose history. `metadata` is JSONB, so each event type can carry its own shape without a schema migration.
 
-Event types emitted today (from `internal/audit/service.go`): `login_success`, `login_failure`, `logout`, `mfa_enrolled`, `mfa_challenge_success`, `mfa_challenge_failure`, `password_changed`, `password_reset_requested`, `password_reset_completed`, `user_created`, `user_updated`, `user_deleted`, `user_locked`, `user_unlocked`, `email_verified`, `client_created`, `client_updated`, `client_deleted`, `client_secret_rotated`, `cas_service_created`, `cas_service_updated`, `cas_service_deleted`, `federation_linked`, `federation_unlinked`, `admin_action`.
+Event types emitted today (from `internal/audit/service.go`): `login_success`, `login_failure`, `logout`, `mfa_enrolled`, `mfa_challenge_success`, `mfa_challenge_failure`, `password_changed`, `password_reset_requested`, `password_reset_completed`, `user_created`, `user_updated`, `user_deleted`, `user_locked`, `user_unlocked`, `email_verified`, `client_created`, `client_updated`, `client_deleted`, `client_secret_rotated`, `cas_service_created`, `cas_service_updated`, `cas_service_deleted`, `federation_linked`, `federation_unlinked`, `admin_action`, `allowlist_updated` (an admin added/removed allow-list entries), `authz_denied_allowlist` (a user was refused a service by `require_allowlist`).
 
 The schema tunes the indexes for the common access patterns: reverse-chronological listing, and filters by type, actor, and target.
 
@@ -450,6 +483,8 @@ The schema tunes the indexes for the common access patterns: reverse-chronologic
 | 0007 | `0007_admin_audit.up.sql`              | Adds `is_admin` to `users`. Creates `audit_log`                                            |
 | 0008 | `0008_password_reset.up.sql`           | `password_reset_tokens`                                                                    |
 | 0009 | `0009_email_verification.up.sql`       | `email_verification_tokens`                                                                |
+| 0010 | `0010_user_names.up.sql`               | Adds `first_name`/`last_name` to `users`                                                   |
+| 0011 | `0011_service_email_allowlist.up.sql`  | Adds `require_allowlist` to `cas_services`/`oidc_clients`. Creates `service_email_allowlist` |
 
 `AUTO_MIGRATE=true` applies any pending migration on boot — fine for a single instance, but a footgun once you run more than one: a bad migration takes down every replica at once, and concurrent replicas can race applying it. For that case, set `AUTO_MIGRATE=false` and run the `/migrate` binary (built from `cmd/migrate`, shipped in the container image) as a one-shot step before rolling out the new server version. For local dev rollbacks, `make migrate-up` and `make migrate-down` (the external `golang-migrate` CLI) still work as before.
 

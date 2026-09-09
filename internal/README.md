@@ -240,7 +240,7 @@ The server derives the WebAuthn RPID from `BASE_URL` (no env var).
 
 ### internal/auth/cas
 
-CAS service-ticket lifecycle. Issue, validate, expire.
+CAS service-ticket lifecycle. Issue, validate, expire. `IssueServiceTicket` is the only place that mints a ticket: it resolves the service and enforces its email allow-list (`CheckServiceAccess`, backed by `service_email_allowlist` — see [store-docs](./store/README.md#access-control)) internally before minting, so it's a structural guarantee rather than something each caller has to remember. Three HTTP-layer packages call it — `api/cas` (fresh password login and SSO-reuse), `api/federation` (upstream SSO callback), and `api/mfa` (after a second-factor challenge completes) — and all three are gated the same way as a result. That mattered in practice: allow-list enforcement was originally added only to `api/cas`, and federation/MFA logins could bypass it entirely until the check moved into `IssueServiceTicket` itself.
 
 ```mermaid
 flowchart TD
@@ -344,6 +344,8 @@ You cannot use the reserved slugs (`google`, `github`) as generic OIDC slugs.
 
 `internal/oidc` is the protocol-layer logic (token issuance, code exchange, claim assembly). It is distinct from `internal/api/oidc`. That package is the HTTP handler. This package is the service.
 
+Same per-service email allow-list mechanism as CAS (`service_email_allowlist`, see [store-docs](./store/README.md#access-control)), enforced here via `enforceAllowlist`/`checkClientAllowlist`. Unlike CAS's short-lived tickets, OIDC tokens are long-lived, so the check runs at three points, not one: `Authorize` (the only path that mints a code), `ExchangeCode`, and `RefreshTokens` — the latter two re-check rather than trust the decision `Authorize` made, so removing someone from a client's allow-list also cuts off a refresh token they already hold.
+
 ```mermaid
 flowchart TD
   ApiOidc[api/oidc] --> OidcSvc
@@ -440,6 +442,8 @@ flowchart TD
   R1[GET /admin/v1/users *] --> ApiAdmin
   R2[GET /admin/v1/clients *] --> ApiAdmin
   R3[GET /admin/v1/cas-services *] --> ApiAdmin
+  R3b[GET POST DELETE /admin/v1/clients/id/allowlist] --> ApiAdmin
+  R3c[GET POST DELETE /admin/v1/cas-services/id/allowlist] --> ApiAdmin
   R4[GET /admin/v1/federation *] --> ApiAdmin
   R5[GET /admin/v1/audit-log] --> ApiAdmin
   R6[GET /admin/v1/keys] --> ApiAdmin
