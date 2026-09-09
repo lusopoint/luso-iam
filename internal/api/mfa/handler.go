@@ -3,6 +3,7 @@ package mfa
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -238,6 +239,10 @@ func (h *Handler) challengeWebAuthnFinish(w http.ResponseWriter, r *http.Request
 	// return the redirect URL
 	dest, err := h.finishChallenge(w, r, ch, userID, []string{"pwd", "hwk"})
 	if err != nil {
+		if errors.Is(err, authcas.ErrAccessDenied) {
+			http.Error(w, "You are not authorized to access this application.", http.StatusForbidden)
+			return
+		}
 		http.Error(w, "could not complete sign-in", http.StatusInternalServerError)
 		return
 	}
@@ -464,6 +469,10 @@ func (h *Handler) completeChallenge(
 ) {
 	dest, err := h.finishChallenge(w, r, ch, userID, amr)
 	if err != nil {
+		if errors.Is(err, authcas.ErrAccessDenied) {
+			http.Error(w, "You are not authorized to access this application.", http.StatusForbidden)
+			return
+		}
 		slog.Error("mfa: complete challenge", "err", err)
 		http.Error(w, "could not complete sign-in", http.StatusInternalServerError)
 		return
@@ -508,7 +517,11 @@ func (h *Handler) finishChallenge(
 	}
 
 	// resolve the destination
-	// 1. CAS service ticket (downstream app login completed via CAS)
+	// 1. CAS service ticket (downstream app login completed via CAS).
+	//    IssueServiceTicket resolves the service and enforces its email
+	//    allow-list internally, so a login completed via MFA (whether the
+	//    first factor was password or federation) is gated the same way
+	//    a plain password login is
 	// 2. ch.NextURL, first-party in-server path (admin UI, ...)
 	// 3. ch.Redirect, cross-origin URL for the reverse-proxy companion
 	//    (Caddy/Traefik forward_auth flow), already validated against
@@ -516,11 +529,24 @@ func (h *Handler) finishChallenge(
 	//    time the challenge was issued, so we trust it here
 	// 4. root
 	if ch.Service != "" {
-		if _, err := h.cas.ResolveService(r.Context(), ch.Service); err == nil {
-			ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, ch.Service, false)
-			if err == nil {
-				return appendTicket(ch.Service, ticket), nil
+		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, userID, ch.Service, false)
+		switch {
+		case err == nil:
+			return appendTicket(ch.Service, ticket), nil
+		case errors.Is(err, authcas.ErrAccessDenied):
+			if h.audit != nil {
+				h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
+					Type:     audit.EventAuthzDenied,
+					Actor:    &userID,
+					Metadata: map[string]any{"service": ch.Service, "protocol": "cas"},
+				}))
 			}
+			return "", authcas.ErrAccessDenied
+		case errors.Is(err, authcas.ErrUnauthorizedService):
+			// stale/removed service param: fall through below rather
+			// than hard-failing an otherwise-successful MFA challenge
+		default:
+			return "", err
 		}
 	}
 	if ch.NextURL != "" {

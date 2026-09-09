@@ -97,6 +97,8 @@ func tokenError(w http.ResponseWriter, err error) {
 		oauthError(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials.")
 	case errors.Is(err, oidcsvc.ErrInvalidGrant):
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "The authorization code is invalid or has expired.")
+	case errors.Is(err, oidcsvc.ErrAccessDenied):
+		oauthError(w, http.StatusBadRequest, "invalid_grant", "The resource owner is not authorized for this client.")
 	case errors.Is(err, oidcsvc.ErrPKCEFailed):
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed.")
 	case errors.Is(err, oidcsvc.ErrPKCERequired):

@@ -79,8 +79,26 @@ func (s *Service) CheckServiceAccess(ctx context.Context, svc *postgres.CASServi
 	return nil
 }
 
+// IssueServiceTicket resolves serviceURL, enforces its email allow-list for
+// userID, and only then mints a ticket bound to (sessionID, serviceURL).
+// This is the only place that mints a CAS ticket, so every login-completing
+// flow (password, federation, post-MFA) is gated the same way regardless of
+// how the session was established — allow-list enforcement can't silently
+// drift out of sync across callers the way it once did when the check lived
+// only in the HTTP handler for the password-login path.
+//
+// Returns ErrUnauthorizedService if serviceURL isn't registered, or
+// ErrAccessDenied if the service requires an allow-list userID isn't on.
 // Caller is responsible for redirecting the user back to serviceURL with the returned ticket appended
-func (s *Service) IssueServiceTicket(ctx context.Context, sessionID pgtype.UUID, serviceURL string, renew bool) (string, error) {
+func (s *Service) IssueServiceTicket(ctx context.Context, sessionID, userID pgtype.UUID, serviceURL string, renew bool) (string, error) {
+	svc, err := s.ResolveService(ctx, serviceURL)
+	if err != nil {
+		return "", err
+	}
+	if err := s.CheckServiceAccess(ctx, svc, userID); err != nil {
+		return "", err
+	}
+
 	tok, err := crypto.RandomToken(32) // 64 hex chars
 	if err != nil {
 		return "", fmt.Errorf("mint ticket: %w", err)

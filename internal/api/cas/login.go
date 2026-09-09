@@ -34,27 +34,9 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 			//   3. rd=<URL>       -> cross-origin redirect (proxy companion)
 			//   4. nothing        -> fall back to /
 			if serviceURL != "" {
-				svc, regErr := h.cas.ResolveService(r.Context(), serviceURL)
-				if regErr != nil {
-					renderError(w, http.StatusForbidden, errorPageData{
-						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-						Title:    "Service not authorized",
-						Message:  "This application is not registered with the IAM server.",
-						Detail:   serviceURL,
-					})
-					return
-				}
-				if accErr := h.cas.CheckServiceAccess(r.Context(), svc, sess.UserID); accErr != nil {
-					h.renderServiceAccessError(w, r, accErr, serviceURL, &sess.UserID)
-					return
-				}
-				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, false)
+				ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, sess.UserID, serviceURL, false)
 				if err != nil {
-					renderError(w, http.StatusInternalServerError, errorPageData{
-						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-						Title:    "Login error",
-						Message:  "Could not create a service ticket. Please try again.",
-					})
+					h.renderTicketError(w, r, err, serviceURL, &sess.UserID)
 					return
 				}
 				http.Redirect(w, r, appendTicket(serviceURL, ticket), http.StatusFound)
@@ -152,30 +134,19 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// verify the service before creating a session
-	// we check early so we don't create a session that leads nowhere
+	// verify the service (registered + allow-list) before creating a
+	// session or prompting for MFA: we check early so we don't put the
+	// user through a second-factor challenge for a service they'll be
+	// denied anyway. IssueServiceTicket re-checks both at the end
+	// regardless, this is purely a UX shortcut, not the enforcement point.
 	if serviceURL != "" {
 		svc, err := h.cas.ResolveService(r.Context(), serviceURL)
 		if err != nil {
-			if errors.Is(err, authcas.ErrUnauthorizedService) {
-				renderError(w, http.StatusForbidden, errorPageData{
-					CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-					Title:    "Service not authorized",
-					Message:  "This application is not registered with the IAM server.",
-					Detail:   serviceURL,
-				})
-				return
-			}
-			renderError(w, http.StatusInternalServerError, errorPageData{
-				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-				Title:    "Login error",
-				Message:  "Could not verify the requesting service.",
-			})
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
 			return
 		}
-		// Enforce the service's email allowlist before we mint a session.
-		if accErr := h.cas.CheckServiceAccess(r.Context(), svc, user.ID); accErr != nil {
-			h.renderServiceAccessError(w, r, accErr, serviceURL, &user.ID)
+		if err := h.cas.CheckServiceAccess(r.Context(), svc, user.ID); err != nil {
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
 			return
 		}
 	}
@@ -251,13 +222,9 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 
 	// issue service ticket and redirect
 	if serviceURL != "" {
-		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, serviceURL, renew)
+		ticket, err := h.cas.IssueServiceTicket(r.Context(), sess.ID, user.ID, serviceURL, renew)
 		if err != nil {
-			renderError(w, http.StatusInternalServerError, errorPageData{
-				CSPNonce: middleware.CSPNonceFromContext(r.Context()),
-				Title:    "Login error",
-				Message:  "Could not issue a service ticket. Please try again.",
-			})
+			h.renderTicketError(w, r, err, serviceURL, &user.ID)
 			return
 		}
 		http.Redirect(w, r, appendTicket(serviceURL, ticket), http.StatusFound)
@@ -292,12 +259,21 @@ func safeNext(s string) string {
 	return s
 }
 
-// renderServiceAccessError renders the appropriate error page when a CAS
-// service access check fails and audits allowlist denials
-// ErrAccessDenied is a 403 "not authorized for this application"
-// anything else is an unexpected condition and renders a generic 500
-func (h *Handler) renderServiceAccessError(w http.ResponseWriter, r *http.Request, err error, serviceURL string, actor *pgtype.UUID) {
-	if errors.Is(err, authcas.ErrAccessDenied) {
+// renderTicketError renders the appropriate error page for a failure from
+// ResolveService, CheckServiceAccess, or IssueServiceTicket (which wraps
+// both) — the three ways obtaining a CAS ticket for serviceURL can fail.
+// ErrAccessDenied is audited; anything else is an unexpected condition and
+// renders a generic 500.
+func (h *Handler) renderTicketError(w http.ResponseWriter, r *http.Request, err error, serviceURL string, actor *pgtype.UUID) {
+	switch {
+	case errors.Is(err, authcas.ErrUnauthorizedService):
+		renderError(w, http.StatusForbidden, errorPageData{
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Service not authorized",
+			Message:  "This application is not registered with the IAM server.",
+			Detail:   serviceURL,
+		})
+	case errors.Is(err, authcas.ErrAccessDenied):
 		if h.audit != nil {
 			h.audit.Log(r.Context(), audit.FromRequest(r, audit.Event{
 				Type:     audit.EventAuthzDenied,
@@ -306,16 +282,18 @@ func (h *Handler) renderServiceAccessError(w http.ResponseWriter, r *http.Reques
 			}))
 		}
 		renderError(w, http.StatusForbidden, errorPageData{
-			Title:   "Access denied",
-			Message: "You are not authorized to access this application.",
-			Detail:  serviceURL,
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Access denied",
+			Message:  "You are not authorized to access this application.",
+			Detail:   serviceURL,
 		})
-		return
+	default:
+		slog.ErrorContext(r.Context(), "cas: could not issue service ticket",
+			"err", err, "service", serviceURL)
+		renderError(w, http.StatusInternalServerError, errorPageData{
+			CSPNonce: middleware.CSPNonceFromContext(r.Context()),
+			Title:    "Login error",
+			Message:  "Could not issue a service ticket. Please try again.",
+		})
 	}
-	slog.ErrorContext(r.Context(), "cas: service access check failed",
-		"err", err, "service", serviceURL)
-	renderError(w, http.StatusInternalServerError, errorPageData{
-		Title:   "Login error",
-		Message: "Could not verify access to the requested service.",
-	})
 }
