@@ -156,7 +156,7 @@ const CASServices = () => {
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle>Allow-list · {managed.name}</CardTitle>
+                <CardTitle>{managed.name}</CardTitle>
                 <code className="mt-1 block break-all font-mono text-xs text-on-surface-variant">
                   {managed.service_url_pattern}
                 </code>
@@ -170,18 +170,29 @@ const CASServices = () => {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <Checkbox
-              label="Require allow-list"
-              description="Only listed emails may obtain a ticket for this service."
-              checked={managed.require_allowlist}
-              onChange={e => toggleAllowlist(managed, e.target.checked)}
+          <CardContent className="space-y-6">
+            <EditServiceForm
+              service={managed}
+              onSaved={updated =>
+                setServices(list =>
+                  list.map(x => (x.id === updated.id ? updated : x)),
+                )
+              }
             />
-            <AllowlistPanel
-              kind="cas"
-              id={managed.id}
-              enforced={managed.require_allowlist}
-            />
+
+            <div className="space-y-5 border-t border-outline-variant/50 pt-6">
+              <Checkbox
+                label="Require allow-list"
+                description="Only listed emails may obtain a ticket for this service."
+                checked={managed.require_allowlist}
+                onChange={e => toggleAllowlist(managed, e.target.checked)}
+              />
+              <AllowlistPanel
+                kind="cas"
+                id={managed.id}
+                enforced={managed.require_allowlist}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -248,7 +259,7 @@ const CASServices = () => {
                         size="sm"
                         onClick={() => setManagingId(s.id)}
                       >
-                        Allow-list
+                        Manage
                       </Button>
                       <Button
                         variant="ghost"
@@ -333,7 +344,7 @@ const CASServices = () => {
                           size="sm"
                           onClick={() => setManagingId(s.id)}
                         >
-                          Allow-list
+                          Manage
                         </Button>
                         <Button
                           variant="ghost"
@@ -458,4 +469,114 @@ function AddForm({
     </Card>
   )
 }
+
+// EditServiceForm edits the fields Register only sets once: name, URL
+// pattern, released attributes, description. Enabled and the allow-list
+// (require_allowlist + its entries) persist immediately elsewhere in the
+// panel, same split as ClientDetail's batched settings vs. its immediate
+// allow-list toggle.
+function EditServiceForm({
+  service,
+  onSaved,
+}: {
+  service: CASService
+  onSaved: (updated: CASService) => void
+}) {
+  const toast = useToast()
+  const [name, setName] = useState(service.name)
+  const [urlPattern, setUrlPattern] = useState(service.service_url_pattern)
+  const [description, setDescription] = useState(service.description ?? '')
+  const [releasedAttributes, setReleasedAttributes] = useState<string[]>(
+    service.released_attributes,
+  )
+  const [saving, setSaving] = useState(false)
+
+  // reset the form when a different service is opened, but not on every
+  // re-render of the same one (e.g. toggling require_allowlist above
+  // shouldn't clobber an in-progress edit here)
+  useEffect(() => {
+    setName(service.name)
+    setUrlPattern(service.service_url_pattern)
+    setDescription(service.description ?? '')
+    setReleasedAttributes(service.released_attributes)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service.id])
+
+  const dirty =
+    name !== service.name ||
+    urlPattern !== service.service_url_pattern ||
+    description !== (service.description ?? '') ||
+    releasedAttributes.join(',') !== service.released_attributes.join(',')
+
+  const valid = name.trim() !== '' && urlPattern.trim() !== ''
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const updated = await api.updateCASService(service.id, {
+        name,
+        service_url_pattern: urlPattern,
+        description,
+        released_attributes: releasedAttributes,
+      })
+      onSaved(updated)
+      toast.success('Service updated.')
+    } catch (err) {
+      toast.error(
+        'Could not update service.',
+        err instanceof ApiError ? err.message : String(err),
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input
+          label="Name"
+          required
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
+        <div>
+          <Input
+            label="Service URL pattern"
+            required
+            className="font-mono"
+            value={urlPattern}
+            onChange={e => setUrlPattern(e.target.value)}
+          />
+          <p className="ml-1 mt-1 text-xs text-on-surface-variant">
+            Trailing slash is treated as a prefix match.
+          </p>
+        </div>
+      </div>
+
+      <TagInput
+        label="Released attributes"
+        value={releasedAttributes}
+        onChange={setReleasedAttributes}
+        placeholder="email"
+      />
+      <p className="-mt-2 ml-1 text-xs text-on-surface-variant">
+        Leave empty to release the username only.
+      </p>
+
+      <Input
+        label="Description (optional)"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+      />
+
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving || !dirty || !valid}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default CASServices

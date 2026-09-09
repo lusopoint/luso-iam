@@ -62,7 +62,6 @@ const UserDetail = () => {
     } catch {
       // if this fails, the inline panel just shows stale data
       // the next page navigation refetches everything
-      // TODO: maybe we should console err
     }
   }
 
