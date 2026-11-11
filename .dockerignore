@@ -5,6 +5,7 @@
 *.key
 .env
 .env.*
+deployments/iam.dump
 
 .git/
 .github/
