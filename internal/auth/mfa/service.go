@@ -60,6 +60,8 @@ type Config struct {
 	WebAuthnOrigins []string
 }
 
+// New builds the MFA service. WebAuthn stays disabled when the relying-party
+// configuration is invalid, so a bad RPID does not stop server startup.
 func New(c Config) (*Service, error) {
 	if c.Store == nil || c.Signer == nil {
 		return nil, errors.New("mfa: store and signer are required")
