@@ -118,7 +118,7 @@ The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWOR
 
 **Update:** `docker compose up -d --build` · **Logs:** `docker compose logs -f iam`
 
-**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error.
+**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error and reuses an existing dump, so a retry never dumps from the new database. If a check fails, delete `~/pg-upgrade-backup/iam.dump` and run again from step 2; the PostgreSQL 16 volume is still in place.
 
 ```console
 cd deployments
@@ -127,9 +127,14 @@ set -e
 # 1. stop IAM, keep PostgreSQL 16 running
 docker compose stop iam
 
-# 2. dump into a new private directory in your home, then check the backup
-BACKUP_DIR=$(mktemp -d "$HOME/pg-upgrade-backup.XXXXXX")
-docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_DIR/iam.dump"
+# 2. dump once into a private directory in your home, then check the backup
+BACKUP_DIR="$HOME/pg-upgrade-backup"
+if [ ! -s "$BACKUP_DIR/iam.dump" ]; then
+  install -d -m 700 "$BACKUP_DIR"
+  # refuse to dump from a server that is not PostgreSQL 16
+  docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc 'SHOW server_version_num' | grep -q '^16'
+  docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_DIR/iam.dump"
+fi
 test -s "$BACKUP_DIR/iam.dump"
 docker compose exec -T postgres pg_restore --list < "$BACKUP_DIR/iam.dump" > /dev/null
 
