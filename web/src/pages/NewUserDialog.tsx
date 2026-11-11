@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   Alert,
   Button,
@@ -8,7 +7,7 @@ import {
   Input,
   useToast,
 } from '@lusopoint/luso-ui'
-
+import { useEffect, useState } from 'react'
 import { ApiError, api } from '../lib/api'
 import type { CreateUserRequest, CreateUserResponse } from '../lib/types'
 

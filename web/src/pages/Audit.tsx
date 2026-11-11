@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
 import {
   Badge,
   Button,
@@ -16,7 +15,7 @@ import {
   TableRow,
 } from '@lusopoint/luso-ui'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-
+import { useEffect, useMemo, useState } from 'react'
 import { ErrorState } from '../components/States'
 import { ApiError, api } from '../lib/api'
 import type { AuditEvent } from '../lib/types'

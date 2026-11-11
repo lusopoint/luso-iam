@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -19,6 +17,8 @@ import {
   useToast,
 } from '@lusopoint/luso-ui'
 import { Search, UserPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ErrorState } from '../components/States'
 import { ApiError, api } from '../lib/api'
 import type { AdminUser } from '../lib/types'

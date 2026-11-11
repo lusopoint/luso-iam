@@ -1,8 +1,8 @@
 import {
   AppShell,
   Badge,
-  navItemClass,
   type NavSection,
+  navItemClass,
 } from '@lusopoint/luso-ui'
 import {
   Boxes,
@@ -15,7 +15,6 @@ import {
   Users as UsersIcon,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-
 import type { AdminUser } from '../lib/types'
 
 interface LayoutProps {

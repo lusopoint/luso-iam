@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
 import {
   Button,
   Card,
@@ -11,7 +9,8 @@ import {
   TagInput,
   useToast,
 } from '@lusopoint/luso-ui'
-
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { ScopesEditor } from '../components/ScopesEditor'
 import { ErrorState } from '../components/States'
 import { ApiError, api } from '../lib/api'

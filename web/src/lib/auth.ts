@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError } from './api'
+import { ApiError, api } from './api'
 import type { AdminUser } from './types'
 
 export interface MeState {
