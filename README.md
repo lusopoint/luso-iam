@@ -118,7 +118,10 @@ The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWOR
 
 **Update:** `docker compose up -d --build` · **Logs:** `docker compose logs -f iam`
 
-**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error and reuses an existing dump, so a retry never dumps from the new database. If a check fails, delete `~/pg-upgrade-backup/iam.dump` and run again from step 2; the PostgreSQL 16 volume is still in place.
+**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error and keeps one dump for each Compose project, so a retry never dumps from the new database.
+
+- **A step before 3 fails:** the PostgreSQL 16 volume is still in place. Fix the error, delete `~/pg-upgrade-backup-<project>/iam.dump` only if the dump checks fail, then run again from step 2.
+- **A step after 3 fails:** keep the dump. Fix the PostgreSQL 18 startup or the restore error, then run again from step 3.
 
 ```console
 cd deployments
@@ -127,25 +130,29 @@ set -e
 # 1. stop IAM, keep PostgreSQL 16 running
 docker compose stop iam
 
-# 2. dump once into a private directory in your home, then check the backup
-BACKUP_DIR="$HOME/pg-upgrade-backup"
-if [ ! -s "$BACKUP_DIR/iam.dump" ]; then
+# 2. dump once into a private directory for this project, then check the backup
+PROJECT=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$(docker compose ps -aq postgres)")
+test -n "$PROJECT" || { echo "Compose project not found; is the postgres container present?"; exit 1; }
+BACKUP_DIR="$HOME/pg-upgrade-backup-$PROJECT"
+DUMP="$BACKUP_DIR/iam.dump"
+if [ ! -s "$DUMP" ]; then
   install -d -m 700 "$BACKUP_DIR"
-  # refuse to dump from a server that is not PostgreSQL 16
-  docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc 'SHOW server_version_num' | grep -q '^16'
-  docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_DIR/iam.dump"
+  # only a PostgreSQL 16 server may write the backup
+  docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SHOW server_version_num"' | grep -q '^16'
+  docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$DUMP.tmp"
+  test -s "$DUMP.tmp"
+  docker compose exec -T postgres pg_restore --list < "$DUMP.tmp" > /dev/null
+  mv "$DUMP.tmp" "$DUMP"
 fi
-test -s "$BACKUP_DIR/iam.dump"
-docker compose exec -T postgres pg_restore --list < "$BACKUP_DIR/iam.dump" > /dev/null
 
 # 3. remove this project's database volume and start PostgreSQL 18
-VOLUME=$(docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -q postgres)")
+VOLUME=$(docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -aq postgres)")
 docker compose down
 docker volume rm "$VOLUME"
 docker compose up -d --wait postgres
 
 # 4. restore in one transaction; a failure rolls back and you can retry
-docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --single-transaction' < "$BACKUP_DIR/iam.dump"
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --single-transaction' < "$DUMP"
 
 # 5. start IAM only after a successful restore
 docker compose up -d --build
