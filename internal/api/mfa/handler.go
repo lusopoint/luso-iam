@@ -533,7 +533,7 @@ func (h *Handler) finishChallenge(
 }
 
 func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (*postgres.Session, error) {
-	sess, err := h.sessions.Get(r.Context(), r)
+	sess, err := h.sessions.GetForEnrollment(r.Context(), r)
 	if err != nil {
 		http.Redirect(w, r, "/cas/login?next="+esc(r.URL.RequestURI()), http.StatusFound)
 		return nil, err

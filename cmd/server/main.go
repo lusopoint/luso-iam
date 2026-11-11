@@ -119,17 +119,6 @@ func run() error {
 
 	signer := crypto.NewCookieSigner(cfg.SessionSecret)
 	passwordSvc := password.New(store)
-	sessionSvc := session.New(session.Config{
-		Store:  store,
-		Signer: signer,
-		Cookie: session.CookieOptions{
-			Path:       "/",
-			Domain:     cfg.SessionCookieDomain,
-			SecureOnly: cfg.CookiesSecure(),
-			SameSite:   http.SameSiteLaxMode,
-		},
-		Lifetime: 24 * time.Hour,
-	})
 	casSvc := authcas.New(store)
 	fedSvc := authfed.New(store)
 	oidcSvc := oidcsvc.New(store, keys, cfg.BaseURL)
@@ -150,6 +139,18 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("init mfa: %w", err)
 	}
+	sessionSvc := session.New(session.Config{
+		Store:  store,
+		Signer: signer,
+		MFA:    mfaSvc,
+		Cookie: session.CookieOptions{
+			Path:       "/",
+			Domain:     cfg.SessionCookieDomain,
+			SecureOnly: cfg.CookiesSecure(),
+			SameSite:   http.SameSiteLaxMode,
+		},
+		Lifetime: 24 * time.Hour,
+	})
 	if cfg.MFA.Force {
 		logger.Info("mfa: enforcement is global (FORCE_MFA=true)")
 	}

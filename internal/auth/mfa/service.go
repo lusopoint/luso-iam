@@ -149,6 +149,19 @@ func (s *Service) StatusForUser(ctx context.Context, userID pgtype.UUID) (*UserM
 	return computeStatus(types, backups > 0, s.forceMFA), nil
 }
 
+// EnrollmentRequiredForUser reports whether the user must enroll an MFA method
+// before the session can access other services. It is false when ForceMFA is off.
+func (s *Service) EnrollmentRequiredForUser(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	if !s.forceMFA {
+		return false, nil
+	}
+	status, err := s.StatusForUser(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return status.EnrollmentRequired, nil
+}
+
 // computeStatus rolls up the raw inputs (enrolled method types, whether
 // backup codes exist, server wide force flag) into the policy status
 // pulled out as a pure function so the policy is testable without a db
