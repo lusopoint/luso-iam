@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	authmfa "github.com/lusopoint/lusoiam/internal/auth/mfa"
 	"github.com/lusopoint/lusoiam/internal/crypto"
 	"github.com/lusopoint/lusoiam/internal/store/postgres"
 )
@@ -20,9 +21,14 @@ const CookieName = "iam_session"
 // signature-invalid, or refers to a session that's been revoked or expired
 var ErrInvalidSession = errors.New("session: invalid")
 
+// ErrEnrollmentRequired means the session is valid, but the user must enroll
+// an MFA method before the session can access other services.
+var ErrEnrollmentRequired = errors.New("session: enrollment required")
+
 type Service struct {
 	store    *postgres.Store
 	signer   *crypto.CookieSigner
+	mfa      *authmfa.Service
 	cookie   CookieOptions
 	lifetime time.Duration
 }
@@ -38,6 +44,7 @@ type CookieOptions struct {
 type Config struct {
 	Store    *postgres.Store
 	Signer   *crypto.CookieSigner
+	MFA      *authmfa.Service // optional, blocks sessions that must enroll
 	Cookie   CookieOptions
 	Lifetime time.Duration
 }
@@ -55,6 +62,7 @@ func New(c Config) *Service {
 	return &Service{
 		store:    c.Store,
 		signer:   c.Signer,
+		mfa:      c.MFA,
 		cookie:   c.Cookie,
 		lifetime: c.Lifetime,
 	}
@@ -93,8 +101,18 @@ func (s *Service) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 }
 
 // Get validates the cookie on response and returns the associated session
-// on success, last_seen_at is updated
+// on success, last_seen_at is updated. A session whose user must enroll an
+// MFA method returns ErrEnrollmentRequired.
 func (s *Service) Get(ctx context.Context, r *http.Request) (*postgres.Session, error) {
+	return s.get(ctx, r, true)
+}
+
+// GetForEnrollment is Get without the enrollment check, for the enrollment pages.
+func (s *Service) GetForEnrollment(ctx context.Context, r *http.Request) (*postgres.Session, error) {
+	return s.get(ctx, r, false)
+}
+
+func (s *Service) get(ctx context.Context, r *http.Request, checkEnrollment bool) (*postgres.Session, error) {
 	c, err := r.Cookie(CookieName)
 	if err != nil {
 		return nil, ErrInvalidSession
@@ -115,6 +133,16 @@ func (s *Service) Get(ctx context.Context, r *http.Request) (*postgres.Session, 
 			return nil, ErrInvalidSession
 		}
 		return nil, err
+	}
+
+	if checkEnrollment && s.mfa != nil {
+		required, err := s.mfa.EnrollmentRequiredForUser(ctx, sess.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if required {
+			return nil, ErrEnrollmentRequired
+		}
 	}
 
 	// sliding expiry: bump last_seen_at
