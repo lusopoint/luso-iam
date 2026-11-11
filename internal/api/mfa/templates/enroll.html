@@ -57,9 +57,15 @@
   <p class="empty">No security keys enrolled.</p>
   {{ end }}
   <div class="actions">
+    {{ if .WebAuthnEnabled }}
     <button id="add-wa" class="btn-secondary" type="button">
       Add security key or passkey
     </button>
+    {{ else }}
+    <p class="empty">
+      Security keys and passkeys are not available on this server.
+    </p>
+    {{ end }}
   </div>
   <div id="wa-status"></div>
 

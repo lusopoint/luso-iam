@@ -48,6 +48,11 @@
   <p class="alt">
     Lost your device? <a href="/mfa/backup">Use a backup code</a>
   </p>
+  {{ end }} {{ if not (or .HasTOTP .HasWebAuthn .HasBackup) }}
+  <p class="empty">
+    No verification method is available. Contact your administrator to reset
+    your MFA.
+  </p>
   {{ end }}
 </main>
 {{end}} {{define "scripts"}} {{ if .HasWebAuthn }}
