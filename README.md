@@ -131,7 +131,7 @@ set -e
 docker compose stop iam
 
 # 2. dump once into a private directory for this project, then check the backup
-PROJECT=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$(docker compose ps -aq postgres)")
+PROJECT=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$(docker compose ps -aq postgres)" || true)
 test -n "$PROJECT" || { echo "Compose project not found; run 'docker compose create postgres' and try again"; exit 1; }
 BACKUP_DIR="$HOME/pg-upgrade-backup-$PROJECT"
 DUMP="$BACKUP_DIR/iam.dump"
@@ -148,7 +148,7 @@ fi
 # 3. remove this project's database volume and start PostgreSQL 18
 VOLUME_FILE="$BACKUP_DIR/volume"
 if [ ! -s "$VOLUME_FILE" ]; then
-  docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -aq postgres)" > "$VOLUME_FILE"
+  docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -aq postgres)" > "$VOLUME_FILE" || true
 fi
 VOLUME=$(cat "$VOLUME_FILE")
 test -n "$VOLUME" || { echo "Database volume not found; run 'docker compose create postgres' and try again"; exit 1; }
