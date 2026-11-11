@@ -127,18 +127,20 @@ set -e
 # 1. stop IAM, keep PostgreSQL 16 running
 docker compose stop iam
 
-# 2. dump with the configured user and database, then check the backup
-docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > iam.dump
-test -s iam.dump
-docker compose exec -T postgres pg_restore --list < iam.dump > /dev/null
+# 2. dump into a new private directory, then check the backup
+BACKUP_DIR=$(mktemp -d)
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_DIR/iam.dump"
+test -s "$BACKUP_DIR/iam.dump"
+docker compose exec -T postgres pg_restore --list < "$BACKUP_DIR/iam.dump" > /dev/null
 
-# 3. remove the 16 volume and start PostgreSQL 18, wait for the healthcheck
+# 3. remove this project's database volume and start PostgreSQL 18
+VOLUME=$(docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -q postgres)")
 docker compose down
-docker volume rm deployments_pgdata
+docker volume rm "$VOLUME"
 docker compose up -d --wait postgres
 
-# 4. restore; --exit-on-error stops the procedure if a statement fails
-docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' < iam.dump
+# 4. restore in one transaction; a failure rolls back and you can retry
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --single-transaction' < "$BACKUP_DIR/iam.dump"
 
 # 5. start IAM only after a successful restore
 docker compose up -d --build
