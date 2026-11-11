@@ -76,7 +76,7 @@ func New(c Config) (*Service, error) {
 	from := c.From
 	if from == "" {
 		// TODO: default should be re-thinked
-		from = "IAM <noreply@localhost>"
+		from = "LusoIAM <noreply@localhost>"
 	}
 
 	return &Service{

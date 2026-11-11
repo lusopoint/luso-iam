@@ -56,8 +56,8 @@ services:
       DOCS_ENABLED: ${DOCS_ENABLED:-false}
 
       # MFA labels
-      MFA_ISSUER: ${MFA_ISSUER:-IAM}
-      MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-IAM}
+      MFA_ISSUER: ${MFA_ISSUER:-LusoIAM}
+      MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-LusoIAM}
 
       # optional federation set in .env to enable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

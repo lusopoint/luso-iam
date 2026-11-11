@@ -31,8 +31,8 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'icon-180.png'],
       manifest: {
         id: '/admin/',
-        name: 'IAM Server — Admin',
-        short_name: 'IAM Admin',
+        name: 'LusoIAM — Admin',
+        short_name: 'LusoIAM Admin',
         description:
           'Administer users, OIDC clients, CAS services, audit log, and signing keys.',
         start_url: '/admin/',

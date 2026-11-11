@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to IAM Server. This is a self-hosted identity server, correctness and security bugs here have outsized impact, so the bar for changes touching auth, tokens, sessions, or crypto is higher than a typical web app.
+Thanks for considering a contribution to LusoIAM. This is a self-hosted identity server, correctness and security bugs here have outsized impact, so the bar for changes touching auth, tokens, sessions, or crypto is higher than a typical web app.
 
 ## Before you start
 

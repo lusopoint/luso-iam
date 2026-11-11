@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>IAM Server Documentation</title>
+    <title>LusoIAM Documentation</title>
     <link rel="stylesheet" href="/static/tokens.css" />
     <style nonce="{{.CSPNonce}}">
       :root {
@@ -1041,7 +1041,7 @@
       <button class="menu-btn" id="menuBtn" aria-label="Open navigation">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
-      <span class="brand-text">IAM Server</span>
+      <span class="brand-text">LusoIAM</span>
     </div>
 
     <div class="scrim" id="scrim"></div>
@@ -1054,7 +1054,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </span>
             <span>
-              <span class="title">IAM Server</span>
+              <span class="title">LusoIAM</span>
               <span class="sub">Documentation</span>
             </span>
           </a>
@@ -1103,7 +1103,7 @@
             <p class="ticker"><span class="dot"></span> Identity &amp; Access Management</p>
             <h1>One binary for SSO, MFA, and OpenID&nbsp;Connect.</h1>
             <p class="lede">
-              IAM Server gives your apps single sign-on, multi-factor
+              LusoIAM gives your apps single sign-on, multi-factor
               authentication, and standards-based OpenID Connect. It adds CAS
               support and protects other apps behind a reverse proxy. You need
               only the binary and a PostgreSQL database.
@@ -1143,9 +1143,9 @@
 
           <section id="introduction">
             <p class="ticker"><span class="dot"></span><span class="n">00</span> Introduction</p>
-            <h2>What IAM Server is</h2>
+            <h2>What LusoIAM is</h2>
             <p class="sec-lede">
-              IAM Server is a self-hosted identity server. It ships as one Go
+              LusoIAM is a self-hosted identity server. It ships as one Go
               binary with the admin UI built in.
             </p>
             <p>The server does five jobs:</p>
@@ -1638,9 +1638,9 @@ await fetch("/admin/v1/users", {
             session, the server starts an upstream OIDC or OAuth flow (Google,
             GitHub, and others). It maps the returned identity to a local user.
             Then it issues the CAS ticket.</p>
-            <pre class="flow">Client App  --CAS login-->  IAM Server  --OIDC flow-->  Google / GitHub
+            <pre class="flow">Client App  --CAS login-->  LusoIAM  --OIDC flow-->  Google / GitHub
                 &lt;-- ST --                   &lt;-- id_token --
-Client App  --validate ST--> IAM Server
+Client App  --validate ST--> LusoIAM
                 &lt;-- user attrs --</pre>
 
             <h3>Register a CAS service</h3>
@@ -1930,7 +1930,7 @@ docker compose logs -f iam     # follow the logs</code></pre>
             </figure>
 
             <footer class="docfoot">
-              <p>IAM Server documentation. This reference is served at
+              <p>LusoIAM documentation. This reference is served at
               <code>/docs</code> when <code>DOCS_ENABLED</code> is set. It does
               not read this instance's live configuration.</p>
             </footer>

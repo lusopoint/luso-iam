@@ -12,7 +12,7 @@ import (
 // "title" and "content" blocks and leaves "scripts" alone.
 var fixture = fstest.MapFS{
 	"templates/hello.html": &fstest.MapFile{Data: []byte(
-		`{{define "title"}}Hello - IAM{{end}}
+		`{{define "title"}}Hello - LusoIAM{{end}}
 		 {{define "content"}}<main class="card"><h1>{{ .Greeting }}</h1></main>{{end}}`,
 	)},
 	"templates/other.html": &fstest.MapFile{Data: []byte(
@@ -38,7 +38,7 @@ func TestRenderWrapsPageInBaseLayout(t *testing.T) {
 		"<!doctype html>",
 		`href="/static/tokens.css"`,  // shared design tokens
 		`href="/static/auth.css"`,    // shared stylesheet
-		"<title>Hello - IAM</title>", // page overrode the default title
+		"<title>Hello - LusoIAM</title>", // page overrode the default title
 		"Sign in",                    // page content, with its data
 		`nonce="test-nonce"`,         // base layout's inline script carries the caller's CSPNonce
 	} {
@@ -74,7 +74,7 @@ func TestDefaultTitle(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Render(rec, pages, "other.html", http.StatusOK, nil)
 
-	if !strings.Contains(rec.Body.String(), "<title>IAM</title>") {
+	if !strings.Contains(rec.Body.String(), "<title>LusoIAM</title>") {
 		t.Error("expected the base layout's default title")
 	}
 }

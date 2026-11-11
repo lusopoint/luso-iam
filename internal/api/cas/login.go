@@ -36,7 +36,7 @@ func (h *Handler) loginGET(w http.ResponseWriter, r *http.Request) {
 					renderError(w, http.StatusForbidden, errorPageData{
 						CSPNonce: middleware.CSPNonceFromContext(r.Context()),
 						Title:    "Service not authorized",
-						Message:  "This application is not registered with the IAM server.",
+						Message:  "This application is not registered with the LusoIAM server.",
 						Detail:   serviceURL,
 					})
 					return
@@ -153,7 +153,7 @@ func (h *Handler) loginPOST(w http.ResponseWriter, r *http.Request) {
 				renderError(w, http.StatusForbidden, errorPageData{
 					CSPNonce: middleware.CSPNonceFromContext(r.Context()),
 					Title:    "Service not authorized",
-					Message:  "This application is not registered with the IAM server.",
+					Message:  "This application is not registered with the LusoIAM server.",
 					Detail:   serviceURL,
 				})
 				return

@@ -72,8 +72,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.24 AS final
 
-LABEL org.opencontainers.image.title="iam-server" \
-      org.opencontainers.image.description="OpenID Connect provider + CAS server with MFA and federation" \
+LABEL org.opencontainers.image.title="LusoIAM" \
+      org.opencontainers.image.description="LusoIAM - OpenID Connect provider + CAS server with MFA and federation" \
       org.opencontainers.image.source="https://github.com/lusopoint/lusoiam" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 

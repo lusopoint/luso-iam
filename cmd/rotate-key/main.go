@@ -31,7 +31,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "hint: create the directory first, then move your existing signing.pem")
-		fmt.Fprintln(os.Stderr, "      into it, then run rotate-key. The IAM server's SIGNING_KEY_PATH")
+		fmt.Fprintln(os.Stderr, "      into it, then run rotate-key. The LusoIAM server's SIGNING_KEY_PATH")
 		fmt.Fprintln(os.Stderr, "      must point at the directory (not a single file) to enable rotation.")
 		os.Exit(1)
 	}
@@ -94,10 +94,10 @@ func main() {
 	fmt.Printf("\nnew signing key written:\n  %s\n", full)
 	fmt.Println("")
 	fmt.Println("next steps:")
-	fmt.Println("  1. restart the IAM server (it loads keys at startup)")
+	fmt.Println("  1. restart the LusoIAM server (it loads keys at startup)")
 	fmt.Println("     - the new key becomes primary; the previous primary becomes retiring")
 	fmt.Println("     - both keys remain in /.well-known/jwks.json so existing tokens still verify")
 	fmt.Println("  2. wait at least max-access-token-TTL (default ~1 hour)")
 	fmt.Println("  3. delete the OLDEST *.pem files from this directory")
-	fmt.Println("  4. restart the IAM server again to clear retired keys from the JWKS")
+	fmt.Println("  4. restart the LusoIAM server again to clear retired keys from the JWKS")
 }

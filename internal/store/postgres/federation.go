@@ -35,7 +35,7 @@ func (s *Store) GetUserIdentity(ctx context.Context, provider, sub string) (*Use
 	return &id, nil
 }
 
-// GetUserByProviderSub is a convenience join that returns the IAM User
+// GetUserByProviderSub is a convenience join that returns the LusoIAM User
 // that owns the given (provider, sub) identity, or ErrNotFound
 func (s *Store) GetUserByProviderSub(ctx context.Context, provider, sub string) (*User, error) {
 	q := `SELECT ` + userColumnsAs("u") + ` FROM users u

@@ -45,7 +45,7 @@ export interface UserFederationIdentity {
   display_name: string
   sub: string
   email?: string
-  // the user's name as known by the provider, distinct from their IAM display_name
+  // the user's name as known by the provider, distinct from their LusoIAM display_name
   provider_name?: string
   picture_url?: string
   created_at: string

@@ -9,7 +9,7 @@ import (
 )
 
 // SecurityHeaders adds defense in depth response headers to every response
-// the values are tuned to be safe defaults for an IAM server
+// the values are tuned to be safe defaults for an LusoIAM server
 // nothing fancy
 //
 // why use this headers:
@@ -24,7 +24,7 @@ import (
 //     from second guessing us and, for example, executing a .txt upload as
 //     JS because it happens to look like one
 //
-//   - X-Frame-Options: DENY forbids embedding any IAM page in an iframe
+//   - X-Frame-Options: DENY forbids embedding any LusoIAM page in an iframe
 //     this is anti-clickjacking, without it, an attacker
 //     could load /cas/login in a transparent iframe over their own
 //     UI and trick a user into clicking the "Sign in" button
@@ -32,11 +32,11 @@ import (
 //
 //   - Referrer-Policy: strict-origin-when-cross-origin prevents leaking full URLs
 //     (with potentially sensitive query strings like CAS service tickets)
-//     to third parties when a user navigates away from an IAM page
+//     to third parties when a user navigates away from an LusoIAM page
 //     we allow sending the origin (no path) so analytics/logging on
 //     downstream apps still get useful information
 //
-//   - Permissions-Policy disables browser APIs the IAM server has
+//   - Permissions-Policy disables browser APIs the LusoIAM server has
 //     no business using, geolocation/camera/microphone/USB would be
 //     foothold for compromise if a XSS ever slipped through
 //
@@ -95,7 +95,7 @@ func SecurityHeaders(secure bool) Middleware {
 		"payment=()",
 		"usb=()",
 		// publickey-credentials-get is REQUIRED for WebAuthn / passkeys
-		// to work. We allow it on the IAM origin only (it's already
+		// to work. We allow it on the LusoIAM origin only (it's already
 		// scoped to the requesting origin by browser policy, so this
 		// is a no-op safety belt, but explicit is better)
 		"publickey-credentials-get=(self)",

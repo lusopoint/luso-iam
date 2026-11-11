@@ -1,6 +1,6 @@
 # `cmd/server` Server Entry Point
 
-This is the main IAM server. It runs no business logic of its own. Its job is to load configuration, build every service in the right order, and run the HTTP server.
+This is the main LusoIAM server. It runs no business logic of its own. Its job is to load configuration, build every service in the right order, and run the HTTP server.
 
 ---
 

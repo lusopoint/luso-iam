@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config is the full runtime configuration for the IAM server
+// Config is the full runtime configuration for the LusoIAM server
 type Config struct {
 	// Env is a free form tag (dev|staging|prod) used in logs and metrics
 	Env string `yaml:"env"`
@@ -60,10 +60,10 @@ type Config struct {
 	// set to ".example.com" so that auth.example.com can issue a cookie readable
 	// by app.example.com
 	// the standard forward-auth deployment pattern, empty means the cookie is host only
-	// (only sent back to the IAM server's own hostname)
+	// (only sent back to the LusoIAM server's own hostname)
 	//
 	// IMPORTANT: must start with a dot (".example.com") for the cookie to apply
-	// to all subdomains, OR be a bare host that matches the IAM server's BASE_URL host
+	// to all subdomains, OR be a bare host that matches the LusoIAM server's BASE_URL host
 	// Setting this to a different parent domain than BASE_URL will silently break sessions
 	SessionCookieDomain string `yaml:"session_cookie_domain"`
 
@@ -185,14 +185,14 @@ func (c OAuthProviderConfig) Enabled() bool {
 //	SMTP_PORT=587                       # 465 for implicit TLS, 587 for STARTTLS
 //	SMTP_USERNAME=apikey
 //	SMTP_PASSWORD=<env-only secret>
-//	SMTP_FROM=IAM <noreply@example.com>
+//	SMTP_FROM=LusoIAM <noreply@example.com>
 type SMTPConfig struct {
 	Host     string `yaml:"-"`
 	Port     int    `yaml:"-"`
 	Username string `yaml:"-"`
 	Password string `yaml:"-"`
 	// From is the email's From header
-	// ("noreply@example.com") or ("IAM <noreply@example.com>")
+	// ("noreply@example.com") or ("LusoIAM <noreply@example.com>")
 	// both are accepted
 	From string `yaml:"from"`
 }
@@ -224,9 +224,9 @@ type ProxyConfig struct {
 	//
 	// why a positive allowlist rather than a wildcard pattern
 	// an attacker who can poison the proxys auth redirect with their
-	// own host turns the IAM server into an open redirect gadget
+	// own host turns the LusoIAM server into an open redirect gadget
 	// the proxy itself sets the value via forward-auth headers (X-Forwarded-Proto/Host)
-	// but those headers are trivially forgeable by anyone who can reach the IAM directly
+	// but those headers are trivially forgeable by anyone who can reach the LusoIAM directly
 	// The allowlist closes that gap
 	//
 	// empty list = the /proxy/verify endpoint still works, but on a

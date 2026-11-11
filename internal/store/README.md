@@ -127,7 +127,7 @@ erDiagram
     }
 ```
 
-`(provider, sub)` is unique. One provider account links to exactly one IAM user. `raw_claims` is the full token payload from the last login. The server keeps it for audit and for future attribute release without a re-fetch. The `email` here is cached from the provider. It is NOT authoritative, so do not authorise against it.
+`(provider, sub)` is unique. One provider account links to exactly one LusoIAM user. `raw_claims` is the full token payload from the last login. The server keeps it for audit and for future attribute release without a re-fetch. The `email` here is cached from the provider. It is NOT authoritative, so do not authorise against it.
 
 ### `user_mfa_methods`
 

@@ -69,7 +69,7 @@ func TestEmailHash_CaseAndWhitespaceNormalised(t *testing.T) {
 func TestEmailMessage_ContainsLink(t *testing.T) {
 	t.Parallel()
 	url := "https://auth.example.com/password/reset?token=xyz"
-	msg := email_message("IAM <noreply@example.com>", "user@example.com", url, 30*time.Minute)
+	msg := email_message("LusoIAM <noreply@example.com>", "user@example.com", url, 30*time.Minute)
 
 	if msg.To != "user@example.com" {
 		t.Errorf("To = %q, want user@example.com", msg.To)

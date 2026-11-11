@@ -16,7 +16,7 @@ import (
 type Handler struct {
 	sessions *session.Service
 	store    *postgres.Store
-	// baseURL is the IAM server's external URL, used to build the
+	// baseURL is the LusoIAM server's external URL, used to build the
 	baseURL string
 	// allowedOrigins is a set of accepted callback origins
 	allowedOrigins map[string]struct{}
