@@ -130,7 +130,7 @@ flowchart TD
 | `SMTP_PORT`     | Default 587 (STARTTLS) or 465 (implicit TLS).          |
 | `SMTP_USERNAME` | Auth username.                                         |
 | `SMTP_PASSWORD` | Auth secret. Env-only, never YAML.                     |
-| `SMTP_FROM`     | Display From header, ex `IAM <noreply@lusopoint.com>`. |
+| `SMTP_FROM`     | Display From header, ex `LusoIAM <noreply@lusopoint.com>`. |
 
 ### internal/audit
 

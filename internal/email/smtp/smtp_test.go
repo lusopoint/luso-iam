@@ -15,7 +15,7 @@ import (
 // produce something the receiving MTA can't parse.
 func TestBuildBody_Multipart(t *testing.T) {
 	t.Parallel()
-	body := buildBody("IAM <noreply@example.com>", email.Message{
+	body := buildBody("LusoIAM <noreply@example.com>", email.Message{
 		To:      "user@example.com",
 		Subject: "Test",
 		Text:    "plain version",
@@ -25,7 +25,7 @@ func TestBuildBody_Multipart(t *testing.T) {
 
 	// Headers
 	for _, want := range []string{
-		"From: IAM <noreply@example.com>",
+		"From: LusoIAM <noreply@example.com>",
 		"To: user@example.com",
 		"Subject: Test",
 		"MIME-Version: 1.0",
@@ -101,7 +101,7 @@ func TestExtractAddress(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"user@example.com":          "user@example.com",
-		"IAM <noreply@example.com>": "noreply@example.com",
+		"LusoIAM <noreply@example.com>": "noreply@example.com",
 		"<bare@example.com>":        "bare@example.com",
 		"  spaces@example.com  ":    "spaces@example.com",
 	}

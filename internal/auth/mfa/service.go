@@ -68,7 +68,7 @@ func New(c Config) (*Service, error) {
 	}
 	issuer := c.TOTPIssuer
 	if issuer == "" {
-		issuer = "IAM"
+		issuer = "LusoIAM"
 	}
 
 	s := &Service{

@@ -69,7 +69,7 @@ func run() error {
 	// logger
 	logger := newLogger(cfg.Log)
 	slog.SetDefault(logger)
-	logger.Info("starting iam-server",
+	logger.Info("starting lusoiam",
 		"version", version,
 		"env", cfg.Env,
 		"base_url", cfg.BaseURL,
@@ -190,7 +190,7 @@ func run() error {
 		Store:   store,
 		Sender:  sender,
 		BaseURL: cfg.BaseURL,
-		From:    fallback(cfg.SMTP.From, "IAM <noreply@lusupoint.com>"),
+		From:    fallback(cfg.SMTP.From, "LusoIAM <noreply@lusupoint.com>"),
 	})
 	if err != nil {
 		return fmt.Errorf("init passwordreset: %w", err)
@@ -207,7 +207,7 @@ func run() error {
 			Store:             store,
 			Sender:            sender,
 			BaseURL:           cfg.BaseURL,
-			From:              fallback(cfg.SMTP.From, "IAM <noreply@lusopoint.com>"),
+			From:              fallback(cfg.SMTP.From, "LusoIAM <noreply@lusopoint.com>"),
 			TokenTTL:          ttl,
 			MinPasswordLength: cfg.Signup.MinPasswordLength,
 		})

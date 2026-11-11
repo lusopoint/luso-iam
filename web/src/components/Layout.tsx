@@ -83,7 +83,7 @@ const Layout = ({ me }: LayoutProps) => {
         <div className="flex items-center gap-2">
           <ShieldCheck size={22} className="text-primary" />
           <span className="text-sm font-black uppercase tracking-tightest text-on-surface">
-            IAM&nbsp;Admin
+            LusoIAM&nbsp;Admin
           </span>
         </div>
       }

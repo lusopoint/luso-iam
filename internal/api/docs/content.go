@@ -126,7 +126,7 @@ func guides() []Guide {
 		},
 		{
 			Title: "Production (Docker Compose)",
-			Intro: "Everything runs in Docker on your server: PostgreSQL and the single IAM binary. Terminate TLS in front of the server.",
+			Intro: "Everything runs in Docker on your server: PostgreSQL and the single LusoIAM binary. Terminate TLS in front of the server.",
 			Prereqs: []string{
 				"Docker on the host",
 				"A domain and TLS in front (a reverse proxy or a tunnel)",
@@ -149,7 +149,7 @@ func guides() []Guide {
 				},
 				{
 					Title: "Start the stack",
-					Body:  "This command starts Postgres and IAM. The server creates the first admin account from ADMIN_EMAIL and ADMIN_PASSWORD on the first run.",
+					Body:  "This command starts Postgres and LusoIAM. The server creates the first admin account from ADMIN_EMAIL and ADMIN_PASSWORD on the first run.",
 					Code:  "docker compose up -d --build",
 				},
 				{
@@ -481,7 +481,7 @@ func systems() []System {
 		},
 		{
 			Name:    "Reverse-proxy companion",
-			Summary: "A forward-auth endpoint. It lets any compatible proxy delegate authentication to the IAM server.",
+			Summary: "A forward-auth endpoint. It lets any compatible proxy delegate authentication to the LusoIAM server.",
 			Features: []string{
 				"First-class Caddy (forward_auth) support; Traefik (ForwardAuth) is supported",
 				"Returns identity headers (X-Auth-User, X-Auth-Email, and X-Auth-Groups) on success",

@@ -3,7 +3,7 @@ import type { ApiError } from '../lib/api'
 
 export { EmptyState, Loading } from '@lusopoint/luso-ui'
 
-// ErrorState stays local, because what to do about an error is IAM policy
+// ErrorState stays local, because what to do about an error is LusoIAM policy
 // not a UI concern: a 401/403 means the admin session lapsed, and the fix is a trip through CAS
 // we use `next=` (a first-party same-origin redirect) rather than CAS's `service=` parameter
 export const ErrorState = ({ error }: { error: ApiError | Error }) => {

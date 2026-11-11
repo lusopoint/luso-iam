@@ -1,9 +1,9 @@
 {
-  "name": "iam-server-admin",
+  "name": "lusoiam-admin",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Admin SPA for the IAM server. Compiled output lives in web/dist and is embedded in the Go binary.",
+  "description": "Admin SPA for the LusoIAM server. Compiled output lives in web/dist and is embedded in the Go binary.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

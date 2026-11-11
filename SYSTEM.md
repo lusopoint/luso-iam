@@ -1,4 +1,4 @@
-# IAM Server Project Guidelines
+# LusoIAM Project Guidelines
 
 > An open-source Identity & Access Management server and portal providing MFA, SSO, and OpenID Connect services, with CAS compatibility and reverse-proxy integration.
 
@@ -129,9 +129,9 @@ CAS is the entry-point protocol. Implement in order:
 **CAS -> SSO bridge:** When a CAS service ticket is requested and the user is not locally authenticated, the server initiates an upstream OIDC/OAuth flow (Google, GitHub, etc.) and maps the returned identity to an internal user record before issuing the CAS ticket.
 
 ```
-Client App  --CAS login-->  IAM Server  --OIDC flow-->  Google / GitHub
+Client App  --CAS login-->  LusoIAM  --OIDC flow-->  Google / GitHub
                 <-- ST --                  <-- id_token --
-Client App  --validate ST--> IAM Server
+Client App  --validate ST--> LusoIAM
                 <-- user attrs --
 ```
 

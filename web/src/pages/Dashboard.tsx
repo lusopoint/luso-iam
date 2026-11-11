@@ -77,7 +77,7 @@ const Dashboard = () => {
     <>
       <PageHeader
         title="Dashboard"
-        subtitle="At-a-glance view of the IAM environment."
+        subtitle="At-a-glance view of the LusoIAM environment."
       />
 
       {/* StatsCard isn't a link, so each one is wrapped. The wrapper carries

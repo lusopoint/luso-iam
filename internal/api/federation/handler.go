@@ -171,7 +171,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// link or create IAM user
+	// link or create LusoIAM user
 	user, isNewLink, err := h.fedSvc.LinkOrCreate(r.Context(), providerName, identity)
 	if err != nil {
 		slog.Error("federation: link or create", "provider", providerName, "err", err)

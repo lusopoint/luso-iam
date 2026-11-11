@@ -19,10 +19,10 @@ func New(store *postgres.Store) *Service {
 	return &Service{store: store}
 }
 
-// LinkOrCreate resolves the upstream Identity to an IAM User, creating
+// LinkOrCreate resolves the upstream Identity to an LusoIAM User, creating
 // or linking accounts as needed
 //
-// returns the IAM user and whether this was the first time we've seen
+// returns the LusoIAM user and whether this was the first time we've seen
 // this upstream identity (isNew=true -> optional "welcome" UX)
 func (s *Service) LinkOrCreate(
 	ctx context.Context,
