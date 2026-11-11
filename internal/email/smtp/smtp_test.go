@@ -100,10 +100,10 @@ func TestSanitizeHeader_StripsInjection(t *testing.T) {
 func TestExtractAddress(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		"user@example.com":          "user@example.com",
+		"user@example.com":              "user@example.com",
 		"LusoIAM <noreply@example.com>": "noreply@example.com",
-		"<bare@example.com>":        "bare@example.com",
-		"  spaces@example.com  ":    "spaces@example.com",
+		"<bare@example.com>":            "bare@example.com",
+		"  spaces@example.com  ":        "spaces@example.com",
 	}
 	for in, want := range cases {
 		if got := extractAddress(in); got != want {

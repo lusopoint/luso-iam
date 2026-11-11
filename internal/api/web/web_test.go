@@ -36,11 +36,11 @@ func TestRenderWrapsPageInBaseLayout(t *testing.T) {
 
 	for _, want := range []string{
 		"<!doctype html>",
-		`href="/static/tokens.css"`,  // shared design tokens
-		`href="/static/auth.css"`,    // shared stylesheet
+		`href="/static/tokens.css"`,      // shared design tokens
+		`href="/static/auth.css"`,        // shared stylesheet
 		"<title>Hello - LusoIAM</title>", // page overrode the default title
-		"Sign in",                    // page content, with its data
-		`nonce="test-nonce"`,         // base layout's inline script carries the caller's CSPNonce
+		"Sign in",                        // page content, with its data
+		`nonce="test-nonce"`,             // base layout's inline script carries the caller's CSPNonce
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("rendered page is missing %q", want)
