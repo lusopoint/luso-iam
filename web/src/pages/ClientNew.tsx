@@ -1,5 +1,3 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -10,12 +8,13 @@ import {
   PageHeader,
   TagInput,
 } from '@lusopoint/luso-ui'
-
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ScopesEditor } from '../components/ScopesEditor'
-import { SecretBanner } from './Clients'
-import { validRedirectURI } from '../lib/util'
 import { ApiError, api } from '../lib/api'
 import type { CreateClientRequest, OIDCClient } from '../lib/types'
+import { validRedirectURI } from '../lib/util'
+import { SecretBanner } from './Clients'
 
 const ClientNew = () => {
   const navigate = useNavigate()

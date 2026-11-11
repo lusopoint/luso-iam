@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   Alert,
   Badge,
@@ -19,7 +17,8 @@ import {
   useToast,
 } from '@lusopoint/luso-ui'
 import { Plus } from 'lucide-react'
-
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ErrorState } from '../components/States'
 import { ApiError, api } from '../lib/api'
 import type { OIDCClient } from '../lib/types'

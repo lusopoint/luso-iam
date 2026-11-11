@@ -1,7 +1,6 @@
-import { useRegisterSW } from 'virtual:pwa-register/react'
-
 import { useToast } from '@lusopoint/luso-ui'
 import { useEffect } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
 /*
  * PwaUpdater: mounts once near the app root, registers the service

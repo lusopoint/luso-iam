@@ -27,14 +27,18 @@
   --on-surface: #0f172a;
   --on-surface-variant: #475569;
 
-  --primary: #b3922d;
-  --primary-rgb: 179, 146, 45;
-  --primary-container: #8c7223;
+  /* Darkened from #b3922d so white text clears 4.5:1 on the fill and the gradient. */
+  --primary: #7a6318;
+  --primary-rgb: 122, 99, 24;
+  --primary-container: #5f4c12;
   --on-primary: #ffffff;
-  --spotlight-color: rgba(179, 146, 45, 0.05);
+  --spotlight-color: rgba(122, 99, 24, 0.05);
 
   --secondary: #64748b;
-  --error: #ef4444;
+  --error: #b91c1c;
+  --on-error: #ffffff;
+  --success: #047857;
+  --warning: #92400e;
   --outline-variant: #e2e8f0;
 }
 
@@ -65,19 +69,42 @@
 
   --secondary: #94a3b8;
   --error: #f87171;
+  --on-error: #450a0a;
+  --success: #34d399;
+  --warning: #fbbf24;
   --outline-variant: rgba(255, 255, 255, 0.05);
+}
+
+/**
+ * CELESTIAL GOLD (Explicit reset for nested swatches)
+ * Without this, a gold swatch inside a themed subtree inherits the active theme.
+ */
+.theme-gold {
+  --primary: #7a6318;
+  --primary-rgb: 122, 99, 24;
+  --primary-container: #5f4c12;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(122, 99, 24, 0.05);
+}
+.theme-gold.dark {
+  --primary: #f2ca50;
+  --primary-rgb: 242, 202, 80;
+  --primary-container: #d4af37;
+  --on-primary: #3c2f00;
+  --spotlight-color: rgba(242, 202, 80, 0.03);
 }
 
 /**
  * TECH SAPPHIRE (Blue Colour Theme Override)
  */
-:root.theme-sapphire {
-  --primary: #0284c7;
-  --primary-rgb: 2, 132, 199;
-  --primary-container: #0369a1;
-  --spotlight-color: rgba(2, 132, 199, 0.05);
+.theme-sapphire {
+  --primary: #0369a1;
+  --primary-rgb: 3, 105, 161;
+  --primary-container: #075985;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(3, 105, 161, 0.05);
 }
-:root.theme-sapphire.dark {
+.theme-sapphire.dark {
   --primary: #38bdf8;
   --primary-rgb: 56, 189, 248;
   --primary-container: #0ea5e9;
@@ -88,13 +115,14 @@
 /**
  * ECO EMERALD (Green Colour Theme Override)
  */
-:root.theme-emerald {
-  --primary: #059669;
-  --primary-rgb: 5, 150, 105;
-  --primary-container: #047857;
-  --spotlight-color: rgba(5, 150, 105, 0.05);
+.theme-emerald {
+  --primary: #047857;
+  --primary-rgb: 4, 120, 87;
+  --primary-container: #065f46;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(4, 120, 87, 0.05);
 }
-:root.theme-emerald.dark {
+.theme-emerald.dark {
   --primary: #34d399;
   --primary-rgb: 52, 211, 153;
   --primary-container: #10b981;
@@ -105,13 +133,14 @@
 /**
  * CRIMSON RUBY (Red Colour Theme Override)
  */
-:root.theme-ruby {
-  --primary: #e11d48;
-  --primary-rgb: 225, 29, 72;
-  --primary-container: #be123c;
-  --spotlight-color: rgba(225, 29, 72, 0.05);
+.theme-ruby {
+  --primary: #be123c;
+  --primary-rgb: 190, 18, 60;
+  --primary-container: #9f1239;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(190, 18, 60, 0.05);
 }
-:root.theme-ruby.dark {
+.theme-ruby.dark {
   --primary: #fb7185;
   --primary-rgb: 251, 113, 133;
   --primary-container: #f43f5e;
@@ -122,13 +151,14 @@
 /**
  * AMETHYST VIOLET (Purple Colour Theme Override)
  */
-:root.theme-amethyst {
-  --primary: #7c3aed;
-  --primary-rgb: 124, 58, 237;
-  --primary-container: #6d28d9;
-  --spotlight-color: rgba(124, 58, 237, 0.05);
+.theme-amethyst {
+  --primary: #6d28d9;
+  --primary-rgb: 109, 40, 217;
+  --primary-container: #5b21b6;
+  --on-primary: #ffffff;
+  --spotlight-color: rgba(109, 40, 217, 0.05);
 }
-:root.theme-amethyst.dark {
+.theme-amethyst.dark {
   --primary: #a78bfa;
   --primary-rgb: 167, 139, 250;
   --primary-container: #8b5cf6;

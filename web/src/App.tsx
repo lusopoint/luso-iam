@@ -1,23 +1,22 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
 import {
   ConfirmProvider,
   Loading,
   PromptProvider,
   ToastProvider,
 } from '@lusopoint/luso-ui'
-
+import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import PwaUpdater from './components/PwaUpdater'
 import { ErrorState } from './components/States'
 import { useMe } from './lib/auth'
 import Audit from './pages/Audit'
-import ClientNew from './pages/ClientNew'
+import CASServices from './pages/CASServices'
 import ClientDetail from './pages/ClientDetail'
+import ClientNew from './pages/ClientNew'
 import Clients from './pages/Clients'
 import Dashboard from './pages/Dashboard'
 import Federation from './pages/Federation'
 import Keys from './pages/Keys'
-import CASServices from './pages/CASServices'
 import UserDetail from './pages/UserDetail'
 import Users from './pages/Users'
 

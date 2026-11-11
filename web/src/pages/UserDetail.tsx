@@ -1,7 +1,3 @@
-import { ApiError, api } from '../lib/api'
-import { StatusBadge } from './Users'
-import { ErrorState } from '../components/States'
-import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -22,8 +18,11 @@ import {
   usePrompt,
   useToast,
 } from '@lusopoint/luso-ui'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { KeyRound, Link2Off, ShieldOff, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ErrorState } from '../components/States'
+import { ApiError, api } from '../lib/api'
 import type {
   AdminSession,
   AdminUser,
@@ -31,6 +30,7 @@ import type {
   UserFederationIdentity,
 } from '../lib/types'
 import { formatDateTime, relativeTime, shortID } from '../lib/util'
+import { StatusBadge } from './Users'
 
 const UserDetail = () => {
   const { id = '' } = useParams<{ id: string }>()
