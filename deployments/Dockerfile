@@ -1,6 +1,6 @@
 # --platform=$BUILDPLATFORM: run the builder stages natively on the build host instead of emulated
 # this is an optimization for the github action
-FROM --platform=$BUILDPLATFORM node:22-alpine AS web-build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS web-build
 
 WORKDIR /src/web
 
@@ -9,7 +9,7 @@ RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS server-build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS server-build
 
 RUN apk add --no-cache git
 
@@ -70,7 +70,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/audit-prune \
         ./cmd/audit-prune
 
-FROM alpine:3.20 AS final
+FROM alpine:3.24 AS final
 
 LABEL org.opencontainers.image.title="iam-server" \
       org.opencontainers.image.description="OpenID Connect provider + CAS server with MFA and federation" \
