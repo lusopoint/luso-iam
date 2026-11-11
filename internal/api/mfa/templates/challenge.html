@@ -23,6 +23,12 @@
       Use a security key or passkey
     </button>
     <div id="wa-status"></div>
+    {{ if not (or .HasTOTP .HasBackup) }}
+    <p id="wa-unsupported" class="empty" hidden>
+      This browser does not support security keys or passkeys. Contact your
+      administrator to reset your MFA.
+    </p>
+    {{ end }}
   </div>
   <div class="divider">or enter a code</div>
   {{ end }} {{ if .HasTOTP }}
@@ -67,6 +73,8 @@
 
     if (!btn || !window.PublicKeyCredential) {
       if (btn) btn.style.display = "none";
+      const unsupported = document.getElementById("wa-unsupported");
+      if (unsupported) unsupported.hidden = false;
       return;
     }
 
