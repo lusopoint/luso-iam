@@ -154,7 +154,7 @@ func run() error {
 	if mfaSvc.WebAuthnEnabled() {
 		logger.Info("mfa: webauthn enabled", "rp_id", rpID)
 	} else {
-		logger.Info("mfa: webauthn disabled (could not derive RPID from BASE_URL)")
+		logger.Info("mfa: webauthn disabled (invalid RPID or BASE_URL)")
 	}
 
 	// email sender

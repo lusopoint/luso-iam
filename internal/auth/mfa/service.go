@@ -3,7 +3,7 @@ package mfa
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log/slog"
 	"net/url"
 
 	wa "github.com/go-webauthn/webauthn/webauthn"
@@ -89,9 +89,12 @@ func New(c Config) (*Service, error) {
 			RPOrigins:     c.WebAuthnOrigins,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("init webauthn: %w", err)
+			// a bad RPID (for example an IP address in BASE_URL) must not stop
+			// startup, TOTP and the other login paths still work
+			slog.Warn("mfa: webauthn disabled", "err", err)
+		} else {
+			s.webauthn = web
 		}
-		s.webauthn = web
 	}
 
 	return s, nil
