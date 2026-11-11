@@ -127,8 +127,8 @@ set -e
 # 1. stop IAM, keep PostgreSQL 16 running
 docker compose stop iam
 
-# 2. dump into a new private directory, then check the backup
-BACKUP_DIR=$(mktemp -d)
+# 2. dump into a new private directory in your home, then check the backup
+BACKUP_DIR=$(mktemp -d "$HOME/pg-upgrade-backup.XXXXXX")
 docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_DIR/iam.dump"
 test -s "$BACKUP_DIR/iam.dump"
 docker compose exec -T postgres pg_restore --list < "$BACKUP_DIR/iam.dump" > /dev/null
