@@ -50,6 +50,7 @@ import (
 // version is overwritten at build time via -ldflags "-X main.version=...".
 var version = "dev"
 
+// main runs the server and exits with a non-zero status on a fatal error.
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
@@ -57,6 +58,7 @@ func main() {
 	}
 }
 
+// run loads the configuration and serves until the process is stopped.
 func run() error {
 	// configuration initialization
 	cfg, err := config.Load()
@@ -634,7 +636,8 @@ func tokenLimitKey(r *http.Request, tp *middleware.TrustedProxies) string {
 	return "token:ip:" + tp.ClientIP(r)
 }
 
-// used to derive an email From header when SMTP is in noop mode
+// fallback returns def when s is empty, used to derive an email From header
+// when SMTP is in noop mode.
 func fallback(s, def string) string {
 	if s == "" {
 		return def
