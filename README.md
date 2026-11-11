@@ -259,14 +259,14 @@ Common optional settings:
 | Variable | Effect |
 | --- | --- |
 | `LOG_LEVEL`, `LOG_FORMAT` | Log verbosity (`debug`, `info`, `warn`, `error`) and format (`text` or `json`). |
-| `AUTO_MIGRATE` | Apply pending migrations on start. Set `false` for multiple instances and run `/migrate` as a one-shot step. |
-| `FORCE_MFA` | Require a second factor for every user. |
+| `AUTO_MIGRATE` | Apply pending migrations on start. Set `false` in `deployments/.env` when you run more than one replica, then run `/migrate` once as a deploy step. |
+| `FORCE_MFA` | Require a second factor for every user. Set it in `deployments/.env`. |
 | `SIGNUP_ENABLED` | Open public registration at `/signup`. |
 | `SESSION_COOKIE_DOMAIN` | Share the session cookie across subdomains for forward-auth. |
 | `PROXY_ALLOWED_CALLBACK_ORIGINS` | Allow redirect-back origins for `/proxy/verify`. |
 | `TRUSTED_PROXIES` | Trust `X-Forwarded-For` from these CIDR ranges only. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | Send verification and password-reset email. When `SMTP_HOST` is empty, the server logs email instead. |
-| `GOOGLE_*`, `GITHUB_*`, `OIDC_*` | Upstream provider credentials. A provider is active only when its id and secret are set. |
+| `GOOGLE_*`, `GITHUB_*`, `OIDC_*` | Upstream provider credentials. A provider is active only when its id and secret are set. For generic OIDC, set `OIDC_PROVIDERS` and the matching `OIDC_<SLUG>_ISSUER`, `OIDC_<SLUG>_CLIENT_ID`, and `OIDC_<SLUG>_CLIENT_SECRET` in `deployments/.env`. Compose passes them to the container. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `ADMIN_USERNAME` | Seed the first admin account. Read by the Docker entrypoint on the first run. |
 | `DOCS_ENABLED` | Serve the reference page at `/docs`. |
 
@@ -303,7 +303,7 @@ Supported OIDC flows: Authorization Code with PKCE, Client Credentials, and Refr
 | `make grant-admin email=…` | Make an existing user an admin. |
 | `make seed-client` | Register a test OIDC client with PKCE. |
 | `make migrate-up` | Apply database migrations. |
-| `make migrate-container` | Apply migrations with the `/migrate` binary that the container image ships. Use it when `AUTO_MIGRATE=false`. |
+| `make migrate-container` | Run `go run ./cmd/migrate` on the host against `DATABASE_URL` (the local dev database by default). It needs Go and a reachable database. Use it when `AUTO_MIGRATE=false`. |
 | `make migrate-new name=…` | Create a new migration pair. |
 | `make rotate-key dir=/etc/iam/keys` | Generate a new signing key. |
 | `make compose-dev-up` / `-down` / `-clear` | Manage the development PostgreSQL container. |
