@@ -1,5 +1,7 @@
 services:
   postgres:
+    # PostgreSQL 18 changed the data path. A 16 volume is not compatible.
+    # For disposable dev data, run `make compose-dev-clear` and reseed.
     image: postgres:18-alpine
     container_name: iam-postgres
     environment:

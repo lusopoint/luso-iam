@@ -118,6 +118,18 @@ The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWOR
 
 **Update:** `docker compose up -d --build` · **Logs:** `docker compose logs -f iam`
 
+**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, remove the old volume, then restore:
+
+```console
+cd deployments
+docker compose exec -T postgres pg_dump -U iam -d iam -Fc > iam.dump   # 16 still runs
+docker compose down
+docker volume rm deployments_pgdata
+docker compose up -d postgres
+docker compose exec -T postgres pg_restore -U iam -d iam --no-owner < iam.dump
+docker compose up -d --build
+```
+
 > **Back up two things:** the **`pgdata`** volume (your whole database) and **`signing/signing.pem`** (it signs your tokens, if you lose it, every issued token stops working).
 
 ---
