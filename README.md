@@ -118,15 +118,29 @@ The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWOR
 
 **Update:** `docker compose up -d --build` · **Logs:** `docker compose logs -f iam`
 
-**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, remove the old volume, then restore:
+**Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error.
 
 ```console
 cd deployments
-docker compose exec -T postgres pg_dump -U iam -d iam -Fc > iam.dump   # 16 still runs
+set -e
+
+# 1. stop IAM, keep PostgreSQL 16 running
+docker compose stop iam
+
+# 2. dump with the configured user and database, then check the backup
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > iam.dump
+test -s iam.dump
+docker compose exec -T postgres pg_restore --list < iam.dump > /dev/null
+
+# 3. remove the 16 volume and start PostgreSQL 18, wait for the healthcheck
 docker compose down
 docker volume rm deployments_pgdata
-docker compose up -d postgres
-docker compose exec -T postgres pg_restore -U iam -d iam --no-owner < iam.dump
+docker compose up -d --wait postgres
+
+# 4. restore; --exit-on-error stops the procedure if a statement fails
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' < iam.dump
+
+# 5. start IAM only after a successful restore
 docker compose up -d --build
 ```
 
