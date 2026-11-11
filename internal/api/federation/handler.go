@@ -193,6 +193,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// MFA gate
+	enrollmentRequired := false
 	if h.mfa != nil {
 		status, err := h.mfa.StatusForUser(r.Context(), user.ID)
 		if err != nil {
@@ -200,7 +201,8 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 			h.callbackError(w, r, "Could not verify your security settings. Please try again.")
 			return
 		}
-		if status.Required {
+		enrollmentRequired = status.EnrollmentRequired
+		if status.Required && !status.EnrollmentRequired {
 			ch := authmfa.Challenge{
 				UserID:    uuidToString(user.ID),
 				Service:   st.Service,
@@ -235,6 +237,12 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 			Actor:    &user.ID,
 			Metadata: map[string]any{"method": "federation", "provider": providerName, "mfa": false},
 		}))
+	}
+
+	// force mfa: a user with no enrolled methods must enroll first
+	if enrollmentRequired {
+		http.Redirect(w, r, "/mfa/enroll?required=1", http.StatusFound)
+		return
 	}
 
 	// issue CAS ticket if service was set
