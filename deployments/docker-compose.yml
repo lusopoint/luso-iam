@@ -62,6 +62,7 @@ services:
       # MFA labels
       MFA_ISSUER: ${MFA_ISSUER:-LusoIAM}
       MFA_WEBAUTHN_RP_NAME: ${MFA_WEBAUTHN_RP_NAME:-LusoIAM}
+      FORCE_MFA: ${FORCE_MFA:-false}
 
       # optional federation set in .env to enable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
