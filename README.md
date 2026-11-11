@@ -120,8 +120,8 @@ The server creates the first admin account from `ADMIN_EMAIL` and `ADMIN_PASSWOR
 
 **Upgrade from PostgreSQL 16:** the image is now `postgres:18-alpine`. PostgreSQL 18 cannot use a 16 data directory. Dump the data, check the dump, remove the old volume, then restore. The sequence stops on the first error and keeps one dump for each Compose project, so a retry never dumps from the new database.
 
-- **A step before 3 fails:** the PostgreSQL 16 volume is still in place. Fix the error, delete `~/pg-upgrade-backup-<project>/iam.dump` only if the dump checks fail, then run again from step 2.
-- **A step after 3 fails:** keep the dump. Fix the PostgreSQL 18 startup or the restore error, then run again from step 3.
+- **A step before 3 fails:** the PostgreSQL 16 volume is still in place. Fix the error and run again from step 2; it reuses a valid dump or replaces an incomplete `iam.dump.tmp`.
+- **A step after 3 fails:** keep the dump. Fix the PostgreSQL 18 startup or the restore error, then run again from step 2. Step 2 reuses the dump and step 3 uses the saved volume name.
 
 ```console
 cd deployments
@@ -132,7 +132,7 @@ docker compose stop iam
 
 # 2. dump once into a private directory for this project, then check the backup
 PROJECT=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$(docker compose ps -aq postgres)")
-test -n "$PROJECT" || { echo "Compose project not found; is the postgres container present?"; exit 1; }
+test -n "$PROJECT" || { echo "Compose project not found; run 'docker compose create postgres' and try again"; exit 1; }
 BACKUP_DIR="$HOME/pg-upgrade-backup-$PROJECT"
 DUMP="$BACKUP_DIR/iam.dump"
 if [ ! -s "$DUMP" ]; then
@@ -146,9 +146,19 @@ if [ ! -s "$DUMP" ]; then
 fi
 
 # 3. remove this project's database volume and start PostgreSQL 18
-VOLUME=$(docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -aq postgres)")
+VOLUME_FILE="$BACKUP_DIR/volume"
+if [ ! -s "$VOLUME_FILE" ]; then
+  docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$(docker compose ps -aq postgres)" > "$VOLUME_FILE"
+fi
+VOLUME=$(cat "$VOLUME_FILE")
+test -n "$VOLUME" || { echo "Database volume not found; run 'docker compose create postgres' and try again"; exit 1; }
 docker compose down
-docker volume rm "$VOLUME"
+# a retry can find the volume already removed
+if ! docker volume rm "$VOLUME" 2>/dev/null; then
+  if docker volume inspect "$VOLUME" > /dev/null 2>&1; then
+    echo "cannot remove volume $VOLUME"; exit 1
+  fi
+fi
 docker compose up -d --wait postgres
 
 # 4. restore in one transaction; a failure rolls back and you can retry
