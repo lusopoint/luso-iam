@@ -20,8 +20,8 @@ COPY go.sum* ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-COPY --from=web-build /src/web/dist ./web/dist
 COPY . .
+COPY --from=web-build /src/web/dist ./web/dist
 
 # we need to check versions release?
 ARG VERSION=dev
